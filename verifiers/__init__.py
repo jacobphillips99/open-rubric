@@ -1,5 +1,7 @@
-from typing import Callable
-RewardFunc = Callable[..., float]
+from typing import Callable, Union
+
+from .rewards.reward import Reward
+RewardFunc = Union[Callable[..., float], Reward]
 
 import torch._dynamo
 torch._dynamo.config.suppress_errors = True # type: ignore
