@@ -15,6 +15,8 @@ class Reward:
     Returns:
     - float
     """
+    name: str
+
     def __call__(self, *args, **kwargs) -> float:
         raise NotImplementedError("Reward function must implement a `__call__` method.")
     
@@ -26,4 +28,4 @@ class RewardWithFunction(Reward):
     
     def __call__(self, *args, **kwargs) -> float:
         return self.func(*args, **kwargs)
-    
+
