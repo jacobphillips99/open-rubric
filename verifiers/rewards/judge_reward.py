@@ -1,6 +1,7 @@
+import asyncio
 from typing import Any, Optional
 from verifiers.rewards.reward import Reward
-from openai import AsyncOpenAI
+from openai import OpenAI
 from verifiers.parsers.parser import Parser
 
 class JudgeResponseFormat:
@@ -28,11 +29,11 @@ binary_judge_response_format = JudgeResponseFormat([1.0, 0.0], meanings={1.0: "y
 
 
 class JudgeRewarder(Reward):
-    def __init__(self, judge_prompt: str, judge_response_format: JudgeResponseFormat, judge_client: AsyncOpenAI | None = None, judge_model: str = "gpt-4.1-nano", parser: Parser = Parser(), **kwargs):
+    def __init__(self, judge_prompt: str, judge_response_format: JudgeResponseFormat, judge_client: OpenAI | None = None, judge_model: str = "gpt-4.1-nano", parser: Parser = Parser(), **kwargs):
         super().__init__(**kwargs)
         self.judge_response_format = judge_response_format
         self.judge_prompt = judge_prompt
-        self.judge_client = judge_client if judge_client is not None else AsyncOpenAI()
+        self.judge_client = judge_client if judge_client is not None else OpenAI()
         self.judge_model = judge_model
         self.parser = parser
 
@@ -49,16 +50,20 @@ class JudgeRewarder(Reward):
         else:
             response = completion
         prompt = self.judge_prompt.format(question=question, answer=answer, response=response, judge_response_format=self.judge_response_format)
-        judge_response = await self.judge_client.chat.completions.create(
-            model=self.judge_model,
-            messages=[
-                {"role": "user", "content": prompt}
-            ],
-            max_tokens=10,
-        )
+        
+        def _create_completion():
+            return self.judge_client.chat.completions.create(
+                model=self.judge_model,
+                messages=[
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=10,
+            )
+        
+        judge_response = await asyncio.to_thread(_create_completion)
         judge_answer = judge_response.choices[0].message.content
         return self.judge_response_format.convert(judge_answer)
 
 class BinaryJudgeRewarder(JudgeRewarder):
-    def __init__(self, judge_prompt: str, judge_client: AsyncOpenAI | None = None, judge_model: str = "gpt-4.1-nano", parser: Parser = Parser(), **kwargs):
+    def __init__(self, judge_prompt: str, judge_client: OpenAI | None = None, judge_model: str = "gpt-4.1-nano", parser: Parser = Parser(), **kwargs):
         super().__init__(judge_prompt, binary_judge_response_format, judge_client, judge_model, parser, **kwargs)
