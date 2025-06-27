@@ -4,9 +4,6 @@ from typing import List, Any, Optional
 
 from verifiers.rewards.judge_reward import JudgeResponseFormat, binary_judge_response_format
 
-judge_prompt = "Does the following response satisfy this question? Question: {question}\nResponse: {response}\nAnswer: {answer}\n{judge_response_format}"
-
-
 class Requirement:
     def __init__(self, name: str, question: str, judge_response_format: JudgeResponseFormat, dependencies: Optional[dict[float, list[str]]] = None):
         self.name = name
@@ -197,3 +194,48 @@ first_responder_reqs = [
 
 
 
+scenarios = [
+    {
+        "prompt": "you come across a patient who is unconcious and not breathing.",
+        "completion": "First, I'll check if the scene is safe. Then I'll jump right into CPR.",
+        "answer": {
+            "scene_safety": 1.0,  # Scene is safe, proceed to assessments
+            "initial_assessment": 0.0,  # Patient unconscious/unresponsive
+            "airway_management": 0.0,  # Airway needs intervention
+            "breathing_support": 0.0,  # Not breathing adequately
+            "emergency_protocols": 1.0  # Emergency protocols activated
+        }
+    },
+    {
+        "prompt": "You arrive at a car accident where the patient is conscious and alert but has a deep laceration on their arm that's bleeding heavily.",
+        "completion": "After ensuring scene safety, I'll apply direct pressure to control the bleeding while assessing their vital signs and checking for other injuries. Once bleeding is controlled, I'll gather their medical history and prepare for transport.",
+        "answer": {
+            "scene_safety": 1.0,  # Scene is safe
+            "initial_assessment": 1.0,  # Patient conscious and responsive
+            "trauma_check": 1.0,  # Visible trauma present
+            "bleeding_control": 1.0,  # Bleeding controlled
+            "communication": 1.0,  # Can communicate clearly
+            "transport_decision": 1.0  # Ready for transport
+        }
+    },
+    {
+        "prompt": "You find an elderly patient who has fallen and is responsive but complaining of severe hip pain and unable to move their leg.",
+        "completion": "I'll first ensure the scene is safe, then assess their consciousness and vital signs. Given the mechanism of injury and symptoms, I'll suspect a hip fracture and immobilize them before moving. I'll assess their pain level and provide comfort measures while preparing for transport.",
+        "answer": {
+            "scene_safety": 1.0,  # Scene is safe
+            "initial_assessment": 1.0,  # Patient responsive
+            "trauma_check": 1.0,  # Trauma from fall
+            "pain_assessment": 0.0,  # Pain not yet managed
+            "pain_management": 1.0,  # Pain management provided
+            "immobilization": 1.0,  # Proper immobilization
+            "transport_preparation": 1.0  # Prepared for transport
+        }
+    },
+    {
+        "prompt": "At a construction site, a worker is trapped under debris with visible injuries and is calling for help.",
+        "completion": "This scene may not be safe to approach immediately. I need to ensure the area is secure and get proper equipment before approaching. Once safe, I'll assess their consciousness and injuries while coordinating with rescue teams for safe extrication and immediate trauma care.",
+        "answer": {
+            "scene_safety": 0.0  # Scene unsafe - terminates workflow early
+        }
+    }
+]

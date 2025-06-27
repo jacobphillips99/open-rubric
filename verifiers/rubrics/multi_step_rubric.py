@@ -1,5 +1,5 @@
 import asyncio
-from typing import Any, List, Dict, Union
+from typing import Any, List, Dict, Union, Optional, Set, Callable
 from collections import defaultdict, deque
 from enum import Enum
 from verifiers.parsers.parser import Parser
@@ -15,6 +15,33 @@ class EvaluationMode(Enum):
     MODEL_GUIDED = "model_guided"        # Follow model's answers through graph
     REFERENCE_GUIDED = "reference_guided"  # Follow ground truth answers through graph  
     EXHAUSTIVE = "exhaustive"            # Evaluate all nodes regardless of dependencies
+    ADAPTIVE = "adaptive"                # Stop gracefully when can't proceed further
+
+
+class TerminalCondition(Enum):
+    """Reasons why evaluation might terminate."""
+    COMPLETED = "completed"              # Successfully evaluated all reachable nodes
+    NO_VALID_PATH = "no_valid_path"      # No valid path forward from current state
+    ERROR = "error"                      # Error occurred during evaluation
+    MAX_DEPTH_REACHED = "max_depth_reached"  # Hit maximum evaluation depth
+
+
+class EvaluationResult:
+    """Result of evaluating requirements with terminal condition handling."""
+    
+    def __init__(self, state: Dict[str, Any], terminal_condition: TerminalCondition,
+                 completed_requirements: Set[str] = None):
+        self.state = state
+        self.terminal_condition = terminal_condition
+        self.completed_requirements = completed_requirements or set()
+        
+    def to_dict(self) -> Dict[str, Any]:
+        return {
+            "state": self.state,
+            "terminal_condition": self.terminal_condition.value,
+            "completed_requirements": list(self.completed_requirements),
+            "completion_ratio": len(self.completed_requirements) / max(1, len(self.state.get("all_requirements", [])))
+        }
 
 
 def topological_levels(dependencies: dict[str, list[str] | None]) -> list[list[str]]:
@@ -55,20 +82,33 @@ class MultiStepRubric:
     """
     Rubric that evaluates requirements with dependencies using different traversal modes.
     
-    Supports three evaluation modes:
-    - MODEL_GUIDED: Follow model's answers to simulate real decision paths
-    - REFERENCE_GUIDED: Follow ground truth answers for standardized evaluation
-    - EXHAUSTIVE: Evaluate all requirements for comprehensive capability assessment
+    Supports evaluation modes including adaptive evaluation that stops gracefully
+    when no valid path forward exists.
     """
     
-    def __init__(self, requirements: List[Requirement], judge_rewarder: JudgeRewarder):
+    def __init__(self, requirements: List[Any], judge_rewarder: JudgeRewarder, 
+                 node_factory: Callable = None):
+        """
+        Initialize MultiStepRubric.
+        
+        Args:
+            requirements: List of requirement objects with name, dependencies, etc.
+            judge_rewarder: Rewarder for evaluating requirements
+            node_factory: Optional factory function to create custom nodes
+        """
         self.requirements = requirements
         self.judge_rewarder = judge_rewarder
         
         # Build lookup structures
         self.name_to_req = {req.name: req for req in requirements}
-        self.name_to_node = {name: RequirementRewardNode(req, judge_rewarder) 
-                            for name, req in self.name_to_req.items()}
+        
+        # Use custom node factory if provided, otherwise use default
+        if node_factory:
+            self.name_to_node = {name: node_factory(req, judge_rewarder) 
+                                for name, req in self.name_to_req.items()}
+        else:
+            self.name_to_node = {name: RequirementRewardNode(req, judge_rewarder) 
+                                for name, req in self.name_to_req.items()}
         
         # Build dependency structure for topological sorting
         self.name_to_dependency_options = {
@@ -79,6 +119,61 @@ class MultiStepRubric:
         # Get topological levels (reversed to start from root nodes)
         self.levels = topological_levels(self.name_to_dependency_options)
         self.levels.reverse()
+    
+    async def evaluate_adaptive(self, prompt: str, completion: str, answer: str,
+                               max_depth: int = 10, **kwargs) -> EvaluationResult:
+        """
+        Adaptive evaluation that stops gracefully when no valid path forward exists.
+        Returns detailed results including terminal condition and completion status.
+        """
+        state = defaultdict(dict)
+        completed_requirements = set()
+        i = 0
+        level = self.levels[0] if self.levels else []
+        
+        while level and i < max_depth:
+            print(f"Evaluating level {i}: {level}")
+            nodes = [self.name_to_node[name] for name in level]
+            
+            # Evaluate all nodes in this level
+            level_results = {}
+            
+            for name, node in zip(level, nodes):
+                try:
+                    result = await node(prompt, completion, answer, **kwargs)
+                    level_results[name] = result
+                    completed_requirements.add(name)
+                except Exception as e:
+                    print(f"Error evaluating {name}: {e}")
+                    level_results[name] = 0.0
+            
+            state[i] = level_results
+            
+            # Determine next level - only proceed if we have valid paths
+            next_level = []
+            
+            for name, result in level_results.items():
+                node = self.name_to_node[name]
+                if not node.requirement.terminal():
+                    # Check if we have a valid result that maps to dependencies
+                    if isinstance(result, (int, float)) and result in node.requirement.dependencies:
+                        next_level.extend(node.requirement.dependencies[result])
+            
+            # Stop if no valid path forward
+            if not next_level:
+                terminal_condition = TerminalCondition.NO_VALID_PATH if i > 0 else TerminalCondition.COMPLETED
+                return EvaluationResult(dict(state), terminal_condition, completed_requirements)
+            
+            level = list(set(next_level))
+            i += 1
+            
+        # Determine terminal condition
+        if i >= max_depth:
+            terminal_condition = TerminalCondition.MAX_DEPTH_REACHED
+        else:
+            terminal_condition = TerminalCondition.COMPLETED
+            
+        return EvaluationResult(dict(state), terminal_condition, completed_requirements)
     
     async def evaluate_model_guided(self, prompt: str, completion: str, answer: str, 
                                   start_level_idx: int = 0, **kwargs) -> Dict[str, Any]:
@@ -160,7 +255,7 @@ class MultiStepRubric:
     async def evaluate(self, prompt: str, completion: str, answer: str,
                       mode: EvaluationMode = EvaluationMode.MODEL_GUIDED,
                       ground_truth_path: Dict[str, float] = None,
-                      **kwargs) -> Dict[str, Any]:
+                      **kwargs) -> Union[Dict[str, Any], EvaluationResult]:
         """
         Main evaluation method that dispatches to appropriate evaluation mode.
         """
@@ -172,6 +267,8 @@ class MultiStepRubric:
             return await self.evaluate_reference_guided(prompt, completion, answer, ground_truth_path, **kwargs)
         elif mode == EvaluationMode.EXHAUSTIVE:
             return await self.evaluate_exhaustive(prompt, completion, answer, **kwargs)
+        elif mode == EvaluationMode.ADAPTIVE:
+            return await self.evaluate_adaptive(prompt, completion, answer, **kwargs)
         else:
             raise ValueError(f"Unknown evaluation mode: {mode}")
         
@@ -182,16 +279,36 @@ class MultiStepRubric:
                             state: Dict[str, Any],
                             task: str = "default",
                             info: dict = {},
-                            **kwargs) -> Dict[str, float]:
-        state = await self.evaluate(prompt, completion, answer, mode=EvaluationMode.MODEL_GUIDED)
-        reward = sum([i*sum(state[i].values()) for i in state.keys()]) # weighted sum against successful level rewards
-        state['reward'] = reward
-        return state
+                            mode: EvaluationMode = EvaluationMode.MODEL_GUIDED,
+                            **kwargs) -> Dict[str, Any]:
+        """
+        Enhanced score_rollout that can handle different evaluation modes and terminal conditions.
+        """
+        result = await self.evaluate(prompt, completion, answer, mode=mode, **kwargs)
         
+        if isinstance(result, EvaluationResult):
+            # Adaptive evaluation
+            reward = sum([i * sum(result.state[i].values()) for i in result.state.keys() if isinstance(result.state[i], dict)])
+            return {
+                **result.to_dict(),
+                'reward': reward,
+                'mode': mode.value
+            }
+        else:
+            # Traditional evaluation modes
+            reward = sum([i * sum(result[i].values()) for i in result.keys() if isinstance(result[i], dict)])
+            return {
+                'state': result,
+                'reward': reward,
+                'mode': mode.value,
+                'terminal_condition': TerminalCondition.COMPLETED.value
+            }
 
 
 class RequirementRewardNode:
-    def __init__(self, requirement: Requirement, judge_rewarder: JudgeRewarder):
+    """Basic node for evaluating requirements."""
+    
+    def __init__(self, requirement: Any, judge_rewarder: JudgeRewarder):
         self.requirement = requirement
         self.judge_rewarder = judge_rewarder
         self.name = requirement.name
@@ -202,67 +319,14 @@ class RequirementRewardNode:
     def get_dependencies(self):
         return self.requirement.dependencies
 
+
 class BinaryRequirementRewardNode(RequirementRewardNode):
-    def __init__(self, requirement: Requirement, judge_rewarder: BinaryJudgeRewarder):
+    def __init__(self, requirement: Any, judge_rewarder: BinaryJudgeRewarder):
         super().__init__(requirement, judge_rewarder)
-
-
-async def main():
-    import os
-    api_key = os.getenv("OPENAI_API_KEY")
-    judge_client = OpenAI(api_key=api_key)
-    
-    judge_prompt = "Does the following response satisfy this question? Question: {question}\nResponse: {response}\nRespond with the following answer format: {judge_response_format}"
-    judge_rewarder = BinaryJudgeRewarder(judge_prompt, judge_client=judge_client)
-    
-    # name_to_req = {req.name: req for req in first_responder_reqs}
-    # name_to_node = {name: BinaryRequirementRewardNode(name_to_req[name], judge_rewarder) for name in name_to_req.keys()}
-    # name_to_dependencies = {name: name_to_node[name].get_dependencies() for name in name_to_req.keys()}
-    # name_to_dependency_options = {name: sum(deps.values(), []) if deps else [] for name, deps in name_to_dependencies.items()}
-
-    # need to reverse the levels to find starting point
-    # levels = topological_levels(name_to_dependency_options) 
-    # levels.reverse()
-    
-
-    prompt = "you come across a patient who is unconsious and not breathing. "
-    completion = "First, I'll check if the scene is safe. Then I'll jump right into CPR."
-    
-    # Ground truth path for unconscious, non-breathing patient scenario
-    # This represents the expected correct decisions at each step
-    answer = {
-        # Initial assessments - scene safety is assumed safe (allows workflow to continue)
-        "scene_safety": 1.0,  # Assume scene is safe to proceed with patient care
-        
-        # Based on patient being unconscious and not breathing:
-        "initial_assessment": 0.0,  # Patient is unconscious/unresponsive (from prompt)
-        "vital_signs": 0.0,  # Not breathing indicates unstable vitals (from prompt)  
-        "trauma_check": 0.0,  # No trauma mentioned in prompt, assume medical emergency
-        
-        # Subsequent steps based on unconscious, non-breathing patient:
-        "airway_management": 1.0,  # Must assess/manage airway for unconscious patient
-        "breathing_support": 0.0,  # Patient not breathing adequately (from prompt)
-        "medical_history": 0.0,  # Cannot obtain from unconscious patient
-        "symptom_assessment": 0.0,  # Cannot obtain from unconscious patient
-        
-        # Critical care steps:
-        "immediate_intervention": 1.0,  # CPR/resuscitation needed immediately
-        "emergency_protocols": 1.0,  # Emergency protocols must be activated
-    }
-    
-    kwargs = {"ground_truth_path": answer}
-
-    rubric = MultiStepRubric(first_responder_reqs, judge_rewarder)
-    reference_result = await rubric.score_rollout(prompt, completion, answer, state=dict(), mode=EvaluationMode.REFERENCE_GUIDED, **kwargs)
-    model_result = await rubric.score_rollout(prompt, completion, answer, state=dict(), mode=EvaluationMode.MODEL_GUIDED, **kwargs)
-    exhaustive_result = await rubric.score_rollout(prompt, completion, answer, state=dict(), mode=EvaluationMode.EXHAUSTIVE, **kwargs)
-    
-    breakpoint()
 
 
 if __name__ == "__main__":
     result = asyncio.run(main())
-    breakpoint()
 
 
 
