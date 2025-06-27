@@ -53,16 +53,23 @@ class JudgeRewarder(Reward):
         
         def _create_completion():
             return self.judge_client.chat.completions.create(
-                model=self.judge_model,
-                messages=[
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=10,
-            )
+                    model=self.judge_model,
+                    messages=[
+                        {"role": "user", "content": prompt}
+                    ],
+                    max_tokens=10,
+                )
+        try:
+            judge_response = await asyncio.to_thread(_create_completion)
+            judge_answer = judge_response.choices[0].message.content
+            score = self.judge_response_format.convert(judge_answer)
+        except Exception as e:
+            print(f"Error in judge_rewarder: {e}")
+            breakpoint()
         
-        judge_response = await asyncio.to_thread(_create_completion)
-        judge_answer = judge_response.choices[0].message.content
-        return self.judge_response_format.convert(judge_answer)
+        return score
+
+        
 
 class BinaryJudgeRewarder(JudgeRewarder):
     def __init__(self, judge_prompt: str, judge_client: OpenAI | None = None, judge_model: str = "gpt-4.1-nano", parser: Parser = Parser(), **kwargs):

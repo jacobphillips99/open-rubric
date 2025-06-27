@@ -183,8 +183,8 @@ class MultiStepRubric:
                             task: str = "default",
                             info: dict = {},
                             **kwargs) -> Dict[str, float]:
-        state = self.evaluate(prompt, completion, answer, mode=EvaluationMode.MODEL_GUIDED)
-        reward = sum(state.values()) # TODO add weights
+        state = await self.evaluate(prompt, completion, answer, mode=EvaluationMode.MODEL_GUIDED)
+        reward = sum([i*sum(state[i].values()) for i in state.keys()]) # weighted sum against successful level rewards
         state['reward'] = reward
         return state
         
@@ -226,12 +226,37 @@ async def main():
     
 
     prompt = "you come across a patient who is unconsious and not breathing. "
-    completion = "I will check the patient's airway and breathing."
-    answer = "The patient is not breathing."
-    kwargs = {}
+    completion = "First, I'll check if the scene is safe. Then I'll jump right into CPR."
+    
+    # Ground truth path for unconscious, non-breathing patient scenario
+    # This represents the expected correct decisions at each step
+    answer = {
+        # Initial assessments - scene safety is assumed safe (allows workflow to continue)
+        "scene_safety": 1.0,  # Assume scene is safe to proceed with patient care
+        
+        # Based on patient being unconscious and not breathing:
+        "initial_assessment": 0.0,  # Patient is unconscious/unresponsive (from prompt)
+        "vital_signs": 0.0,  # Not breathing indicates unstable vitals (from prompt)  
+        "trauma_check": 0.0,  # No trauma mentioned in prompt, assume medical emergency
+        
+        # Subsequent steps based on unconscious, non-breathing patient:
+        "airway_management": 1.0,  # Must assess/manage airway for unconscious patient
+        "breathing_support": 0.0,  # Patient not breathing adequately (from prompt)
+        "medical_history": 0.0,  # Cannot obtain from unconscious patient
+        "symptom_assessment": 0.0,  # Cannot obtain from unconscious patient
+        
+        # Critical care steps:
+        "immediate_intervention": 1.0,  # CPR/resuscitation needed immediately
+        "emergency_protocols": 1.0,  # Emergency protocols must be activated
+    }
+    
+    kwargs = {"ground_truth_path": answer}
 
     rubric = MultiStepRubric(first_responder_reqs, judge_rewarder)
-    result = await rubric.evaluate(prompt, completion, answer, mode=EvaluationMode.MODEL_GUIDED)
+    reference_result = await rubric.score_rollout(prompt, completion, answer, state=dict(), mode=EvaluationMode.REFERENCE_GUIDED, **kwargs)
+    model_result = await rubric.score_rollout(prompt, completion, answer, state=dict(), mode=EvaluationMode.MODEL_GUIDED, **kwargs)
+    exhaustive_result = await rubric.score_rollout(prompt, completion, answer, state=dict(), mode=EvaluationMode.EXHAUSTIVE, **kwargs)
+    
     breakpoint()
 
 
