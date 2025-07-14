@@ -63,7 +63,20 @@ class RequirementJudgeRewardNode(RequirementRewardNode):
     async def __call__(self, scenario: Scenario, **kwargs):
         print(f"operating on node {self.name} on req {self.requirement.name}")
         question = self.requirement.question
-        answer = scenario.answers[self.requirement.name]
+        
+        # Handle missing answers gracefully in reference-guided evaluation
+        if self.requirement.name not in scenario.answers:
+            print(f"Warning: No answer provided for requirement '{self.requirement.name}', skipping evaluation")
+            return 0.0  # Return neutral score when answer is missing
+        
+        # Extract answer value from the new format
+        answer_data = scenario.answers[self.requirement.name]
+        if isinstance(answer_data, dict) and "answer" in answer_data:
+            answer = answer_data["answer"]
+        else:
+            # Fallback for old format
+            answer = answer_data
+            
         content = scenario.to_content()
         return await self.judge_rewarder(question, content, answer, **kwargs)
     
@@ -149,7 +162,58 @@ class MultiStepRubric:
         self.levels = topological_levels(self.name_to_dependency_options)
         self.levels.reverse()
     
-    async def evaluate_adaptive(self, prompt: str, completion: str, answer: str,
+    def validate(self, scenario: Scenario, mode: EvaluationMode = None, **kwargs) -> None:
+        """
+        Validate that the scenario is compatible with this rubric's requirements.
+        
+        Args:
+            scenario: The scenario to validate
+            mode: The evaluation mode (for mode-specific validation)
+            **kwargs: Additional arguments that may contain ground_truth_path
+        
+        Raises:
+            ValueError: If validation fails
+        """
+        if scenario.answers:
+            # Check unknown requirements
+            unknown_requirements = set(scenario.answers.keys()) - set(self.name_to_req.keys())
+            if unknown_requirements:
+                raise ValueError(f"Scenario contains answers for unknown requirements: {unknown_requirements}")
+            
+            # Check invalid answer values
+            for req_name, answer_data in scenario.answers.items():
+                requirement = self.name_to_req[req_name]
+                valid_options = requirement.judge_response_format.options
+                
+                # Extract answer value from new format
+                if isinstance(answer_data, dict) and "answer" in answer_data:
+                    answer_value = answer_data["answer"]
+                else:
+                    # Fallback for old format
+                    answer_value = answer_data
+                    
+                if answer_value not in valid_options:
+                    raise ValueError(f"Invalid answer value {answer_value} for requirement '{req_name}'. "
+                                   f"Valid options are: {valid_options}")
+        
+        # Mode-specific validation
+        if mode == EvaluationMode.REFERENCE_GUIDED:
+            ground_truth_path = kwargs.get("ground_truth_path")
+            if ground_truth_path is None:
+                raise ValueError("ground_truth_path is required for REFERENCE_GUIDED mode")
+            
+            # Validate ground truth path
+            for req_name, answer_value in ground_truth_path.items():
+                if req_name not in self.name_to_req:
+                    raise ValueError(f"Ground truth path contains unknown requirement: {req_name}")
+                
+                requirement = self.name_to_req[req_name]
+                valid_options = requirement.judge_response_format.options
+                if answer_value not in valid_options:
+                    raise ValueError(f"Invalid answer value {answer_value} in ground truth path for requirement '{req_name}'. "
+                                   f"Valid options are: {valid_options}")
+    
+    async def evaluate_adaptive(self, scenario: Scenario,
                                max_depth: int = 10, **kwargs) -> EvaluationResult:
         """
         Adaptive evaluation that stops gracefully when no valid path forward exists.
@@ -169,7 +233,7 @@ class MultiStepRubric:
             
             for name, node in zip(level, nodes):
                 try:
-                    result = await node(prompt, completion, answer, **kwargs)
+                    result = await node(scenario, **kwargs)
                     level_results[name] = result
                     completed_requirements.add(name)
                 except Exception as e:
@@ -249,24 +313,31 @@ class MultiStepRubric:
         
         while level:
             print(f"Evaluating reference level {i}: {level}")
-            nodes = [self.name_to_node[name] for name in level]
+            
+            # Only evaluate requirements that have ground truth answers
+            level_with_answers = [name for name in level if name in ground_truth_path]
+            
+            if not level_with_answers:
+                break  # No requirements to evaluate at this level
+                
+            nodes = [self.name_to_node[name] for name in level_with_answers]
             
             # Evaluate model on this level
             coros = [node(scenario, **kwargs) for node in nodes]
-            level_scores = dict(zip(level, await asyncio.gather(*coros)))
+            level_scores = dict(zip(level_with_answers, await asyncio.gather(*coros)))
             state[i] = level_scores
             
             # Determine next level based on ground truth answers
             next_level = []
-            for name in level:
-                if name in ground_truth_path:
-                    node = self.name_to_node[name]
-                    gt_answer = ground_truth_path[name]
-                    if not node.requirement.terminal() and gt_answer in node.requirement.dependencies:
-                        next_level.extend(node.requirement.dependencies[gt_answer])
+            for name in level_with_answers:
+                node = self.name_to_node[name]
+                gt_answer = ground_truth_path[name]
+                if not node.requirement.terminal() and gt_answer in node.requirement.dependencies:
+                    next_level.extend(node.requirement.dependencies[gt_answer])
             
             level = list(set(next_level))
             i += 1
+            breakpoint()
             
         return dict(state)
     
@@ -290,16 +361,24 @@ class MultiStepRubric:
         """
         Main evaluation method that dispatches to appropriate evaluation mode.
         """
+        self.validate(scenario, mode, **kwargs)  # Validate scenario before evaluation
         if mode == EvaluationMode.MODEL_GUIDED:
             return await self.evaluate_model_guided(scenario, **kwargs)
         elif mode == EvaluationMode.REFERENCE_GUIDED:
             if "ground_truth_path" not in kwargs:
-                raise ValueError("ground_truth_path required for REFERENCE_GUIDED mode")
+                # Convert scenario.answers to ground_truth_path format
+                ground_truth_path = {}
+                for req_name, answer_data in scenario.answers.items():
+                    if isinstance(answer_data, dict) and "answer" in answer_data:
+                        ground_truth_path[req_name] = answer_data["answer"]
+                    else:
+                        ground_truth_path[req_name] = answer_data
+                kwargs["ground_truth_path"] = ground_truth_path
             return await self.evaluate_reference_guided(scenario, kwargs["ground_truth_path"], **kwargs)
         elif mode == EvaluationMode.EXHAUSTIVE:
             return await self.evaluate_exhaustive(scenario, **kwargs)
         elif mode == EvaluationMode.ADAPTIVE:
-            return await self.evaluate_adaptive(scenario.prompt, scenario.completion, scenario.answer, **kwargs)
+            return await self.evaluate_adaptive(scenario, **kwargs)
         else:
             raise ValueError(f"Unknown evaluation mode: {mode}")
         
@@ -351,7 +430,16 @@ async def main():
     scenario = scenarios[0]
     judge_rewarder = BinaryJudgeRewarder(judge_prompt=judge_prompt)
     rubric = MultiStepRubric(first_responder_reqs, judge_rewarder, node_factory=BinaryRequirementRewardNode)
-    result = await rubric.evaluate_reference_guided(scenario, scenario.answers)
+    
+    # Convert scenario.answers to ground_truth_path format for compatibility
+    ground_truth_path = {}
+    for req_name, answer_data in scenario.answers.items():
+        if isinstance(answer_data, dict) and "answer" in answer_data:
+            ground_truth_path[req_name] = answer_data["answer"]
+        else:
+            ground_truth_path[req_name] = answer_data
+    
+    result = await rubric.evaluate_reference_guided(scenario, ground_truth_path)
     breakpoint()
 
 

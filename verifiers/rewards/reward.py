@@ -13,11 +13,12 @@ class Reward:
     - **kwargs: additional kwargs
 
     Returns:
-    - float
+    - float | dict[str, float]
+    if dict, the float answer is at the key "answer"
     """
     name: str
 
-    def __call__(self, *args, **kwargs) -> float:
+    def __call__(self, *args, **kwargs) -> float | dict[str, float]:
         raise NotImplementedError("Reward function must implement a `__call__` method.")
     
 

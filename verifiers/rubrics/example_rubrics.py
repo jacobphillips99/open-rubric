@@ -185,13 +185,12 @@ transport_preparation = BinaryRequirement(
 # List of all requirements for the first responder workflow
 first_responder_reqs = [
     scene_safety, initial_assessment, vital_signs, trauma_check,
-    airway_management, breathing_support, bleeding_control, circulation_check]
-
-#     communication, pain_assessment, immediate_intervention, immobilization,
-#     emergency_protocols, transport_decision, medical_history, symptom_assessment,
-#     observation_assessment, injury_assessment, comfort_measures, pain_management,
-#     stabilization_check, transport_preparation
-# ]
+    airway_management, breathing_support, bleeding_control, circulation_check,
+    communication, pain_assessment, immediate_intervention, immobilization,
+    emergency_protocols, transport_decision, medical_history, symptom_assessment,
+    observation_assessment, injury_assessment, comfort_measures, pain_management,
+    stabilization_check, transport_preparation
+]
 
 class Scenario:
     """
@@ -230,7 +229,7 @@ class Scenario:
 
 scenarios = [
     Scenario(
-        prompt="you come across a patient who is unconcious and not breathing.",
+        prompt="you come across a patient who is unconcious and not breathing. You are a first responder. the scene is safe.",
         completion="First, I'll check if the scene is safe. Then I'll jump right into CPR.",
         answers={
             "scene_safety": 1.0,  # Scene is safe, proceed to assessments
