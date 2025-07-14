@@ -24,8 +24,9 @@ class JudgeResponseFormat:
         if converted_response not in self.options:
             raise ValueError(f"Invalid response: {response}; expected one of {self.options}")
         return converted_response
-    
-binary_judge_response_format = JudgeResponseFormat([1.0, 0.0], meanings={1.0: "yes", 0.0: "no"})
+
+binary_responses = {1.0: "yes", 0.0: "no"}
+binary_judge_response_format = JudgeResponseFormat(list(binary_responses.keys()), meanings=binary_responses)
 
 
 class JudgeRewarder(Reward):

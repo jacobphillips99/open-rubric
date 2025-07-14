@@ -5,9 +5,9 @@ from enum import Enum
 from verifiers.parsers.parser import Parser
 from verifiers.rewards.judge_reward import JudgeRewarder, BinaryJudgeRewarder, binary_judge_response_format
 from verifiers.rewards.reward import Reward
+from verifiers.rubrics.example_rubrics import Requirement, Scenario
 from verifiers.rubrics.rubric import Rubric
 from openai import OpenAI
-from verifiers.rubrics.example_rubrics import first_responder_reqs, Requirement
 
 
 class EvaluationMode(Enum):
@@ -42,6 +42,38 @@ class EvaluationResult:
             "completed_requirements": list(self.completed_requirements),
             "completion_ratio": len(self.completed_requirements) / max(1, len(self.state.get("all_requirements", [])))
         }
+    
+class RequirementRewardNode:
+    """Basic node for evaluating requirements."""
+    def __init__(self, requirement: Requirement, reward: Reward):
+        self.requirement = requirement
+        self.reward = reward
+        self.name = requirement.name
+
+    async def __call__(self, scenario: Scenario, **kwargs):
+        return await self.reward(scenario, **kwargs)
+    
+
+class RequirementJudgeRewardNode(RequirementRewardNode):
+    def __init__(self, requirement: Requirement, judge_rewarder: JudgeRewarder):
+        self.requirement = requirement
+        self.judge_rewarder = judge_rewarder
+        self.name = requirement.name
+    
+    async def __call__(self, scenario: Scenario, **kwargs):
+        print(f"operating on node {self.name} on req {self.requirement.name}")
+        question = self.requirement.question
+        answer = scenario.answers[self.requirement.name]
+        content = scenario.to_content()
+        return await self.judge_rewarder(question, content, answer, **kwargs)
+    
+    def get_dependencies(self):
+        return self.requirement.dependencies
+
+
+class BinaryRequirementRewardNode(RequirementJudgeRewardNode):
+    def __init__(self, requirement: Any, judge_rewarder: BinaryJudgeRewarder):
+        super().__init__(requirement, judge_rewarder)
 
 
 def topological_levels(dependencies: dict[str, list[str] | None]) -> list[list[str]]:
@@ -87,7 +119,7 @@ class MultiStepRubric:
     """
     
     def __init__(self, requirements: List[Any], judge_rewarder: JudgeRewarder, 
-                 node_factory: Callable = None):
+                 node_factory: Callable = RequirementRewardNode):
         """
         Initialize MultiStepRubric.
         
@@ -103,12 +135,9 @@ class MultiStepRubric:
         self.name_to_req = {req.name: req for req in requirements}
         
         # Use custom node factory if provided, otherwise use default
-        if node_factory:
-            self.name_to_node = {name: node_factory(req, judge_rewarder) 
-                                for name, req in self.name_to_req.items()}
-        else:
-            self.name_to_node = {name: RequirementRewardNode(req, judge_rewarder) 
-                                for name, req in self.name_to_req.items()}
+        self.name_to_node = {name: node_factory(req, judge_rewarder) 
+                            for name, req in self.name_to_req.items()}
+       
         
         # Build dependency structure for topological sorting
         self.name_to_dependency_options = {
@@ -175,7 +204,8 @@ class MultiStepRubric:
             
         return EvaluationResult(dict(state), terminal_condition, completed_requirements)
     
-    async def evaluate_model_guided(self, prompt: str, completion: str, answer: str, 
+    async def evaluate_model_guided(self, 
+                                  scenario: Scenario,
                                   start_level_idx: int = 0, **kwargs) -> Dict[str, Any]:
         """
         Follow the model's answers through the dependency graph.
@@ -190,7 +220,7 @@ class MultiStepRubric:
             nodes = [self.name_to_node[name] for name in level]
             
             # Evaluate all nodes in this level
-            coros = [node(prompt, completion, answer, **kwargs) for node in nodes]
+            coros = [node(scenario, **kwargs) for node in nodes]
             level_answers = dict(zip(level, await asyncio.gather(*coros)))
             state[i] = level_answers
             
@@ -206,7 +236,8 @@ class MultiStepRubric:
             
         return dict(state)
     
-    async def evaluate_reference_guided(self, prompt: str, completion: str, answer: str,
+    async def evaluate_reference_guided(self, 
+                                      scenario: Scenario,
                                       ground_truth_path: Dict[str, float], **kwargs) -> Dict[str, Any]:
         """
         Follow the ground truth answers through the dependency graph.
@@ -221,7 +252,7 @@ class MultiStepRubric:
             nodes = [self.name_to_node[name] for name in level]
             
             # Evaluate model on this level
-            coros = [node(prompt, completion, answer, **kwargs) for node in nodes]
+            coros = [node(scenario, **kwargs) for node in nodes]
             level_scores = dict(zip(level, await asyncio.gather(*coros)))
             state[i] = level_scores
             
@@ -239,7 +270,7 @@ class MultiStepRubric:
             
         return dict(state)
     
-    async def evaluate_exhaustive(self, prompt: str, completion: str, answer: str, **kwargs) -> Dict[str, float]:
+    async def evaluate_exhaustive(self, scenario: Scenario, **kwargs) -> Dict[str, float]:
         """
         Evaluate all requirements regardless of dependencies.
         Provides comprehensive capability assessment.
@@ -247,28 +278,28 @@ class MultiStepRubric:
         all_nodes = list(self.name_to_node.values())
         
         # Evaluate all nodes in parallel
-        coros = [node(prompt, completion, answer, **kwargs) for node in all_nodes]
+        coros = [node(scenario, **kwargs) for node in all_nodes]
         all_scores = await asyncio.gather(*coros)
         
         return {node.name: score for node, score in zip(all_nodes, all_scores)}
     
-    async def evaluate(self, prompt: str, completion: str, answer: str,
+    async def evaluate(self, 
+                      scenario: Scenario,
                       mode: EvaluationMode = EvaluationMode.MODEL_GUIDED,
-                      ground_truth_path: Dict[str, float] = None,
                       **kwargs) -> Union[Dict[str, Any], EvaluationResult]:
         """
         Main evaluation method that dispatches to appropriate evaluation mode.
         """
         if mode == EvaluationMode.MODEL_GUIDED:
-            return await self.evaluate_model_guided(prompt, completion, answer, **kwargs)
+            return await self.evaluate_model_guided(scenario, **kwargs)
         elif mode == EvaluationMode.REFERENCE_GUIDED:
-            if ground_truth_path is None:
+            if "ground_truth_path" not in kwargs:
                 raise ValueError("ground_truth_path required for REFERENCE_GUIDED mode")
-            return await self.evaluate_reference_guided(prompt, completion, answer, ground_truth_path, **kwargs)
+            return await self.evaluate_reference_guided(scenario, kwargs["ground_truth_path"], **kwargs)
         elif mode == EvaluationMode.EXHAUSTIVE:
-            return await self.evaluate_exhaustive(prompt, completion, answer, **kwargs)
+            return await self.evaluate_exhaustive(scenario, **kwargs)
         elif mode == EvaluationMode.ADAPTIVE:
-            return await self.evaluate_adaptive(prompt, completion, answer, **kwargs)
+            return await self.evaluate_adaptive(scenario.prompt, scenario.completion, scenario.answer, **kwargs)
         else:
             raise ValueError(f"Unknown evaluation mode: {mode}")
         
@@ -304,25 +335,24 @@ class MultiStepRubric:
                 'terminal_condition': TerminalCondition.COMPLETED.value
             }
 
+async def main():
+    from verifiers.rubrics.example_rubrics import first_responder_reqs, scenarios
 
-class RequirementRewardNode:
-    """Basic node for evaluating requirements."""
-    
-    def __init__(self, requirement: Any, judge_rewarder: JudgeRewarder):
-        self.requirement = requirement
-        self.judge_rewarder = judge_rewarder
-        self.name = requirement.name
-    
-    async def __call__(self, prompt, completion, answer, **kwargs):
-        return await self.judge_rewarder(prompt, completion, answer, **kwargs)
-    
-    def get_dependencies(self):
-        return self.requirement.dependencies
+    judge_prompt = """
+    Given a question and the ground truth answer, determine if the response is correct.
+    Respond according to the judge response format.
 
+    question={question}
+    ground truth answer={answer}
+    response={response}
+    judge response format={judge_response_format}
+    """
 
-class BinaryRequirementRewardNode(RequirementRewardNode):
-    def __init__(self, requirement: Any, judge_rewarder: BinaryJudgeRewarder):
-        super().__init__(requirement, judge_rewarder)
+    scenario = scenarios[0]
+    judge_rewarder = BinaryJudgeRewarder(judge_prompt=judge_prompt)
+    rubric = MultiStepRubric(first_responder_reqs, judge_rewarder, node_factory=BinaryRequirementRewardNode)
+    result = await rubric.evaluate_reference_guided(scenario, scenario.answers)
+    breakpoint()
 
 
 if __name__ == "__main__":
