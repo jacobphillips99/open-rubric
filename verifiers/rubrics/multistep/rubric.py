@@ -1,125 +1,14 @@
 import asyncio
-from typing import Any, List, Dict, Union, Optional, Set, Callable
-from collections import defaultdict, deque
-from enum import Enum
-from verifiers.parsers.parser import Parser
-from verifiers.rewards.judge_reward import JudgeRewarder, BinaryJudgeRewarder, binary_judge_response_format
-from verifiers.rewards.reward import Reward
-from verifiers.rubrics.example_rubrics import Requirement, Scenario
-from verifiers.rubrics.rubric import Rubric
-from openai import OpenAI
+from typing import Any, List, Dict, Union, Callable
+from collections import defaultdict
 
-
-class EvaluationMode(Enum):
-    """Different modes for evaluating multi-step rubrics."""
-    MODEL_GUIDED = "model_guided"        # Follow model's answers through graph
-    REFERENCE_GUIDED = "reference_guided"  # Follow ground truth answers through graph  
-    EXHAUSTIVE = "exhaustive"            # Evaluate all nodes regardless of dependencies
-    ADAPTIVE = "adaptive"                # Stop gracefully when can't proceed further
-
-
-class TerminalCondition(Enum):
-    """Reasons why evaluation might terminate."""
-    COMPLETED = "completed"              # Successfully evaluated all reachable nodes
-    NO_VALID_PATH = "no_valid_path"      # No valid path forward from current state
-    ERROR = "error"                      # Error occurred during evaluation
-    MAX_DEPTH_REACHED = "max_depth_reached"  # Hit maximum evaluation depth
-
-
-class EvaluationResult:
-    """Result of evaluating requirements with terminal condition handling."""
-    
-    def __init__(self, state: Dict[str, Any], terminal_condition: TerminalCondition,
-                 completed_requirements: Set[str] = None):
-        self.state = state
-        self.terminal_condition = terminal_condition
-        self.completed_requirements = completed_requirements or set()
-        
-    def to_dict(self) -> Dict[str, Any]:
-        return {
-            "state": self.state,
-            "terminal_condition": self.terminal_condition.value,
-            "completed_requirements": list(self.completed_requirements),
-            "completion_ratio": len(self.completed_requirements) / max(1, len(self.state.get("all_requirements", [])))
-        }
-    
-class RequirementRewardNode:
-    """Basic node for evaluating requirements."""
-    def __init__(self, requirement: Requirement, reward: Reward):
-        self.requirement = requirement
-        self.reward = reward
-        self.name = requirement.name
-
-    async def __call__(self, scenario: Scenario, **kwargs):
-        return await self.reward(scenario, **kwargs)
-    
-
-class RequirementJudgeRewardNode(RequirementRewardNode):
-    def __init__(self, requirement: Requirement, judge_rewarder: JudgeRewarder):
-        self.requirement = requirement
-        self.judge_rewarder = judge_rewarder
-        self.name = requirement.name
-    
-    async def __call__(self, scenario: Scenario, **kwargs):
-        question = self.requirement.question
-        
-        # Handle missing answers gracefully in reference-guided evaluation
-        if self.requirement.name not in scenario.answers:
-            print(f"Warning: No answer provided for requirement '{self.requirement.name}', skipping evaluation")
-            return 0.0  # Return neutral score when answer is missing
-        
-        # Extract answer value from the new format
-        answer_data = scenario.answers[self.requirement.name]
-        if isinstance(answer_data, dict) and "answer" in answer_data:
-            answer = answer_data["answer"]
-        else:
-            # Fallback for old format
-            answer = answer_data
-            
-        content = scenario.to_content()
-        return await self.judge_rewarder(question, content, answer, **kwargs)
-    
-    def get_dependencies(self):
-        return self.requirement.dependencies
-
-
-class BinaryRequirementRewardNode(RequirementJudgeRewardNode):
-    def __init__(self, requirement: Any, judge_rewarder: BinaryJudgeRewarder):
-        super().__init__(requirement, judge_rewarder)
-
-
-def topological_levels(dependencies: dict[str, list[str] | None]) -> list[list[str]]:
-    """
-    Topological sort of a DAG of dependencies which returns a list of levels,
-    such that every node's dependencies live in earlier levels.
-    """
-    deps: dict[str, list[str]] = {k: (v or []) for k, v in dependencies.items()}
-    out_edges: dict[str, list[str]] = defaultdict(list)
-    in_degrees: dict[str, int] = defaultdict(int)
-
-    for n, pres in deps.items():
-        in_degrees.setdefault(n, 0)
-        for p in pres:
-            out_edges[p].append(n)
-            in_degrees[n] += 1
-            in_degrees.setdefault(p, 0)
-
-    queue: deque[str] = deque([n for n, d in in_degrees.items() if d == 0])
-    levels: list[list[str]] = []
-
-    while queue:
-        this_lvl = list(queue)
-        levels.append(this_lvl)
-        for _ in range(len(this_lvl)):
-            n = queue.popleft()
-            for m in out_edges[n]:
-                in_degrees[m] -= 1
-                if in_degrees[m] == 0:
-                    queue.append(m)
-
-    if sum(len(level) for level in levels) != len(in_degrees):
-        raise ValueError("Cycle detected in dependencies; levelization impossible")
-    return levels
+from verifiers.rewards.judge_reward import JudgeRewarder
+from .requirements import Scenario
+from .enums import EvaluationMode, TerminalCondition
+from .results import EvaluationResult
+from .reward_strategies import RewardStrategy, LevelWeightedRewardStrategy
+from .nodes import RequirementRewardNode
+from .utils import topological_levels
 
 
 class MultiStepRubric:
@@ -131,7 +20,8 @@ class MultiStepRubric:
     """
     
     def __init__(self, requirements: List[Any], judge_rewarder: JudgeRewarder, 
-                 node_factory: Callable = RequirementRewardNode):
+                 node_factory: Callable = RequirementRewardNode,
+                 reward_strategy: RewardStrategy = None):
         """
         Initialize MultiStepRubric.
         
@@ -139,9 +29,11 @@ class MultiStepRubric:
             requirements: List of requirement objects with name, dependencies, etc.
             judge_rewarder: Rewarder for evaluating requirements
             node_factory: Optional factory function to create custom nodes
+            reward_strategy: Strategy for calculating rewards from evaluation results
         """
         self.requirements = requirements
         self.judge_rewarder = judge_rewarder
+        self.reward_strategy = reward_strategy or LevelWeightedRewardStrategy()
         
         # Build lookup structures
         self.name_to_req = {req.name: req for req in requirements}
@@ -254,7 +146,7 @@ class MultiStepRubric:
             # Stop if no valid path forward
             if not next_level:
                 terminal_condition = TerminalCondition.NO_VALID_PATH if i > 0 else TerminalCondition.COMPLETED
-                return EvaluationResult(dict(state), terminal_condition, completed_requirements)
+                return EvaluationResult(dict(state), terminal_condition, completed_requirements, len(self.requirements))
             
             level = list(set(next_level))
             i += 1
@@ -265,7 +157,7 @@ class MultiStepRubric:
         else:
             terminal_condition = TerminalCondition.COMPLETED
             
-        return EvaluationResult(dict(state), terminal_condition, completed_requirements)
+        return EvaluationResult(dict(state), terminal_condition, completed_requirements, len(self.requirements))
     
     async def evaluate_model_guided(self, 
                                   scenario: Scenario,
@@ -338,8 +230,6 @@ class MultiStepRubric:
             i += 1
 
             print(f"level {i} scores: {level_scores}")
-            if i > 2:
-                breakpoint()
             
         return dict(state)
     
@@ -375,8 +265,9 @@ class MultiStepRubric:
                         ground_truth_answers[req_name] = answer_data["answer"]
                     else:
                         ground_truth_answers[req_name] = answer_data
-                kwargs["ground_truth_answers"] = ground_truth_answers
-            return await self.evaluate_reference_guided(scenario, kwargs["ground_truth_answers"], **kwargs)
+            else:
+                ground_truth_answers = kwargs.pop("ground_truth_answers")
+            return await self.evaluate_reference_guided(scenario, ground_truth_answers, **kwargs)
         elif mode == EvaluationMode.EXHAUSTIVE:
             return await self.evaluate_exhaustive(scenario, **kwargs)
         elif mode == EvaluationMode.ADAPTIVE:
@@ -395,60 +286,33 @@ class MultiStepRubric:
                             **kwargs) -> Dict[str, Any]:
         """
         Enhanced score_rollout that can handle different evaluation modes and terminal conditions.
+        Uses configurable reward strategy for flexible reward calculation.
         """
-        result = await self.evaluate(prompt, completion, answer, mode=mode, **kwargs)
+        # Create a Scenario object from the individual parameters
+        scenario = Scenario(prompt=prompt, completion=completion, answers=answer)
+        result = await self.evaluate(scenario, mode=mode, **kwargs)
+        
+        # Calculate reward using the configured strategy
+        reward_kwargs = {
+            'total_requirements': len(self.requirements),
+            **kwargs
+        }
+        reward = self.reward_strategy.calculate_reward(result, mode, **reward_kwargs)
         
         if isinstance(result, EvaluationResult):
             # Adaptive evaluation
-            reward = sum([i * sum(result.state[i].values()) for i in result.state.keys() if isinstance(result.state[i], dict)])
             return {
                 **result.to_dict(),
                 'reward': reward,
+                'reward_strategy': self.reward_strategy.name,
                 'mode': mode.value
             }
         else:
             # Traditional evaluation modes
-            reward = sum([i * sum(result[i].values()) for i in result.keys() if isinstance(result[i], dict)])
             return {
                 'state': result,
                 'reward': reward,
+                'reward_strategy': self.reward_strategy.name,
                 'mode': mode.value,
                 'terminal_condition': TerminalCondition.COMPLETED.value
-            }
-
-async def main():
-    from verifiers.rubrics.example_rubrics import first_responder_reqs, scenarios
-
-    judge_prompt = """
-    Given a question and the ground truth answer, determine if the response is correct.
-    Respond according to the judge response format.
-
-    question={question}
-    response={response}
-    ground truth answer={answer}
-    judge response format={judge_response_format}
-    """
-
-    scenario = scenarios[0]
-    judge_rewarder = BinaryJudgeRewarder(judge_prompt=judge_prompt)
-    rubric = MultiStepRubric(first_responder_reqs, judge_rewarder, node_factory=BinaryRequirementRewardNode)
-    
-    # Convert scenario.answers to ground_truth_answers format for compatibility
-    ground_truth_answers = {}
-    for req_name, answer_data in scenario.answers.items():
-        if isinstance(answer_data, dict) and "answer" in answer_data:
-            ground_truth_answers[req_name] = answer_data["answer"]
-        else:
-            ground_truth_answers[req_name] = answer_data
-    
-    result = await rubric.evaluate_reference_guided(scenario, ground_truth_answers)
-    breakpoint()
-
-
-if __name__ == "__main__":
-    result = asyncio.run(main())
-
-
-
-
-
+            } 
