@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Union
 
-from .enums import EvaluationMode
+from verifiers.rubrics.multistep.core.enums import EvaluationMode
 
 
 class RewardStrategy(ABC):
@@ -44,7 +44,7 @@ class LevelWeightedRewardStrategy(RewardStrategy):
     def calculate_reward(self, result: Union[Dict[str, Any], 'EvaluationResult'], 
                         mode: EvaluationMode, **kwargs) -> float:
         # Import here to avoid circular imports
-        from .results import EvaluationResult
+        from ..results import EvaluationResult
         
         if isinstance(result, EvaluationResult):
             state = result.state
@@ -66,7 +66,7 @@ class SumRewardStrategy(RewardStrategy):
     def calculate_reward(self, result: Union[Dict[str, Any], 'EvaluationResult'], 
                         mode: EvaluationMode, **kwargs) -> float:
         # Import here to avoid circular imports
-        from .results import EvaluationResult
+        from ..results import EvaluationResult
         
         if isinstance(result, EvaluationResult):
             state = result.state
@@ -86,7 +86,7 @@ class MeanRewardStrategy(RewardStrategy):
     def calculate_reward(self, result: Union[Dict[str, Any], 'EvaluationResult'], 
                         mode: EvaluationMode, **kwargs) -> float:
         # Import here to avoid circular imports  
-        from .results import EvaluationResult
+        from ..results import EvaluationResult
         
         if isinstance(result, EvaluationResult):
             state = result.state
@@ -118,7 +118,7 @@ class LevelBasedRewardStrategy(RewardStrategy):
     def calculate_reward(self, result: Union[Dict[str, Any], 'EvaluationResult'], 
                         mode: EvaluationMode, **kwargs) -> float:
         # Import here to avoid circular imports
-        from .results import EvaluationResult
+        from ..results import EvaluationResult
         
         if isinstance(result, EvaluationResult):
             state = result.state
@@ -155,7 +155,7 @@ class CompletionRatioRewardStrategy(RewardStrategy):
     def calculate_reward(self, result: Union[Dict[str, Any], 'EvaluationResult'], 
                         mode: EvaluationMode, **kwargs) -> float:
         # Import here to avoid circular imports
-        from .results import EvaluationResult
+        from ..results import EvaluationResult
         
         if isinstance(result, EvaluationResult):
             state = result.state
@@ -199,7 +199,7 @@ class ProgressiveRewardStrategy(RewardStrategy):
     def calculate_reward(self, result: Union[Dict[str, Any], 'EvaluationResult'], 
                         mode: EvaluationMode, **kwargs) -> float:
         # Import here to avoid circular imports
-        from .results import EvaluationResult
+        from ..results import EvaluationResult
         
         if isinstance(result, EvaluationResult):
             state = result.state

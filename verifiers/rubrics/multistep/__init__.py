@@ -1,4 +1,5 @@
 # Multistep rubric module for complex dependency-based evaluations
+# TODO FIX MEEEEEEEEE. 
 
 # Core classes that users will typically import
 from .rubric import MultiStepRubric
@@ -13,7 +14,7 @@ from .examples import (
 )
 
 # Reward strategies for advanced users
-from .reward_strategies import (
+from .core.reward_strategies import (
     RewardStrategy,
     LevelWeightedRewardStrategy,
     SumRewardStrategy, 

@@ -8,8 +8,8 @@ and evaluation paths to help users understand complex rubrics.
 from typing import List, Dict, Set, Tuple, Any, Optional
 from collections import defaultdict, deque
 
-from .requirements import Requirement
-from .utils import topological_levels
+from verifiers.rubrics.multistep.core.requirement import Requirement
+from verifiers.rubrics.multistep.core.utils import topological_levels
 
 
 class WorkflowVisualizer:

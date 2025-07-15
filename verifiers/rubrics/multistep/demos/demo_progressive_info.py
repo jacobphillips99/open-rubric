@@ -1,5 +1,3 @@
-from __future__ import annotations
-
 """
 Demonstration of progressive information revelation in multistep environments.
 
@@ -7,7 +5,7 @@ This script shows how information is progressively revealed as requirements are 
 creating a more realistic and engaging interactive experience.
 """
 
-from verifiers.rubrics.multistep.requirements import Scenario
+from verifiers.rubrics.multistep.core.scenario import Scenario
 
 
 def create_progressive_scenario() -> Scenario:
