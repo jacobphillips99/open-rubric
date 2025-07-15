@@ -53,11 +53,7 @@ class JudgeResponseFormat:
             return JudgeResponse(answer=converted_answer, reasoning=reasoning)
         
         except Exception as e:
-            breakpoint()
-        # except json.JSONDecodeError as e:
-        #     raise ValueError(f"Invalid JSON response: {response}. Error: {e}")
-        # except (KeyError, TypeError, ValueError) as e:
-        #     raise ValueError(f"Error parsing response: {response}. Error: {e}")
+            raise ValueError(f"Error parsing response: {response}. Error: {e}")
 
 binary_responses = {1.0: "yes", 0.0: "no"}
 binary_judge_response_format = JudgeResponseFormat(list(binary_responses.keys()), meanings=binary_responses)
@@ -107,7 +103,7 @@ class JudgeRewarder(Reward):
             judge_result = self.judge_response_format.convert(judge_answer)
         except Exception as e:
             print(f"Error in judge_rewarder: {e}")
-            breakpoint()
+            raise e
         
         return judge_result
 

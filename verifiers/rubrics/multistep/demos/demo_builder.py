@@ -4,7 +4,7 @@ Demo script for the WorkflowBuilder and related builder utilities.
 This demonstrates how to create workflows using the fluent builder interface.
 """
 
-from .builder import (
+from verifiers.rubrics.multistep.builders.builder import (
     WorkflowBuilder, 
     ScenarioBuilder,
     LinearWorkflowTemplate,
@@ -12,7 +12,7 @@ from .builder import (
     quick_workflow,
     quick_scenario
 )
-from .visualization import WorkflowVisualizer
+from verifiers.rubrics.multistep.demos.demo_visualizer import WorkflowVisualizer
 
 
 def demo_fluent_builder():

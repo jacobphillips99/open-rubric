@@ -2,11 +2,15 @@ from typing import Any
 
 from verifiers.rewards.judge_reward import JudgeRewarder, BinaryJudgeRewarder
 from verifiers.rewards.reward import Reward
-from .requirements import Requirement, Scenario
+from verifiers.rubrics.multistep.core.scenario import Scenario
+from verifiers.rubrics.multistep.core.requirement import Requirement
 
 
 class RequirementRewardNode:
-    """Basic node for evaluating requirements."""
+    """
+    Basic node in a workflow for evaluating requirements.
+    Nodes combine Requirements and Rewards, and are used to evaluate a scenario.
+    """
     def __init__(self, requirement: Requirement, reward: Reward):
         self.requirement = requirement
         self.reward = reward
@@ -17,6 +21,10 @@ class RequirementRewardNode:
     
 
 class RequirementJudgeRewardNode(RequirementRewardNode):
+    """
+    Special class where the Reward function is a JudgeRewarder.
+    This is used to evaluate the correctness of the response.
+    """
     def __init__(self, requirement: Requirement, judge_rewarder: JudgeRewarder):
         self.requirement = requirement
         self.judge_rewarder = judge_rewarder
@@ -49,5 +57,12 @@ class RequirementJudgeRewardNode(RequirementRewardNode):
 
 
 class BinaryRequirementRewardNode(RequirementJudgeRewardNode):
+    """
+    Special subclass of the RequirementJudgeRewardNode for binary requirements.
+    This is the main node used in workflows with binary branching.
+    """
     def __init__(self, requirement: Any, judge_rewarder: BinaryJudgeRewarder):
         super().__init__(requirement, judge_rewarder) 
+
+
+# TODO: more node types

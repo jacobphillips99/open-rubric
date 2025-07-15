@@ -4,8 +4,8 @@ Demo script for the WorkflowVisualizer.
 This demonstrates the visualization capabilities of the multistep rubric system.
 """
 
-from .visualization import WorkflowVisualizer, visualize_workflow, compare_workflows
-from .examples import first_responder_reqs, debugging_reqs, scenarios, debugging_scenarios
+from verifiers.rubrics.multistep.demos.visualization import WorkflowVisualizer, visualize_workflow, compare_workflows
+from verifiers.rubrics.multistep.demos.examples import first_responder_reqs, debugging_reqs, scenarios, debugging_scenarios
 
 
 def demo_first_responder_visualization():

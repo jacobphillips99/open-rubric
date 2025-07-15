@@ -1,3 +1,5 @@
+# TODO FIX MEEEEEEEEE. 
+
 """
 Workflow builder utilities for creating MultiStep Rubrics.
 
@@ -5,10 +7,11 @@ This module provides a fluent builder interface and templates to make
 creating complex multistep workflows easier and more intuitive.
 """
 
-from typing import List, Dict, Optional, Union, Any
+from typing import List, Dict, Optional, Any
 from dataclasses import dataclass, field
 
-from .requirements import BinaryRequirement, Scenario
+from verifiers.rubrics.multistep.core.scenario import Scenario
+from verifiers.rubrics.multistep.core.requirement import BinaryRequirement
 
 
 @dataclass
