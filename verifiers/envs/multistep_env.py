@@ -25,7 +25,7 @@ from openai import OpenAI
 from verifiers.envs.environment import Environment
 from verifiers.envs.multiturn_env import MultiTurnEnv
 from verifiers.envs.singleturn_env import SingleTurnEnv
-from verifiers.rubrics.multistep.rubric import MultiStepRubric, EvaluationMode
+from verifiers.rubrics.multistep.multistep_rubric import MultiStepRubric, EvaluationMode
 from verifiers.rubrics.rubric import Rubric  # Base class expected by Environment
 
 # ----------------------------------------------------------------------------

@@ -59,7 +59,7 @@ class WorkflowBuilder:
         workflow = builder.build()
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the workflow builder."""
         self.nodes: Dict[str, WorkflowNode] = {}
 
@@ -255,7 +255,7 @@ class ScenarioBuilder:
             .build()
     """
 
-    def __init__(self):
+    def __init__(self) -> None:
         """Initialize the scenario builder."""
         self._prompt: Optional[str] = None
         self._completion: Optional[str] = None

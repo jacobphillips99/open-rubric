@@ -26,7 +26,7 @@ class WorkflowVisualizer:
 
         # Build dependency structure
         self.dependencies = {
-            name: sum(req.dependencies.values(), []) if req.dependencies else []
+            name: sum(req.dependencies.values(), []) if req.dependencies else None
             for name, req in self.name_to_req.items()
         }
 
