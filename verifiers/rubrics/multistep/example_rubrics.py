@@ -176,7 +176,6 @@ first_responder_reqs = [
 ]
 
 
-
 scenarios = [
     Scenario(
         prompt="You are a first responder arriving at a residential street. You come across a patient who is unconscious and not breathing, lying on the sidewalk. There are no immediate hazards visible, no electrical wires down, no fire, and no aggressive bystanders. The area appears secure.",
@@ -222,3 +221,162 @@ scenarios = [
         }
     )
 ]
+
+
+# Software debugging workflow - narrower and deeper with sequential steps
+problem_reproduction = BinaryRequirement(
+    name="problem_reproduction",
+    question="Does the response consider reproducing the reported problem to understand its scope?",
+    dependencies={
+        1.0: ["error_analysis", "log_examination"],  # If reproducible, analyze further
+        0.0: ["information_gathering"]  # If not reproducible, gather more info
+    }
+)
+
+error_analysis = BinaryRequirement(
+    name="error_analysis", 
+    question="Does the response consider analyzing the specific error messages or symptoms?",
+    dependencies={
+        1.0: ["code_review", "dependency_check"],  # If clear error, examine code and deps
+        0.0: ["system_state_analysis"]  # If unclear error, check system state
+    }
+)
+
+log_examination = BinaryRequirement(
+    name="log_examination",
+    question="Does the response consider examining relevant logs for additional context?",
+    dependencies={
+        1.0: ["timeline_analysis"],  # If logs available, analyze timeline
+        0.0: ["monitoring_setup"]  # If no logs, set up monitoring
+    }
+)
+
+information_gathering = BinaryRequirement(
+    name="information_gathering",
+    question="Does the response consider gathering additional information about the problem context?",
+    dependencies={
+        1.0: ["environment_comparison"],  # If more info gathered, compare environments
+        0.0: []  # Dead end - insufficient information
+    }
+)
+
+code_review = BinaryRequirement(
+    name="code_review",
+    question="Does the response consider reviewing the relevant code sections for potential issues?",
+    dependencies={
+        1.0: ["hypothesis_formation"],  # If code issues found, form hypothesis
+        0.0: ["dependency_check"]  # If code looks good, check dependencies
+    }
+)
+
+dependency_check = BinaryRequirement(
+    name="dependency_check", 
+    question="Does the response consider checking dependencies, versions, and external services?",
+    dependencies={
+        1.0: ["configuration_validation"],  # If dependency issues, check config
+        0.0: ["hypothesis_formation"]  # If dependencies OK, form other hypothesis
+    }
+)
+
+system_state_analysis = BinaryRequirement(
+    name="system_state_analysis",
+    question="Does the response consider analyzing the overall system state and resources?",
+    dependencies={
+        1.0: ["configuration_validation"],  # If system issues found, check config
+        0.0: ["monitoring_setup"]  # If system state unclear, set up monitoring
+    }
+)
+
+timeline_analysis = BinaryRequirement(
+    name="timeline_analysis",
+    question="Does the response consider analyzing the timeline of events leading to the problem?",
+    dependencies={
+        1.0: ["hypothesis_formation"],  # If timeline reveals patterns, form hypothesis
+        0.0: ["monitoring_setup"]  # If timeline unclear, need better monitoring
+    }
+)
+
+environment_comparison = BinaryRequirement(
+    name="environment_comparison",
+    question="Does the response consider comparing different environments (dev, staging, prod)?",
+    dependencies={
+        1.0: ["configuration_validation"],  # If env differences found, check config
+        0.0: ["hypothesis_formation"]  # If envs similar, form other hypothesis
+    }
+)
+
+hypothesis_formation = BinaryRequirement(
+    name="hypothesis_formation",
+    question="Does the response consider forming a testable hypothesis about the root cause?",
+    dependencies={
+        1.0: ["testing_strategy"],  # If hypothesis formed, create test strategy
+        0.0: ["information_gathering"]  # If can't form hypothesis, gather more info
+    }
+)
+
+configuration_validation = BinaryRequirement(
+    name="configuration_validation",
+    question="Does the response consider validating configuration files and settings?",
+    dependencies={
+        1.0: ["fix_implementation"],  # If config issues found, implement fix
+        0.0: ["hypothesis_formation"]  # If config OK, form other hypothesis
+    }
+)
+
+testing_strategy = BinaryRequirement(
+    name="testing_strategy",
+    question="Does the response consider developing a strategy to test the hypothesis?",
+    dependencies={
+        1.0: ["fix_implementation"],  # If test confirms hypothesis, implement fix
+        0.0: ["hypothesis_formation"]  # If test disproves hypothesis, form new one
+    }
+)
+
+# Terminal nodes
+monitoring_setup = BinaryRequirement(
+    name="monitoring_setup",
+    question="Does the response consider setting up monitoring or logging to gather more data?"
+)
+
+fix_implementation = BinaryRequirement(
+    name="fix_implementation", 
+    question="Does the response consider implementing a fix and validating it works?"
+)
+
+# List of all requirements for the debugging workflow
+debugging_reqs = [
+    problem_reproduction, error_analysis, log_examination, information_gathering,
+    code_review, dependency_check, system_state_analysis, timeline_analysis,
+    environment_comparison, hypothesis_formation, configuration_validation,
+    testing_strategy, monitoring_setup, fix_implementation
+]
+
+# Debugging scenarios
+debugging_scenarios = [
+    Scenario(
+        prompt="A user reports that the checkout process on your e-commerce website is failing with a '500 Internal Server Error' but only for orders over $100. The error started happening yesterday around 3 PM and affects about 20% of users attempting large purchases.",
+        completion="I'll start by reproducing the issue with a test order over $100 to see the exact error. Looking at the server logs around 3 PM yesterday, I can see the specific error stack trace pointing to a payment processing timeout. I'll examine the payment service configuration and recent deployments to understand what changed.",
+        answers={
+            "problem_reproduction": {"answer": 1.0, "reasoning": "The completion mentions reproducing the issue with a test order to see the exact error."},
+            "error_analysis": {"answer": 1.0, "reasoning": "The response mentions looking at the specific error stack trace to understand the payment processing timeout."},
+            "log_examination": {"answer": 1.0, "reasoning": "The completion specifically mentions looking at server logs around the time the issue started."},
+            "timeline_analysis": {"answer": 1.0, "reasoning": "The response considers examining recent deployments and changes around the 3 PM timeframe."},
+            "hypothesis_formation": {"answer": 1.0, "reasoning": "The completion forms a hypothesis about payment processing timeout being the root cause."}
+        }
+    ),
+    Scenario(
+        prompt="The mobile app keeps crashing on startup for iOS users with version 14.5, but works fine on other iOS versions. The crash reports show it's happening in the authentication module, but the logs don't provide clear error messages.",
+        completion="Since this is specific to iOS 14.5, I'll compare the authentication flow between different iOS versions to identify compatibility issues. I'll review recent changes to the authentication module and check if we're using any APIs that behave differently in iOS 14.5. I'll also examine our dependency versions to see if any libraries have known iOS 14.5 compatibility issues.",
+        answers={
+            "problem_reproduction": {"answer": 1.0, "reasoning": "The issue is already reproducible on iOS 14.5 devices."},
+            "error_analysis": {"answer": 0.0, "reasoning": "The logs don't provide clear error messages, making error analysis difficult."},
+            "system_state_analysis": {"answer": 1.0, "reasoning": "The response considers analyzing iOS version-specific behavior and system compatibility."},
+            "environment_comparison": {"answer": 1.0, "reasoning": "The completion mentions comparing authentication flow between different iOS versions."},
+            "code_review": {"answer": 1.0, "reasoning": "The response mentions reviewing recent changes to the authentication module."},
+            "dependency_check": {"answer": 1.0, "reasoning": "The completion specifically mentions checking dependency versions for iOS 14.5 compatibility issues."}
+        }
+    )
+]
+
+# All scenarios combined
+all_scenarios = scenarios + debugging_scenarios

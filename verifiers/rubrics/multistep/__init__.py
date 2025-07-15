@@ -7,7 +7,7 @@ from .results import EvaluationResult
 
 # Example rubrics and supporting classes
 from .requirements import Requirement, BinaryRequirement, Scenario
-from .example_rubrics import first_responder_reqs, scenarios
+from .example_rubrics import first_responder_reqs, scenarios, debugging_reqs, debugging_scenarios, all_scenarios
 
 # Reward strategies for advanced users
 from .reward_strategies import (
@@ -29,6 +29,16 @@ from .nodes import (
 
 # Utilities
 from .utils import topological_levels
+from .visualization import WorkflowVisualizer, visualize_workflow, compare_workflows
+from .builder import (
+    WorkflowBuilder, 
+    WorkflowNode,
+    ScenarioBuilder,
+    LinearWorkflowTemplate,
+    BranchingWorkflowTemplate,
+    quick_workflow,
+    quick_scenario
+)
 
 __all__ = [
     # Core API
@@ -43,6 +53,9 @@ __all__ = [
     "Scenario",
     "first_responder_reqs",
     "scenarios",
+    "debugging_reqs",
+    "debugging_scenarios", 
+    "all_scenarios",
     
     # Reward strategies
     "RewardStrategy",
@@ -59,5 +72,17 @@ __all__ = [
     "BinaryRequirementRewardNode",
     
     # Utilities
-    "topological_levels"
+    "topological_levels",
+    "WorkflowVisualizer",
+    "visualize_workflow", 
+    "compare_workflows",
+    
+    # Builder utilities
+    "WorkflowBuilder",
+    "WorkflowNode", 
+    "ScenarioBuilder",
+    "LinearWorkflowTemplate",
+    "BranchingWorkflowTemplate",
+    "quick_workflow",
+    "quick_scenario"
 ] 
