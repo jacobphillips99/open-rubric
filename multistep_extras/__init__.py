@@ -1,96 +1,64 @@
-# Multistep rubric module for complex dependency-based evaluations
-# TODO FIX MEEEEEEEEE. 
+"""TODO FIXME - holds the extras for the multistep rubric system."""
 
-# Core classes that users will typically import
-from .rubric import MultiStepRubric
-from .enums import EvaluationMode, TerminalCondition
-from .results import EvaluationResult
-
-# Example rubrics and supporting classes
-from .requirements import Requirement, BinaryRequirement, Scenario
-from .examples import (
-    first_responder_reqs, scenarios, debugging_reqs, debugging_scenarios, all_scenarios,
-    AVAILABLE_WORKFLOWS, get_workflow, list_workflows, get_workflow_summary
-)
-
-# Reward strategies for advanced users
-from .reward_strategies import (
-    RewardStrategy,
-    LevelWeightedRewardStrategy,
-    SumRewardStrategy, 
-    MeanRewardStrategy,
-    LevelBasedRewardStrategy,
-    CompletionRatioRewardStrategy,
-    ProgressiveRewardStrategy
-)
-
-# Node classes for advanced customization
-from .nodes import (
-    RequirementRewardNode,
-    RequirementJudgeRewardNode, 
-    BinaryRequirementRewardNode
-)
-
-# Utilities
-from .utils import topological_levels
-from .visualization import WorkflowVisualizer, visualize_workflow, compare_workflows
-from .builder import (
-    WorkflowBuilder, 
-    WorkflowNode,
-    ScenarioBuilder,
-    LinearWorkflowTemplate,
-    BranchingWorkflowTemplate,
-    quick_workflow,
-    quick_scenario
-)
+from .builders import (BranchingWorkflowTemplate, LinearWorkflowTemplate,
+                       ScenarioBuilder, WorkflowBuilder, WorkflowNode,
+                       quick_scenario, quick_workflow)
+from .demos import (MultiStepTutorial, create_progressive_scenario,
+                    demo_all_possible_paths, demo_branching_template,
+                    demo_debugging_visualization, demo_error_handling,
+                    demo_first_responder_visualization, demo_fluent_builder,
+                    demo_linear_template, demo_progressive_revelation,
+                    demo_quick_helpers, demo_scenario_builder,
+                    demo_workflow_access, demo_workflow_comparison,
+                    demo_workflow_registry, run_builder_demo,
+                    run_registry_demo, run_visualizer_demo)
+from .example_rubrics import (AVAILABLE_WORKFLOWS, all_scenarios,
+                              debugging_reqs, debugging_scenarios,
+                              first_responder_reqs, get_workflow,
+                              get_workflow_summary, list_workflows, scenarios)
+from .visualization import (WorkflowVisualizer, compare_workflows,
+                            visualize_workflow)
 
 __all__ = [
-    # Core API
-    "MultiStepRubric",
-    "EvaluationMode", 
-    "TerminalCondition",
-    "EvaluationResult",
-    
-    # Example rubrics and supporting classes
-    "Requirement",
-    "BinaryRequirement", 
-    "Scenario",
-    "first_responder_reqs",
-    "scenarios",
-    "debugging_reqs",
-    "debugging_scenarios", 
-    "all_scenarios",
-    "AVAILABLE_WORKFLOWS",
-    "get_workflow",
-    "list_workflows",
-    "get_workflow_summary",
-    
-    # Reward strategies
-    "RewardStrategy",
-    "LevelWeightedRewardStrategy",
-    "SumRewardStrategy",
-    "MeanRewardStrategy", 
-    "LevelBasedRewardStrategy",
-    "CompletionRatioRewardStrategy",
-    "ProgressiveRewardStrategy",
-    
-    # Node classes
-    "RequirementRewardNode",
-    "RequirementJudgeRewardNode",
-    "BinaryRequirementRewardNode",
-    
-    # Utilities
-    "topological_levels",
-    "WorkflowVisualizer",
-    "visualize_workflow", 
-    "compare_workflows",
-    
-    # Builder utilities
-    "WorkflowBuilder",
-    "WorkflowNode", 
-    "ScenarioBuilder",
-    "LinearWorkflowTemplate",
+    # Builders
     "BranchingWorkflowTemplate",
+    "LinearWorkflowTemplate",
+    "ScenarioBuilder",
+    "WorkflowBuilder",
+    "WorkflowNode",
+    "quick_scenario",
     "quick_workflow",
-    "quick_scenario"
-] 
+    # Example Rubrics
+    "AVAILABLE_WORKFLOWS",
+    "all_scenarios",
+    "debugging_reqs",
+    "debugging_scenarios",
+    "first_responder_reqs",
+    "get_workflow",
+    "get_workflow_summary",
+    "list_workflows",
+    "scenarios",
+    # Visualization
+    "WorkflowVisualizer",
+    "compare_workflows",
+    "visualize_workflow",
+    # Demos
+    "MultiStepTutorial",
+    "create_progressive_scenario",
+    "demo_all_possible_paths",
+    "demo_branching_template",
+    "demo_debugging_visualization",
+    "demo_error_handling",
+    "demo_first_responder_visualization",
+    "demo_fluent_builder",
+    "demo_linear_template",
+    "demo_progressive_revelation",
+    "demo_quick_helpers",
+    "demo_scenario_builder",
+    "demo_workflow_access",
+    "demo_workflow_comparison",
+    "demo_workflow_registry",
+    "run_builder_demo",
+    "run_registry_demo",
+    "run_visualizer_demo",
+]
