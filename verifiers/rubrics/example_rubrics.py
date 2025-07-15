@@ -25,7 +25,7 @@ class BinaryRequirement(Requirement):
 # First responder workflow - shorter and wider with more branching
 scene_safety = BinaryRequirement(
     name="scene_safety", 
-    question="Is the scene safe to approach?", 
+    question="Does the response consider if the scene is safe to approach?", 
     dependencies={
         1.0: ["initial_assessment", "vital_signs", "trauma_check"],  # If safe, do parallel assessments
         0.0: []  # If unsafe, stop workflow
@@ -34,7 +34,7 @@ scene_safety = BinaryRequirement(
 
 initial_assessment = BinaryRequirement(
     name="initial_assessment", 
-    question="Is the patient conscious and responsive?", 
+    question="Does the response consider if the patient is conscious and responsive?", 
     dependencies={
         1.0: ["communication", "pain_assessment"],  # If responsive, assess communication and pain
         0.0: ["airway_management", "breathing_support"]  # If unresponsive, prioritize ABCs
@@ -43,7 +43,7 @@ initial_assessment = BinaryRequirement(
 
 vital_signs = BinaryRequirement(
     name="vital_signs", 
-    question="Are the patient's vital signs stable?", 
+    question="Does the response consider if the patient's vital signs are stable?", 
     dependencies={
         1.0: ["transport_decision"],  # If stable, consider transport
         0.0: ["immediate_intervention", "emergency_protocols"]  # If unstable, immediate action
@@ -52,7 +52,7 @@ vital_signs = BinaryRequirement(
 
 trauma_check = BinaryRequirement(
     name="trauma_check", 
-    question="Are there visible signs of trauma or injury?", 
+    question="Does the response consider if there are visible signs of trauma or injury?", 
     dependencies={
         1.0: ["bleeding_control", "immobilization", "injury_assessment"],  # If trauma, multiple interventions
         0.0: ["medical_history", "symptom_assessment"]  # If no trauma, focus on medical causes
@@ -61,7 +61,7 @@ trauma_check = BinaryRequirement(
 
 airway_management = BinaryRequirement(
     name="airway_management", 
-    question="Is the patient's airway clear and protected?", 
+    question="Does the response consider if the patient's airway is clear and protected?", 
     dependencies={
         1.0: ["breathing_support"],  # If airway good, check breathing
         0.0: ["emergency_protocols"]  # If airway compromised, emergency
@@ -70,7 +70,7 @@ airway_management = BinaryRequirement(
 
 breathing_support = BinaryRequirement(
     name="breathing_support", 
-    question="Is the patient breathing adequately?", 
+    question="Does the response consider if the patient is breathing adequately?", 
     dependencies={
         1.0: ["circulation_check"],  # If breathing good, check circulation
         0.0: ["emergency_protocols"]  # If breathing poor, emergency
@@ -79,7 +79,7 @@ breathing_support = BinaryRequirement(
 
 bleeding_control = BinaryRequirement(
     name="bleeding_control", 
-    question="Has any significant bleeding been controlled?", 
+    question="Does the response consider if any significant bleeding has been controlled?", 
     dependencies={
         1.0: ["transport_decision"],  # If bleeding controlled, ready for transport
         0.0: ["emergency_protocols"]  # If bleeding uncontrolled, emergency
@@ -88,7 +88,7 @@ bleeding_control = BinaryRequirement(
 
 circulation_check = BinaryRequirement(
     name="circulation_check", 
-    question="Does the patient have adequate circulation and pulse?", 
+    question="Does the response consider if the patient has adequate circulation and pulse?", 
     dependencies={
         1.0: ["transport_decision"],  # If circulation good, consider transport
         0.0: ["emergency_protocols"]  # If circulation poor, emergency
@@ -97,7 +97,7 @@ circulation_check = BinaryRequirement(
 
 communication = BinaryRequirement(
     name="communication", 
-    question="Can the patient communicate their symptoms clearly?", 
+    question="Does the response consider if the patient can communicate their symptoms clearly?", 
     dependencies={
         1.0: ["symptom_assessment", "medical_history"],  # If can communicate, gather info
         0.0: ["observation_assessment"]  # If can't communicate, rely on observation
@@ -106,7 +106,7 @@ communication = BinaryRequirement(
 
 pain_assessment = BinaryRequirement(
     name="pain_assessment", 
-    question="Has the patient's pain level been assessed and managed?", 
+    question="Does the response consider if the patient's pain level has been assessed and managed?", 
     dependencies={
         1.0: ["comfort_measures", "transport_decision"],  # If pain managed, comfort and transport
         0.0: ["pain_management"]  # If pain not managed, intervene
@@ -115,7 +115,7 @@ pain_assessment = BinaryRequirement(
 
 immediate_intervention = BinaryRequirement(
     name="immediate_intervention", 
-    question="Have immediate life-saving interventions been performed?", 
+    question="Does the response consider if immediate life-saving interventions have been performed?", 
     dependencies={
         1.0: ["stabilization_check"],  # If interventions done, check stability
         0.0: ["emergency_protocols"]  # If interventions not done, emergency
@@ -124,7 +124,7 @@ immediate_intervention = BinaryRequirement(
 
 immobilization = BinaryRequirement(
     name="immobilization", 
-    question="Has the patient been properly immobilized if needed?", 
+    question="Does the response consider if the patient has been properly immobilized if needed?", 
     dependencies={
         1.0: ["transport_preparation"],  # If immobilized, prepare for transport
         0.0: ["injury_assessment"]  # If not immobilized, reassess injuries
@@ -134,52 +134,52 @@ immobilization = BinaryRequirement(
 # Terminal nodes (no dependencies)
 emergency_protocols = BinaryRequirement(
     name="emergency_protocols", 
-    question="Have emergency protocols been activated and followed?"
+    question="Does the response consider if emergency protocols have been activated and followed?"
 )
 
 transport_decision = BinaryRequirement(
     name="transport_decision", 
-    question="Has the appropriate transport decision been made and executed?"
+    question="Does the response consider if the appropriate transport decision has been made and executed?"
 )
 
 medical_history = BinaryRequirement(
     name="medical_history", 
-    question="Has relevant medical history been obtained?"
+    question="Does the response consider if relevant medical history has been obtained?"
 )
 
 symptom_assessment = BinaryRequirement(
     name="symptom_assessment", 
-    question="Have the patient's symptoms been thoroughly assessed?"
+    question="Does the response consider if the patient's symptoms have been thoroughly assessed?"
 )
 
 observation_assessment = BinaryRequirement(
     name="observation_assessment", 
-    question="Has a thorough observational assessment been completed?"
+    question="Does the response consider if a thorough observational assessment has been completed?"
 )
 
 injury_assessment = BinaryRequirement(
     name="injury_assessment", 
-    question="Have all injuries been properly assessed and documented?"
+    question="Does the response consider if all injuries have been properly assessed and documented?"
 )
 
 comfort_measures = BinaryRequirement(
     name="comfort_measures", 
-    question="Have appropriate comfort measures been provided?"
+    question="Does the response consider if appropriate comfort measures have been provided?"
 )
 
 pain_management = BinaryRequirement(
     name="pain_management", 
-    question="Has appropriate pain management been provided?"
+    question="Does the response consider if appropriate pain management has been provided?"
 )
 
 stabilization_check = BinaryRequirement(
     name="stabilization_check", 
-    question="Has the patient been stabilized successfully?"
+    question="Does the response consider if the patient has been stabilized successfully?"
 )
 
 transport_preparation = BinaryRequirement(
     name="transport_preparation", 
-    question="Has the patient been properly prepared for transport?"
+    question="Does the response consider if the patient has been properly prepared for transport?"
 )
 
 # List of all requirements for the first responder workflow

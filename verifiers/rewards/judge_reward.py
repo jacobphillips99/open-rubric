@@ -103,7 +103,6 @@ class JudgeRewarder(Reward):
                 )
         try:
             judge_response = await asyncio.to_thread(_create_completion)
-            breakpoint()
             judge_answer = judge_response.choices[0].message.content
             judge_result = self.judge_response_format.convert(judge_answer)
         except Exception as e:
