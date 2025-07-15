@@ -5,7 +5,7 @@ This script shows how information is progressively revealed as requirements are 
 creating a more realistic and engaging interactive experience.
 """
 
-from verifiers.rubrics.multistep.core.scenario import Scenario
+from verifiers.rubrics.multistep.scenario import Scenario
 
 
 def create_progressive_scenario() -> Scenario:

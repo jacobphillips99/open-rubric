@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import Any, Dict, Union
 
-from verifiers.rubrics.multistep.core.enums import EvaluationMode
+from verifiers.rubrics.multistep.enums import EvaluationMode
 
 
 class RewardStrategy(ABC):

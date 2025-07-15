@@ -8,8 +8,8 @@ points typical of emergency response protocols.
 
 from typing import List
 
-from verifiers.rubrics.multistep.core.scenario import Scenario
-from verifiers.rubrics.multistep.core.requirement import BinaryRequirement
+from verifiers.rubrics.multistep.scenario import Scenario
+from verifiers.rubrics.multistep.requirement import BinaryRequirement
 
 
 # First responder workflow - shorter and wider with more branching

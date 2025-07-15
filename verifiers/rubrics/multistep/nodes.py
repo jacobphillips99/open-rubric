@@ -2,8 +2,8 @@ from typing import Any
 
 from verifiers.rewards.judge_reward import JudgeRewarder, BinaryJudgeRewarder
 from verifiers.rewards.reward import Reward
-from verifiers.rubrics.multistep.core.scenario import Scenario
-from verifiers.rubrics.multistep.core.requirement import Requirement
+from verifiers.rubrics.multistep.scenario import Scenario
+from verifiers.rubrics.multistep.requirement import Requirement
 
 
 class RequirementRewardNode:

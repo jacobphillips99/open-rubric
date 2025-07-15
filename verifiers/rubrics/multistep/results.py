@@ -1,6 +1,6 @@
 from typing import Any, Dict, Set
 
-from verifiers.rubrics.multistep.core.enums import TerminalCondition
+from verifiers.rubrics.multistep.enums import TerminalCondition
 
 
 class EvaluationResult:

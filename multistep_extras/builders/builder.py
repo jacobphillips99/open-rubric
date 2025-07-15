@@ -10,8 +10,8 @@ creating complex multistep workflows easier and more intuitive.
 from typing import List, Dict, Optional, Any
 from dataclasses import dataclass, field
 
-from verifiers.rubrics.multistep.core.scenario import Scenario
-from verifiers.rubrics.multistep.core.requirement import BinaryRequirement
+from verifiers.rubrics.multistep.scenario import Scenario
+from verifiers.rubrics.multistep.requirement import BinaryRequirement
 
 
 @dataclass
