@@ -1,8 +1,14 @@
-# example first responder rubric
+"""
+First Responder Workflow Example
 
-from typing import List, Any, Optional
+This example demonstrates a complex, wide-branching workflow for first responder
+emergency medical situations. It shows parallel assessments and multiple decision
+points typical of emergency response protocols.
+"""
 
-from .requirements import Requirement, BinaryRequirement, Scenario
+from typing import List
+
+from ..requirements import BinaryRequirement, Scenario
 
 
 # First responder workflow - shorter and wider with more branching
@@ -166,7 +172,7 @@ transport_preparation = BinaryRequirement(
 )
 
 # List of all requirements for the first responder workflow
-first_responder_reqs = [
+requirements = [
     scene_safety, initial_assessment, vital_signs, trauma_check,
     airway_management, breathing_support, bleeding_control, circulation_check,
     communication, pain_assessment, immediate_intervention, immobilization,
@@ -175,9 +181,11 @@ first_responder_reqs = [
     stabilization_check, transport_preparation
 ]
 
-
+# Test scenarios for first responder workflow
 scenarios = [
     Scenario(
+        name="Unconscious Non-Breathing Patient",
+        description="Patient is unconscious and not breathing in a safe environment",
         prompt="You are a first responder arriving at a residential street. You come across a patient who is unconscious and not breathing, lying on the sidewalk. There are no immediate hazards visible, no electrical wires down, no fire, and no aggressive bystanders. The area appears secure.",
         completion="First, I'll check if the scene is safe. Since there are no visible hazards, I'll proceed. The patient is unconscious and not breathing, so I'll immediately check their airway and begin CPR. I'll call for advanced life support and continue resuscitation efforts.",
         answers={
@@ -189,6 +197,8 @@ scenarios = [
         }
     ),
     Scenario(
+        name="Car Accident with Bleeding",
+        description="Conscious patient with significant bleeding from car accident",
         prompt="You arrive at a car accident scene on a quiet suburban road. The vehicle has come to rest safely on the shoulder, away from traffic. The patient is conscious, alert, and sitting in the driver's seat but has a deep laceration on their left arm that's bleeding heavily, soaking through their shirt.",
         completion="After confirming scene safety and ensuring no traffic hazards, I'll approach the patient. They're alert and responsive, so I'll introduce myself and explain what I'm doing. I'll immediately apply direct pressure to the arm wound to control bleeding while simultaneously assessing their vital signs and checking for other injuries. Once bleeding is controlled, I'll gather their medical history and symptoms, then prepare them for transport to the hospital.",
         answers={
@@ -201,6 +211,8 @@ scenarios = [
         }
     ),
     Scenario(
+        name="Elderly Fall with Hip Injury",
+        description="Elderly patient with suspected hip fracture from fall",
         prompt="You find an elderly patient (approximately 75 years old) who has fallen in their bathroom. They are awake and oriented but complaining of severe pain in their right hip (8/10 on pain scale) and are completely unable to move their right leg. They describe hearing a 'pop' when they fell. The scene is secure with no ongoing hazards.",
         completion="After ensuring scene safety, I'll assess their level of consciousness - they're alert and oriented. Given the mechanism of injury (fall), their age, the severe hip pain, inability to move the leg, and the audible 'pop', I strongly suspect a hip fracture. I'll assess their current pain level, provide initial pain management if within my scope, and carefully immobilize them in position before any movement. I'll prepare them for transport while providing comfort measures.",
         answers={
@@ -214,169 +226,12 @@ scenarios = [
         }
     ),
     Scenario(
+        name="Unsafe Construction Site",
+        description="Trapped worker in hazardous environment",
         prompt="At an active construction site, you receive a call about a worker trapped under a pile of steel beams and concrete debris. Other workers are frantically trying to dig him out. There's heavy equipment still operating nearby, loose materials overhead, and unstable structures. The trapped worker is conscious and calling for help, with visible bleeding from his head and arms.",
         completion="I need to immediately assess scene safety before approaching. This scene has multiple hazards - active heavy equipment, unstable structures, and loose overhead materials that could cause secondary collapse. I cannot safely approach the patient until the scene is secured. I'll coordinate with site supervisors to shut down equipment, establish a safety perimeter, and get proper rescue equipment before attempting patient access.",
         answers={
             "scene_safety": {"answer": 0.0, "reasoning": "The scene has multiple active hazards including operating heavy equipment, unstable structures, loose overhead materials, and risk of secondary collapse, making it unsafe to approach without proper safety measures."}
         }
     )
-]
-
-
-# Software debugging workflow - narrower and deeper with sequential steps
-problem_reproduction = BinaryRequirement(
-    name="problem_reproduction",
-    question="Does the response consider reproducing the reported problem to understand its scope?",
-    dependencies={
-        1.0: ["error_analysis", "log_examination"],  # If reproducible, analyze further
-        0.0: ["information_gathering"]  # If not reproducible, gather more info
-    }
-)
-
-error_analysis = BinaryRequirement(
-    name="error_analysis", 
-    question="Does the response consider analyzing the specific error messages or symptoms?",
-    dependencies={
-        1.0: ["code_review", "dependency_check"],  # If clear error, examine code and deps
-        0.0: ["system_state_analysis"]  # If unclear error, check system state
-    }
-)
-
-log_examination = BinaryRequirement(
-    name="log_examination",
-    question="Does the response consider examining relevant logs for additional context?",
-    dependencies={
-        1.0: ["timeline_analysis"],  # If logs available, analyze timeline
-        0.0: ["monitoring_setup"]  # If no logs, set up monitoring
-    }
-)
-
-information_gathering = BinaryRequirement(
-    name="information_gathering",
-    question="Does the response consider gathering additional information about the problem context?",
-    dependencies={
-        1.0: ["environment_comparison"],  # If more info gathered, compare environments
-        0.0: []  # Dead end - insufficient information
-    }
-)
-
-code_review = BinaryRequirement(
-    name="code_review",
-    question="Does the response consider reviewing the relevant code sections for potential issues?",
-    dependencies={
-        1.0: ["hypothesis_formation"],  # If code issues found, form hypothesis
-        0.0: ["dependency_check"]  # If code looks good, check dependencies
-    }
-)
-
-dependency_check = BinaryRequirement(
-    name="dependency_check", 
-    question="Does the response consider checking dependencies, versions, and external services?",
-    dependencies={
-        1.0: ["configuration_validation"],  # If dependency issues, check config
-        0.0: ["hypothesis_formation"]  # If dependencies OK, form other hypothesis
-    }
-)
-
-system_state_analysis = BinaryRequirement(
-    name="system_state_analysis",
-    question="Does the response consider analyzing the overall system state and resources?",
-    dependencies={
-        1.0: ["configuration_validation"],  # If system issues found, check config
-        0.0: ["monitoring_setup"]  # If system state unclear, set up monitoring
-    }
-)
-
-timeline_analysis = BinaryRequirement(
-    name="timeline_analysis",
-    question="Does the response consider analyzing the timeline of events leading to the problem?",
-    dependencies={
-        1.0: ["hypothesis_formation"],  # If timeline reveals patterns, form hypothesis
-        0.0: ["monitoring_setup"]  # If timeline unclear, need better monitoring
-    }
-)
-
-environment_comparison = BinaryRequirement(
-    name="environment_comparison",
-    question="Does the response consider comparing different environments (dev, staging, prod)?",
-    dependencies={
-        1.0: ["configuration_validation"],  # If env differences found, check config
-        0.0: ["hypothesis_formation"]  # If envs similar, form other hypothesis
-    }
-)
-
-hypothesis_formation = BinaryRequirement(
-    name="hypothesis_formation",
-    question="Does the response consider forming a testable hypothesis about the root cause?",
-    dependencies={
-        1.0: ["testing_strategy"],  # If hypothesis formed, create test strategy
-        0.0: ["information_gathering"]  # If can't form hypothesis, gather more info
-    }
-)
-
-configuration_validation = BinaryRequirement(
-    name="configuration_validation",
-    question="Does the response consider validating configuration files and settings?",
-    dependencies={
-        1.0: ["fix_implementation"],  # If config issues found, implement fix
-        0.0: ["hypothesis_formation"]  # If config OK, form other hypothesis
-    }
-)
-
-testing_strategy = BinaryRequirement(
-    name="testing_strategy",
-    question="Does the response consider developing a strategy to test the hypothesis?",
-    dependencies={
-        1.0: ["fix_implementation"],  # If test confirms hypothesis, implement fix
-        0.0: ["hypothesis_formation"]  # If test disproves hypothesis, form new one
-    }
-)
-
-# Terminal nodes
-monitoring_setup = BinaryRequirement(
-    name="monitoring_setup",
-    question="Does the response consider setting up monitoring or logging to gather more data?"
-)
-
-fix_implementation = BinaryRequirement(
-    name="fix_implementation", 
-    question="Does the response consider implementing a fix and validating it works?"
-)
-
-# List of all requirements for the debugging workflow
-debugging_reqs = [
-    problem_reproduction, error_analysis, log_examination, information_gathering,
-    code_review, dependency_check, system_state_analysis, timeline_analysis,
-    environment_comparison, hypothesis_formation, configuration_validation,
-    testing_strategy, monitoring_setup, fix_implementation
-]
-
-# Debugging scenarios
-debugging_scenarios = [
-    Scenario(
-        prompt="A user reports that the checkout process on your e-commerce website is failing with a '500 Internal Server Error' but only for orders over $100. The error started happening yesterday around 3 PM and affects about 20% of users attempting large purchases.",
-        completion="I'll start by reproducing the issue with a test order over $100 to see the exact error. Looking at the server logs around 3 PM yesterday, I can see the specific error stack trace pointing to a payment processing timeout. I'll examine the payment service configuration and recent deployments to understand what changed.",
-        answers={
-            "problem_reproduction": {"answer": 1.0, "reasoning": "The completion mentions reproducing the issue with a test order to see the exact error."},
-            "error_analysis": {"answer": 1.0, "reasoning": "The response mentions looking at the specific error stack trace to understand the payment processing timeout."},
-            "log_examination": {"answer": 1.0, "reasoning": "The completion specifically mentions looking at server logs around the time the issue started."},
-            "timeline_analysis": {"answer": 1.0, "reasoning": "The response considers examining recent deployments and changes around the 3 PM timeframe."},
-            "hypothesis_formation": {"answer": 1.0, "reasoning": "The completion forms a hypothesis about payment processing timeout being the root cause."}
-        }
-    ),
-    Scenario(
-        prompt="The mobile app keeps crashing on startup for iOS users with version 14.5, but works fine on other iOS versions. The crash reports show it's happening in the authentication module, but the logs don't provide clear error messages.",
-        completion="Since this is specific to iOS 14.5, I'll compare the authentication flow between different iOS versions to identify compatibility issues. I'll review recent changes to the authentication module and check if we're using any APIs that behave differently in iOS 14.5. I'll also examine our dependency versions to see if any libraries have known iOS 14.5 compatibility issues.",
-        answers={
-            "problem_reproduction": {"answer": 1.0, "reasoning": "The issue is already reproducible on iOS 14.5 devices."},
-            "error_analysis": {"answer": 0.0, "reasoning": "The logs don't provide clear error messages, making error analysis difficult."},
-            "system_state_analysis": {"answer": 1.0, "reasoning": "The response considers analyzing iOS version-specific behavior and system compatibility."},
-            "environment_comparison": {"answer": 1.0, "reasoning": "The completion mentions comparing authentication flow between different iOS versions."},
-            "code_review": {"answer": 1.0, "reasoning": "The response mentions reviewing recent changes to the authentication module."},
-            "dependency_check": {"answer": 1.0, "reasoning": "The completion specifically mentions checking dependency versions for iOS 14.5 compatibility issues."}
-        }
-    )
-]
-
-# All scenarios combined
-all_scenarios = scenarios + debugging_scenarios
+] 

@@ -18,7 +18,7 @@ from .reward_strategies import (
     CompletionRatioRewardStrategy
 )
 from .nodes import BinaryRequirementRewardNode
-from .example_rubrics import first_responder_reqs, debugging_reqs, scenarios, debugging_scenarios
+from .examples import first_responder_reqs, debugging_reqs, scenarios, debugging_scenarios
 from verifiers.rewards.judge_reward import BinaryJudgeRewarder
 
 
@@ -176,12 +176,19 @@ class MultiStepTutorial:
                 reward_strategy=strategy
             )
             
+            # Convert scenario.answers to ground_truth_answers format
+            ground_truth_answers = {
+                name: data["answer"] if isinstance(data, dict) else data
+                for name, data in scenario.answers.items()
+            }
+            
             result = await rubric.score_rollout(
                 prompt=scenario.prompt,
                 completion=scenario.completion,
                 answer=scenario.answers,
                 state={},
-                mode=EvaluationMode.REFERENCE_GUIDED
+                mode=EvaluationMode.REFERENCE_GUIDED,
+                ground_truth_answers=ground_truth_answers
             )
             
             print(f"{name} Strategy:")

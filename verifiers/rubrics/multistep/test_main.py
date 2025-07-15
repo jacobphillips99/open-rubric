@@ -1,6 +1,6 @@
 import asyncio
 
-from .example_rubrics import first_responder_reqs, scenarios
+from .examples import first_responder_reqs, scenarios
 from verifiers.rewards.judge_reward import BinaryJudgeRewarder
 
 from .rubric import MultiStepRubric

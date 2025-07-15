@@ -7,7 +7,10 @@ from .results import EvaluationResult
 
 # Example rubrics and supporting classes
 from .requirements import Requirement, BinaryRequirement, Scenario
-from .example_rubrics import first_responder_reqs, scenarios, debugging_reqs, debugging_scenarios, all_scenarios
+from .examples import (
+    first_responder_reqs, scenarios, debugging_reqs, debugging_scenarios, all_scenarios,
+    AVAILABLE_WORKFLOWS, get_workflow, list_workflows, get_workflow_summary
+)
 
 # Reward strategies for advanced users
 from .reward_strategies import (
@@ -56,6 +59,10 @@ __all__ = [
     "debugging_reqs",
     "debugging_scenarios", 
     "all_scenarios",
+    "AVAILABLE_WORKFLOWS",
+    "get_workflow",
+    "list_workflows",
+    "get_workflow_summary",
     
     # Reward strategies
     "RewardStrategy",
