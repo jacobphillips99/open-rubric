@@ -3,7 +3,8 @@
 import asyncio
 from collections import defaultdict
 from collections.abc import Sequence
-from typing import Any, Callable, Dict, List, Mapping, Optional, Union
+from copy import deepcopy
+from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple, Union
 
 from verifiers.rewards.judge_reward import JudgeRewarder
 from verifiers.rubrics.multistep.enums import EvaluationMode, TerminalCondition
@@ -400,3 +401,127 @@ class MultiStepRubric(Rubric):
                 "mode": mode.value,
                 "terminal_condition": TerminalCondition.COMPLETED.value,
             }
+
+    def get_next_conversation_step(
+        self,
+        messages: List[Dict[str, Any]],
+        state: Dict[str, Any],
+        **kwargs
+    ) -> Tuple[Optional[str], Dict[str, Any], bool]:
+        """
+        Determine the next step in the conversation workflow.
+
+        Args:
+            messages: List of conversation messages so far
+            state: Current conversation state containing workflow progress
+            **kwargs: Additional arguments
+
+        Returns:
+            Tuple of (next_message_content, updated_state, is_finished)
+        """
+        if not messages:
+            raise ValueError("messages should contain at least the initial user prompt")
+
+        # Extract the conversation parts
+        initial_user_prompt = messages[0]["content"]
+        last_assistant_msg = ""
+        for m in reversed(messages):
+            if m["role"] == "assistant":
+                last_assistant_msg = m["content"]
+                break
+
+        # Get workflow tracking data from state
+        level_idx = state["level_idx"]
+        active_reqs = state["active_reqs"]
+        raw_answers_gt = state["answers_gt"]
+        revealed_info_set = state.get("revealed_info", set())
+        revealed_info_data = state.get("revealed_info_data", {})
+
+        # Flatten scenario answer dicts so each value is a scalar (e.g., 1.0)
+        answers_gt = {k: (v["answer"] if isinstance(v, dict) else v) for k, v in raw_answers_gt.items()}
+
+        # Build scenario for evaluation
+        tmp_scenario = Scenario(prompt=initial_user_prompt, completion=last_assistant_msg, answers=answers_gt)
+
+        # Use synchronous wrapper to handle nested event loops
+        try:
+            # Try to get the current event loop
+            asyncio.get_running_loop()
+            # We're in an async context, so we need to handle this differently
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(
+                    asyncio.run,
+                    self.evaluate_reference_guided(tmp_scenario, ground_truth_answers=answers_gt)
+                )
+                eval_state = future.result()
+        except RuntimeError:
+            # No event loop running, safe to use asyncio.run
+            eval_state = asyncio.run(
+                self.evaluate_reference_guided(tmp_scenario, ground_truth_answers=answers_gt)
+            )
+
+        # Extract model scores for this level
+        level_scores: Dict[str, float] = eval_state.get(level_idx, {}) if isinstance(eval_state, dict) else {}
+
+        # Determine next requirements based on dependency map and the ground truth answers
+        next_reqs: List[str] = []
+        for req_name, score in level_scores.items():
+            req = self.name_to_req[req_name]
+            if not req.terminal() and req.dependencies is not None and score in req.dependencies:
+                next_reqs.extend(req.dependencies[score])
+
+        next_reqs = list(set(next_reqs))
+
+        # Collect revealed information from just-satisfied requirements
+        revealed_info_lines = []
+
+        # Process revealed information based on current level scores
+        if revealed_info_data:
+            for req_name, score in level_scores.items():
+                if req_name in revealed_info_data:
+                    score_key = str(float(score))
+                    if score_key in revealed_info_data[req_name]:
+                        info_key = f"{req_name}_{score_key}"
+                        if info_key not in revealed_info_set:
+                            revealed_info_lines.append(f"📋 New Information: {revealed_info_data[req_name][score_key]}")
+                            revealed_info_set.add(info_key)
+
+        # Craft environment message with revealed information and follow-up questions
+        content_lines = []
+
+        # Add any revealed information first
+        if revealed_info_lines:
+            content_lines.extend(revealed_info_lines)
+            content_lines.append("")  # Add blank line for separation
+
+        if next_reqs:
+            for r in next_reqs:
+                req = self.name_to_req[r]
+                # Provide any prior reasoning we have about this requirement
+                reasoning = ""
+                if isinstance(answers_gt.get(r), dict):
+                    reasoning = answers_gt[r].get("reasoning", "")
+                if reasoning:
+                    content_lines.append(f"Background ({r}): {reasoning}")
+                content_lines.append(f"Question ({r}): {req.question}")
+            content = "\n".join(content_lines)
+        else:
+            if content_lines:
+                content = "\n".join(content_lines + ["No further information is available. You may conclude."])
+            else:
+                content = "No further information is available. You may conclude."
+
+        # Update state
+        updated_state = deepcopy(state)
+        if not next_reqs:
+            updated_state["finished"] = True
+        else:
+            updated_state["level_idx"] = level_idx + 1
+            updated_state["active_reqs"] = next_reqs
+
+        # Update revealed information in state
+        updated_state["revealed_info"] = revealed_info_set
+
+        is_finished = not next_reqs
+        return content, updated_state, is_finished
