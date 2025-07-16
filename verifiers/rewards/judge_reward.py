@@ -110,7 +110,7 @@ class JudgeRewarder(Reward):
             judge_answer = judge_response.choices[0].message.content
             judge_result = self.judge_response_format.convert(judge_answer)
         except Exception as e:
-            print(f"Error in judge_rewarder: {e}")
+            print(f"Error in judge_rewarder: {e}; {e.__traceback__}")
             raise e
 
         return judge_result

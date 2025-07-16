@@ -60,11 +60,11 @@ class MultiStepMultiTurnEnv(MultiTurnEnv):
                      state: Dict[str, Any],
                      **kwargs) -> Tuple[Dict[str, Any], Dict[str, Any]]:
         """Get the next step in the conversation from the rubric."""
-        # Delegate all workflow logic to the rubric
+        # Delegate all workflow logic to the rubric!
         content, updated_state, is_finished = self.ms_rubric.get_next_conversation_step(
             messages, state, **kwargs
         )
-        
+
         return {"role": "user", "content": content}, updated_state
 
     def rollout(self,
@@ -93,7 +93,7 @@ class MultiStepMultiTurnEnv(MultiTurnEnv):
         # Use MultiTurnEnv.rollout implementation by delegating via deepcopy of self.
         # Unfortunately we cannot directly call super().rollout because that method
         # constructs its own loop; instead we replicate the core logic here with
-        # our custom is_completed/env_response hooks.
+        # our custom is_completed/efnv_response hooks.
 
         is_completed = False
         completion: List[Dict[str, Any]] = []
@@ -114,6 +114,10 @@ class MultiStepMultiTurnEnv(MultiTurnEnv):
             if self.is_completed(messages, state) or turn >= self.max_turns:
                 break
             env_msg, state = self.env_response(messages, state)
-            messages.append(env_msg)
-            completion.append(env_msg)
+
+            # Only append env_msg if it has actual content
+            # None content means "let model continue naturally without explicit prompting"
+            if env_msg.get("content") is not None:
+                messages.append(env_msg)
+                completion.append(env_msg)
         return completion, state
