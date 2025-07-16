@@ -14,9 +14,6 @@ from .demo_visualizer import (demo_all_possible_paths,
                               demo_first_responder_visualization,
                               demo_workflow_comparison)
 from .demo_visualizer import run_full_demo as run_visualizer_demo
-from .demo_workflow_registry import (demo_error_handling, demo_workflow_access,
-                                     demo_workflow_registry)
-from .demo_workflow_registry import run_full_demo as run_registry_demo
 from .tutorial import MultiStepTutorial
 
 __all__ = [
@@ -33,11 +30,6 @@ __all__ = [
     "demo_workflow_comparison",
     "demo_all_possible_paths",
     "run_visualizer_demo",
-    # Registry demos
-    "demo_workflow_registry",
-    "demo_workflow_access",
-    "demo_error_handling",
-    "run_registry_demo",
     # Tutorial
     "MultiStepTutorial",
 ]

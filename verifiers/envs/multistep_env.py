@@ -11,6 +11,14 @@ from verifiers.rubrics.multistep.multistep_rubric import MultiStepRubric
 from verifiers.rubrics.multistep.scenario import Scenario
 
 class MultiStepSingleTurnEnv(SingleTurnEnv):
+    """
+    Single-turn environment for use with MultiStepRubric.
+
+    This is functionally identical to SingleTurnEnv, but provides semantic clarity
+    when using MultiStepRubric in single-turn scenarios. In single-turn mode,
+    the MultiStepRubric evaluates requirements against the final model response,
+    following dependency paths based on ground truth answers.
+    """
     pass
 
 class MultiStepMultiTurnEnv(MultiTurnEnv):
@@ -51,6 +59,7 @@ class MultiStepMultiTurnEnv(MultiTurnEnv):
             "finished": False,
             "revealed_info": set(),  # Track what information has been revealed
             "revealed_info_data": revealed_info_data,  # Store the revealed info mapping
+            "progression": [],  # Track chronological progression of the workflow
         }
 
     def env_response(self,  # type: ignore[override]
@@ -64,6 +73,14 @@ class MultiStepMultiTurnEnv(MultiTurnEnv):
         )
 
         return {"role": "user", "content": content}, updated_state
+
+    def _add_progression_step(self, state: Dict[str, Any], turn: int, step_type: str, **data) -> None:
+        """Add a step to the progression tracking."""
+        state["progression"].append({
+            "turn": turn,
+            "step_type": step_type,
+            **data
+        })
 
     def rollout(self,
                 client: OpenAI,
@@ -88,17 +105,21 @@ class MultiStepMultiTurnEnv(MultiTurnEnv):
         # Initialise state before entering parent rollout loop.
         state = self._initialise_state(answer)
 
-        # Use MultiTurnEnv.rollout implementation by delegating via deepcopy of self.
-        # Unfortunately we cannot directly call super().rollout because that method
-        # constructs its own loop; instead we replicate the core logic here with
-        # our custom is_completed/efnv_response hooks.
+        # Record initial prompt
+        turn = 0
+        self._add_progression_step(state, turn, "initial_prompt",
+                                  content=prompt if isinstance(prompt, str) else str(prompt),
+                                  state=self._capture_state_snapshot(state))
 
+        # Main conversation loop
         is_completed = False
         completion: List[Dict[str, Any]] = []
-        turn = 0
+
         while not is_completed:
             if self.is_completed(messages, state):
                 break
+
+            # Get model response
             model_reply = self.get_model_response(
                 prompt=messages,
                 client=client,
@@ -109,13 +130,30 @@ class MultiStepMultiTurnEnv(MultiTurnEnv):
             messages.append({"role": "assistant", "content": model_reply})
             completion.append({"role": "assistant", "content": model_reply})
             turn += 1
+
+            self._add_progression_step(state, turn, "assistant_response", content=model_reply)
+
             if self.is_completed(messages, state) or turn >= self.max_turns:
                 break
-            env_msg, state = self.env_response(messages, state)
 
-            # Only append env_msg if it has actual content
-            # None content means "let model continue naturally without explicit prompting"
+            # Get environment response with state tracking
+            state_before = self._capture_state_snapshot(state)
+            env_msg, state = self.env_response(messages, state)
+            state_after = self._capture_state_snapshot(state)
+
+            self._add_progression_step(state, turn, "rubric_evaluation",
+                                     state_before=state_before,
+                                     state_after=state_after)
+
+            # Add environment message if it has content
             if env_msg.get("content") is not None:
                 messages.append(env_msg)
                 completion.append(env_msg)
+                self._add_progression_step(state, turn, "env_response", content=env_msg["content"])
+
         return completion, state
+
+    def _capture_state_snapshot(self, state: Dict[str, Any]) -> Dict[str, Any]:
+        """Capture a clean snapshot of state without progression data."""
+        return {k: v for k, v in state.items() if k != "progression"}
+# TODO clean up messy state tracking

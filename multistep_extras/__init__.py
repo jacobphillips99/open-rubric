@@ -5,12 +5,10 @@ from .builders import (BranchingWorkflowTemplate, LinearWorkflowTemplate,
                        quick_scenario, quick_workflow)
 from .demos import (MultiStepTutorial, demo_all_possible_paths,
                     demo_branching_template, demo_debugging_visualization,
-                    demo_error_handling, demo_first_responder_visualization,
-                    demo_fluent_builder, demo_linear_template,
-                    demo_quick_helpers, demo_scenario_builder,
-                    demo_workflow_access, demo_workflow_comparison,
-                    demo_workflow_registry, run_builder_demo,
-                    run_registry_demo, run_visualizer_demo)
+                    demo_first_responder_visualization, demo_fluent_builder,
+                    demo_linear_template, demo_quick_helpers,
+                    demo_scenario_builder, demo_workflow_comparison,
+                    run_builder_demo, run_visualizer_demo)
 from .example_rubrics import (AVAILABLE_WORKFLOWS, all_scenarios,
                               debugging_reqs, debugging_scenarios,
                               first_responder_reqs, get_workflow,
@@ -52,10 +50,7 @@ __all__ = [
     "demo_linear_template",
     "demo_quick_helpers",
     "demo_scenario_builder",
-    "demo_workflow_access",
     "demo_workflow_comparison",
-    "demo_workflow_registry",
     "run_builder_demo",
-    "run_registry_demo",
     "run_visualizer_demo",
 ]

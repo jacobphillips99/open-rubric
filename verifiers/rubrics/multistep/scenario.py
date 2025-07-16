@@ -9,7 +9,7 @@ from typing import Optional
 
 # TODO: Scenario Generation from Full Description
 # ================================================
-# 
+#
 # Vision: Instead of manually crafting prompt, answers, and revealed_info separately,
 # scenarios should be generated from a single "full_description" field that contains
 # the complete ground truth of what actually happened in the scenario.
@@ -17,14 +17,14 @@ from typing import Optional
 # Proposed workflow:
 # 1. Author writes a comprehensive full_description containing all scenario details:
 #    - Environmental conditions and hazards
-#    - Patient/subject status and history  
+#    - Patient/subject status and history
 #    - All relevant facts that would inform correct requirement answers
 #    - Complete timeline of events
 #
 # 2. A model with full access to the rubric requirements would "devise" the scenario by:
 #    - Extracting an appropriate initial prompt (limited information to start)
 #    - Determining correct answers for each requirement based on the full description
-#    - Generating revealed_info snippets that progressively unveil details from the 
+#    - Generating revealed_info snippets that progressively unveil details from the
 #      full description as requirements are satisfied
 #
 # Benefits:
@@ -35,12 +35,12 @@ from typing import Optional
 #
 # Example:
 # full_description = """
-# A 34-year-old electrician was working on power lines when electrocuted and fell 
-# 12 feet onto concrete. Multiple active hazards present: live electrical wires 
-# down and sparking in 15-foot radius. Worker unconscious with visible burns on 
+# A 34-year-old electrician was working on power lines when electrocuted and fell
+# 12 feet onto concrete. Multiple active hazards present: live electrical wires
+# down and sparking in 15-foot radius. Worker unconscious with visible burns on
 # hands/arms, shallow irregular breathing, no pulse detected at wrist...
 # """
-# 
+#
 # Model would derive:
 # - prompt: "You arrive at a scene. A person is on the ground. Your view is limited."
 # - answers: {"scene_safety": {"answer": 0.0, "reasoning": "Live electrical hazards"}}

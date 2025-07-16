@@ -6,12 +6,16 @@ for different domains, showcasing the versatility of the multistep evaluation sy
 """
 
 import typing as t
-from collections.abc import Mapping
+
+from verifiers.rubrics.multistep.requirement import Requirement
+from verifiers.rubrics.multistep.scenario import Scenario
 
 # Import debugging example
 from .debugging import requirements as debugging_requirements
 from .debugging import scenarios as debugging_scenarios
 # Import first responder example
+from .first_responder import \
+    advanced_scenarios as first_responder_advanced_scenarios
 from .first_responder import requirements as first_responder_requirements
 from .first_responder import scenarios as first_responder_scenarios
 
@@ -31,35 +35,27 @@ AVAILABLE_WORKFLOWS: dict[str, dict[str, t.Any]] = {
         "description": "Wide-branching workflow for emergency medical situations with parallel assessments",
         "requirements": first_responder_requirements,
         "scenarios": first_responder_scenarios,
-        "characteristics": {
-            "structure": "wide_branching",
-            "depth": "shallow_to_medium",
-            "domain": "emergency_medical",
-            "complexity": "high_parallel",
-        },
+        "advanced_scenarios": first_responder_advanced_scenarios,
     },
     "debugging": {
         "name": "Software Debugging Investigation",
         "description": "Sequential workflow for systematic software problem investigation",
         "requirements": debugging_requirements,
         "scenarios": debugging_scenarios,
-        "characteristics": {
-            "structure": "sequential",
-            "depth": "deep",
-            "domain": "software_engineering",
-            "complexity": "medium_sequential",
-        },
+        "advanced_scenarios": [],
     },
 }
 
 
-def get_workflow(name: str) -> Mapping[str, t.Any]:
+def get_workflow(
+    name: str, advanced: bool = False
+) -> tuple[list[Requirement], list[Scenario]]:
     """
     Get a workflow by name.
 
     Args:
         name: Name of the workflow ('first_responder' or 'debugging')
-
+        advanced: Whether to return advanced scenarios (default: False)
     Returns:
         Dictionary containing workflow information
 
@@ -70,7 +66,12 @@ def get_workflow(name: str) -> Mapping[str, t.Any]:
         available = ", ".join(AVAILABLE_WORKFLOWS.keys())
         raise KeyError(f"Workflow '{name}' not found. Available workflows: {available}")
 
-    return AVAILABLE_WORKFLOWS[name]
+    reqs = AVAILABLE_WORKFLOWS[name]["requirements"]
+    if advanced:
+        scenarios = AVAILABLE_WORKFLOWS[name]["advanced_scenarios"]
+    else:
+        scenarios = AVAILABLE_WORKFLOWS[name]["scenarios"]
+    return reqs, scenarios
 
 
 def list_workflows() -> list[str]:

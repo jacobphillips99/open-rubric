@@ -344,10 +344,10 @@ advanced_scenarios = [
             },
         },
         revealed_info={
-            "scene_safety": "Scene Assessment: The area is secure. No traffic, electrical hazards, or dangerous individuals present. Safe to approach.",
-            "initial_assessment": "Patient Status: Adult male, unconscious. Eyes closed, no response to verbal stimuli. Appears critical.",
-            "breathing_support": "Breathing Assessment: Inadequate breathing detected. Shallow, irregular pattern. Immediate intervention needed.",
-            "emergency_protocols": "Emergency Response: Emergency services contacted. Advanced life support en route. Protocols active.",
+            "scene_safety": "Scene Assessment: No traffic, electrical hazards, or dangerous individuals present.",
+            "initial_assessment": "Patient Status: Adult male, unconscious. Eyes closed, no response to verbal stimuli.",
+            "breathing_support": "Breathing Assessment: Shallow, irregular breathing pattern detected.",
+            "emergency_protocols": "Emergency Resources: Emergency radio frequencies are available and functioning.",
         },
     ),
 ]
