@@ -322,18 +322,6 @@ scenarios = [
 ]
 advanced_scenarios = [
     Scenario(
-        name="Unsafe Construction Site",
-        description="Trapped worker in hazardous environment",
-        prompt="At an active construction site, you receive a call about a worker trapped under a pile of steel beams and concrete debris. Other workers are frantically trying to dig him out. There's heavy equipment still operating nearby, loose materials overhead, and unstable structures. The trapped worker is conscious and calling for help, with visible bleeding from his head and arms.",
-        completion="I need to immediately assess scene safety before approaching. This scene has multiple hazards - active heavy equipment, unstable structures, and loose overhead materials that could cause secondary collapse. I cannot safely approach the patient until the scene is secured. I'll coordinate with site supervisors to shut down equipment, establish a safety perimeter, and get proper rescue equipment before attempting patient access.",
-        answers={
-            "scene_safety": {
-                "answer": 0.0,
-                "reasoning": "Multiple hazards present including active equipment, unstable structures, and overhead materials",
-            },
-        },
-    ),
-    Scenario(
         name="Progressive Emergency Response",
         description="First responder scenario with progressive information revelation",
         prompt="You are a first responder arriving at a scene. A person is on the ground. Your view is limited.",
@@ -356,22 +344,10 @@ advanced_scenarios = [
             },
         },
         revealed_info={
-            "scene_safety": {
-                "1.0": "🔍 Scene Assessment: The area is secure. No traffic, electrical hazards, or dangerous individuals present. Safe to approach.",
-                "0.0": "⚠️ Scene Assessment: Multiple hazards detected. Do not approach until scene is secured.",
-            },
-            "initial_assessment": {
-                "1.0": "👤 Patient Status: Adult male, conscious and alert. Responsive to voice, tracking movement with eyes.",
-                "0.0": "👤 Patient Status: Adult male, unconscious. Eyes closed, no response to verbal stimuli. Appears critical.",
-            },
-            "breathing_support": {
-                "1.0": "💨 Breathing Assessment: Patient breathing normally, clear chest rise and fall. No distress.",
-                "0.0": "💨 Breathing Assessment: Inadequate breathing detected. Shallow, irregular pattern. Immediate intervention needed.",
-            },
-            "emergency_protocols": {
-                "1.0": "📞 Emergency Response: Emergency services contacted. Advanced life support en route. Protocols active.",
-                "0.0": "📞 Emergency Response: Emergency protocols not yet initiated. Critical time window.",
-            },
+            "scene_safety": "Scene Assessment: The area is secure. No traffic, electrical hazards, or dangerous individuals present. Safe to approach.",
+            "initial_assessment": "Patient Status: Adult male, unconscious. Eyes closed, no response to verbal stimuli. Appears critical.",
+            "breathing_support": "Breathing Assessment: Inadequate breathing detected. Shallow, irregular pattern. Immediate intervention needed.",
+            "emergency_protocols": "Emergency Response: Emergency services contacted. Advanced life support en route. Protocols active.",
         },
     ),
 ]

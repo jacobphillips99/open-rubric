@@ -394,39 +394,17 @@ class MultiStepRubric(Rubric):
 
                     # Only proceed if judge determined the response was correct
                     if judge_score == 1.0 and req_name in revealed_info_data:
-                        # Use ground truth answer for revealed info lookup
-                        gt_answer = answers_gt.get(req_name)
-                        if gt_answer is not None:
-                            score_key = str(float(gt_answer))
+                        info_key = req_name
+                        if info_key not in revealed_info_set:
+                            # Add the revealed information
+                            revealed_info_content.append(revealed_info_data[req_name])
+                            revealed_info_set.add(info_key)
+                            new_info_found = True
                             print(
-                                f"DEBUG: Judge approved correct response for {req_name}, using ground truth answer {gt_answer} -> score_key '{score_key}'"
+                                f"DEBUG: Added revealed info for {req_name}: {revealed_info_data[req_name]}"
                             )
-                            print(
-                                f"DEBUG: Available keys in revealed_info_data[{req_name}]: {list(revealed_info_data[req_name].keys())}"
-                            )
-
-                            if score_key in revealed_info_data[req_name]:
-                                info_key = f"{req_name}_{score_key}"
-                                if info_key not in revealed_info_set:
-                                    # Add the revealed information
-                                    revealed_info_content.append(
-                                        revealed_info_data[req_name][score_key]
-                                    )
-                                    revealed_info_set.add(info_key)
-                                    new_info_found = True
-                                    print(
-                                        f"DEBUG: Added revealed info for {req_name}: {revealed_info_data[req_name][score_key]}"
-                                    )
-                                else:
-                                    print(
-                                        f"DEBUG: Info already revealed for {info_key}"
-                                    )
-                            else:
-                                print(
-                                    f"DEBUG: No revealed info found for score_key '{score_key}' in {req_name}"
-                                )
                         else:
-                            print(f"DEBUG: No ground truth answer found for {req_name}")
+                            print(f"DEBUG: Info already revealed for {info_key}")
                     elif judge_score != 1.0:
                         print(
                             f"DEBUG: Judge determined incorrect response for {req_name} (score: {judge_score}), no info revealed"
