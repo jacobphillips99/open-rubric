@@ -10,7 +10,6 @@ from verifiers.rewards.judge_reward import JudgeRewarder
 from verifiers.rubrics.multistep.enums import EvaluationMode, TerminalCondition
 from verifiers.rubrics.multistep.nodes import RequirementRewardNode
 from verifiers.rubrics.multistep.requirement import Requirement
-from verifiers.rubrics.multistep.results import EvaluationResult
 from verifiers.rubrics.multistep.reward_strategies import (
     LevelWeightedRewardStrategy, RewardStrategy)
 from verifiers.rubrics.multistep.scenario import Scenario
@@ -21,37 +20,35 @@ from verifiers.rubrics.rubric import Rubric
 class MultiStepRubric(Rubric):
     """
     Rubric that evaluates requirements with dependencies in both single-turn and multi-turn environments.
-    Requirements are evaluated according to the scenario, the policy model's answers, and the ground truth answers, according the Reward (which may be a Judge).
+
+    The policy model provides responses which are evaluated by a judge against ground truth answers.
+    The judge's determination of correctness drives workflow progression:
+    - Correct answers continue down the dependency path and may reveal information
+    - Incorrect answers stop that branch immediately
+    - Rewards are calculated per requirement based on judge evaluation
 
     The MultiStepRubric organizes requirements into a dependency graph where each requirement can have
     conditional dependencies on the outcomes of other requirements. This enables complex, branching
-    evaluation workflows that adapt based on intermediate results.
+    evaluation workflows that adapt based on judge-determined correctness.
 
     ## Usage Patterns
 
     ### Single-Turn Environment
-    In the single-turn environment, the rubric evaluates all requirements at the end of a complete interaction:
-    - Some or all requirements are evaluated against the final response, based on the evaluation mode
-    - Dependencies can determine the evaluation path through the requirement graph
-    - Results provide a comprehensive assessment of the entire response
-
+    In the single-turn environment, the rubric evaluates requirements against the final response:
+    - Judge evaluates model response against ground truth for each requirement
+    - Dependencies determine evaluation path based on ground truth answers (when judge says correct)
+    - Results provide assessment based on judge-determined correctness
 
     ### Multi-Turn Environment
     In the multi-turn environment, the rubric drives an interactive conversation workflow:
     - Requirements are evaluated incrementally as the conversation progresses
-    - The rubric advances through (potentially multiple) dependency levels on each turn
-    - When requirements trigger revealed information in the Scenario, that information is provided to the model
-    - The rubric continues advancing through levels until new information is found or the workflow completes
-
-    ## Evaluation Modes
-    - **REFERENCE_GUIDED**: Follows ground truth answers to evaluate on the "correct" path
-    - **MODEL_GUIDED**: Follows the model's actual answers through the dependency graph
-    - **EXHAUSTIVE**: Evaluates all requirements regardless of dependencies
-    - **ADAPTIVE**: Stops gracefully when no valid path forward exists
+    - Judge determines if model responses align with ground truth
+    - Only correct judge evaluations trigger information revelation and path continuation
+    - The rubric advances through dependency levels based on judge-approved correct answers
 
     ## Key Features
-    - Topological sorting ensures requirements are evaluated in dependency order
-    - Progressive information revelation based on requirement outcomes
+    - Judge-driven evaluation against ground truth answers
+    - Progressive information revelation only on correct judge evaluations
     - Flexible reward strategies for different evaluation objectives
     - Robust handling of missing dependencies and evaluation errors
     """
@@ -95,30 +92,115 @@ class MultiStepRubric(Rubric):
         self.levels = topological_levels(self.name_to_dependency_options)
         self.levels.reverse()
 
-    def validate(
-        self, scenario: Scenario, mode: Optional[EvaluationMode] = None, **kwargs
-    ) -> None:
+    async def evaluate(
+        self,
+        scenario: Scenario,
+        ground_truth_answers: Optional[Dict[str, float]] = None,
+        **kwargs,
+    ) -> Dict[str, Any]:
+        """
+        Evaluate the scenario using judge-driven workflow progression.
+
+        The judge evaluates the model's response against ground truth answers.
+        Only when the judge determines correctness do we follow dependency paths.
+
+        Args:
+            scenario: The scenario to evaluate
+            ground_truth_answers: Optional ground truth answers (uses scenario.answers if not provided)
+            **kwargs: Additional arguments for evaluation
+
+        Returns:
+            Dictionary containing evaluation results by level
+        """
+        # Validate that we have ground truth data
+        if ground_truth_answers is None:
+            if not scenario.answers:
+                raise ValueError(
+                    "ground_truth_answers or scenario.answers required for evaluation"
+                )
+
+            # Convert scenario.answers to ground_truth_answers format
+            ground_truth_answers = {}
+            for req_name, answer_data in scenario.answers.items():
+                # Skip None answers
+                if answer_data is None:
+                    continue
+                if isinstance(answer_data, dict) and "answer" in answer_data:
+                    answer_value = answer_data["answer"]
+                    # Only include non-None answer values that are numeric
+                    if answer_value is not None and isinstance(
+                        answer_value, (int, float)
+                    ):
+                        ground_truth_answers[req_name] = float(answer_value)
+                elif answer_data is not None and isinstance(answer_data, (int, float)):
+                    # Old format: direct value, only if not None and numeric
+                    ground_truth_answers[req_name] = float(answer_data)
+
+        state: Dict[int, Dict[str, Any]] = defaultdict(dict)
+        i = 0
+        level = self.levels[0] if self.levels else []
+
+        while level:
+            print(f"Evaluating level {i}: {level}")
+
+            # Only evaluate requirements that have ground truth answers
+            level_with_answers = [
+                name for name in level if name in ground_truth_answers
+            ]
+
+            if not level_with_answers:
+                break  # No requirements to evaluate at this level
+
+            nodes = [self.name_to_node[name] for name in level_with_answers]
+
+            # Evaluate model response with judge for each requirement
+            coros = [node(scenario, **kwargs) for node in nodes]
+            judge_scores = dict(zip(level_with_answers, await asyncio.gather(*coros)))
+            state[i] = judge_scores
+
+            # Determine next level based on ground truth answers where judge said correct
+            next_level = []
+            for name in level_with_answers:
+                node = self.name_to_node[name]
+                judge_score = judge_scores[name]
+                gt_answer = ground_truth_answers[name]
+
+                # Only follow dependencies if judge determined the response was correct
+                # Judge score of 1.0 means correct, anything else means incorrect
+                if (
+                    judge_score == 1.0  # Judge says model response was correct
+                    and not node.requirement.terminal()
+                    and gt_answer in node.requirement.dependencies
+                ):
+                    # Follow the dependency path for the ground truth answer
+                    next_level.extend(node.requirement.dependencies[gt_answer])
+
+            level = list(set(next_level))
+            i += 1
+
+            print(f"level {i} judge scores: {judge_scores}")
+
+        return {str(k): v for k, v in state.items()}  # Convert int keys to string
+
+    def validate(self, scenario: Scenario, **kwargs) -> None:
         """
         Validate that the scenario is compatible with this rubric's requirements.
 
         Args:
             scenario: The scenario to validate
-            mode: The evaluation mode (for mode-specific validation)
             **kwargs: Additional arguments that may contain ground_truth_answers
 
         Raises:
             ValueError: If validation fails
         """
-        # Mode-specific validation first
-        if mode == EvaluationMode.REFERENCE_GUIDED:
-            if not scenario.answers:
-                raise ValueError(
-                    "scenario.answers is required for REFERENCE_GUIDED mode"
-                )
+        # Require ground truth answers for evaluation
+        if not scenario.answers:
+            raise ValueError(
+                "scenario.answers is required for MultiStepRubric evaluation"
+            )
 
-        # Only validate answers when they exist and are not None
-        if scenario.answers:
-            self._validate_answers(scenario.answers)
+        # Validate answers when they exist and are not None
+        self._validate_answers(scenario.answers)
 
     def _validate_answers(self, answers: Mapping[str, Any]) -> None:
         """
@@ -167,221 +249,6 @@ class MultiStepRubric(Rubric):
                     f"Valid options are: {valid_options}"
                 )
 
-    async def evaluate_adaptive(
-        self, scenario: Scenario, max_depth: int = 10, **kwargs
-    ) -> EvaluationResult:
-        """
-        Adaptive evaluation that stops gracefully when no valid path forward exists.
-        Returns detailed results including terminal condition and completion status.
-        """
-        state: Dict[int, Dict[str, Any]] = defaultdict(dict)
-        completed_requirements = set()
-        i = 0
-        level = self.levels[0] if self.levels else []
-
-        while level and i < max_depth:
-            print(f"Evaluating level {i}: {level}")
-            nodes = [self.name_to_node[name] for name in level]
-
-            # Evaluate all nodes in this level
-            level_results = {}
-
-            for name, node in zip(level, nodes):
-                try:
-                    result = await node(scenario, **kwargs)
-                    level_results[name] = result
-                    completed_requirements.add(name)
-                except Exception as e:
-                    print(f"Error evaluating {name}: {e}")
-                    level_results[name] = 0.0
-
-            state[i] = level_results
-
-            # Determine next level - only proceed if we have valid paths
-            next_level = []
-
-            for name, result in level_results.items():
-                node = self.name_to_node[name]
-                if not node.requirement.terminal():
-                    # Check if we have a valid result that maps to dependencies
-                    if (
-                        isinstance(result, (int, float))
-                        and result in node.requirement.dependencies
-                    ):
-                        next_level.extend(node.requirement.dependencies[result])
-
-            # Stop if no valid path forward
-            if not next_level:
-                terminal_condition = (
-                    TerminalCondition.NO_VALID_PATH
-                    if i > 0
-                    else TerminalCondition.COMPLETED
-                )
-                return EvaluationResult(
-                    {str(k): v for k, v in state.items()},  # Convert int keys to string
-                    terminal_condition,
-                    completed_requirements,
-                    len(self.requirements),
-                )
-
-            level = list(set(next_level))
-            i += 1
-
-        # Determine terminal condition
-        if i >= max_depth:
-            terminal_condition = TerminalCondition.MAX_DEPTH_REACHED
-        else:
-            terminal_condition = TerminalCondition.COMPLETED
-
-        return EvaluationResult(
-            {str(k): v for k, v in state.items()},  # Convert int keys to string
-            terminal_condition,
-            completed_requirements,
-            len(self.requirements),
-        )
-
-    async def evaluate_model_guided(
-        self, scenario: Scenario, start_level_idx: int = 0, **kwargs
-    ) -> Dict[str, Any]:
-        """
-        Follow the model's answers through the dependency graph.
-        Simulates the actual workflow path the model would take.
-        """
-        state: Dict[int, Dict[str, Any]] = defaultdict(dict)
-        i = start_level_idx
-        level = (
-            self.levels[start_level_idx] if start_level_idx < len(self.levels) else []
-        )
-
-        while level:
-            print(f"Evaluating level {i}: {level}")
-            nodes = [self.name_to_node[name] for name in level]
-
-            # Evaluate all nodes in this level
-            coros = [node(scenario, **kwargs) for node in nodes]
-            level_answers = dict(zip(level, await asyncio.gather(*coros)))
-            state[i] = level_answers
-
-            # Determine next level based on model's answers
-            next_level = []
-            for name, model_answer in level_answers.items():
-                node = self.name_to_node[name]
-                if (
-                    not node.requirement.terminal()
-                    and model_answer in node.requirement.dependencies
-                ):
-                    next_level.extend(node.requirement.dependencies[model_answer])
-
-            level = list(set(next_level))
-            i += 1
-
-        return {str(k): v for k, v in state.items()}  # Convert int keys to string
-
-    async def evaluate_reference_guided(
-        self, scenario: Scenario, ground_truth_answers: Dict[str, float], **kwargs
-    ) -> Dict[str, Any]:
-        """
-        Follow the ground truth answers through the dependency graph.
-        Evaluates model performance on the "correct" workflow path.
-        """
-        state: Dict[int, Dict[str, Any]] = defaultdict(dict)
-        i = 0
-        level = self.levels[0] if self.levels else []
-
-        while level:
-            print(f"Evaluating reference level {i}: {level}")
-
-            # Only evaluate requirements that have ground truth answers
-            level_with_answers = [
-                name for name in level if name in ground_truth_answers
-            ]
-
-            if not level_with_answers:
-                break  # No requirements to evaluate at this level
-
-            nodes = [self.name_to_node[name] for name in level_with_answers]
-
-            # Evaluate model on this level
-            coros = [node(scenario, **kwargs) for node in nodes]
-            level_scores = dict(zip(level_with_answers, await asyncio.gather(*coros)))
-            state[i] = level_scores
-
-            # Determine next level based on ground truth answers
-            next_level = []
-            for name in level_with_answers:
-                node = self.name_to_node[name]
-                gt_answer = ground_truth_answers[name]
-                if (
-                    not node.requirement.terminal()
-                    and gt_answer in node.requirement.dependencies
-                ):
-                    next_level.extend(node.requirement.dependencies[gt_answer])
-
-            level = list(set(next_level))
-            i += 1
-
-            print(f"level {i} scores: {level_scores}")
-
-        return {str(k): v for k, v in state.items()}  # Convert int keys to string
-
-    async def evaluate_exhaustive(
-        self, scenario: Scenario, **kwargs
-    ) -> Dict[str, float]:
-        """
-        Evaluate all requirements regardless of dependencies.
-        Provides comprehensive capability assessment.
-        """
-        all_nodes = list(self.name_to_node.values())
-
-        # Evaluate all nodes in parallel
-        coros = [node(scenario, **kwargs) for node in all_nodes]
-        all_scores = await asyncio.gather(*coros)
-
-        return {node.name: score for node, score in zip(all_nodes, all_scores)}
-
-    async def evaluate(
-        self,
-        scenario: Scenario,
-        mode: EvaluationMode = EvaluationMode.MODEL_GUIDED,
-        **kwargs,
-    ) -> Union[Dict[str, Any], EvaluationResult]:
-        """Dispatch evaluation to appropriate mode based on evaluation mode."""
-        self.validate(scenario, mode, **kwargs)  # Validate scenario before evaluation
-        if mode == EvaluationMode.MODEL_GUIDED:
-            return await self.evaluate_model_guided(scenario, **kwargs)
-        elif mode == EvaluationMode.REFERENCE_GUIDED:
-            if "ground_truth_answers" not in kwargs:
-                # Convert scenario.answers to ground_truth_answers format
-                ground_truth_answers: Dict[str, float] = {}
-                if scenario.answers:
-                    for req_name, answer_data in scenario.answers.items():
-                        # Skip None answers
-                        if answer_data is None:
-                            continue
-                        if isinstance(answer_data, dict) and "answer" in answer_data:
-                            answer_value = answer_data["answer"]
-                            # Only include non-None answer values that are numeric
-                            if answer_value is not None and isinstance(
-                                answer_value, (int, float)
-                            ):
-                                ground_truth_answers[req_name] = float(answer_value)
-                        elif answer_data is not None and isinstance(
-                            answer_data, (int, float)
-                        ):
-                            # Old format: direct value, only if not None and numeric
-                            ground_truth_answers[req_name] = float(answer_data)
-            else:
-                ground_truth_answers = kwargs.pop("ground_truth_answers")
-            return await self.evaluate_reference_guided(
-                scenario, ground_truth_answers, **kwargs
-            )
-        elif mode == EvaluationMode.EXHAUSTIVE:
-            return await self.evaluate_exhaustive(scenario, **kwargs)
-        elif mode == EvaluationMode.ADAPTIVE:
-            return await self.evaluate_adaptive(scenario, **kwargs)
-        else:
-            raise ValueError(f"Unknown evaluation mode: {mode}")
-
     async def score_rollout(
         self,
         prompt: Union[str, List[Dict[str, Any]]],
@@ -390,11 +257,10 @@ class MultiStepRubric(Rubric):
         state: Dict[str, Any],
         task: str = "default",
         info: Optional[dict] = None,
-        mode: EvaluationMode = EvaluationMode.REFERENCE_GUIDED,
         **kwargs,
     ) -> Dict[str, Any]:
         """
-        Enhanced score_rollout that can handle different evaluation modes and terminal conditions.
+        Score a rollout using judge-driven evaluation strategy.
         Uses configurable reward strategy for flexible reward calculation.
         """
         if info is None:
@@ -408,29 +274,21 @@ class MultiStepRubric(Rubric):
         scenario = Scenario(
             prompt=prompt_str, completion=completion_str, answers=answer
         )
-        result = await self.evaluate(scenario, mode=mode, **kwargs)
+        result = await self.evaluate(scenario, **kwargs)
 
         # Calculate reward using the configured strategy
         reward_kwargs = {"total_requirements": len(self.requirements), **kwargs}
-        reward = self.reward_strategy.calculate_reward(result, mode, **reward_kwargs)
+        reward = self.reward_strategy.calculate_reward(
+            result, EvaluationMode.MODEL_GUIDED, **reward_kwargs
+        )
 
-        if isinstance(result, EvaluationResult):
-            # Adaptive evaluation
-            return {
-                **result.to_dict(),
-                "reward": reward,
-                "reward_strategy": self.reward_strategy.name,
-                "mode": mode.value,
-            }
-        else:
-            # Traditional evaluation modes
-            return {
-                "state": result,
-                "reward": reward,
-                "reward_strategy": self.reward_strategy.name,
-                "mode": mode.value,
-                "terminal_condition": TerminalCondition.COMPLETED.value,
-            }
+        return {
+            "state": result,
+            "reward": reward,
+            "reward_strategy": self.reward_strategy.name,
+            "mode": EvaluationMode.MODEL_GUIDED.value,
+            "terminal_condition": TerminalCondition.COMPLETED.value,
+        }
 
     def get_next_conversation_step(
         self, messages: List[Dict[str, Any]], state: Dict[str, Any], **kwargs
@@ -438,6 +296,9 @@ class MultiStepRubric(Rubric):
         """
         Determine the next step in the conversation workflow using incremental evaluation.
         Continues evaluating until new information is found or workflow is finished.
+
+        The judge evaluates model responses against ground truth. Only correct judge
+        evaluations trigger information revelation and dependency progression.
 
         Args:
             messages: List of conversation messages so far
@@ -517,6 +378,7 @@ class MultiStepRubric(Rubric):
                     current_level_scores = {}
 
             # Check for revealed information from current level scores
+            # Only reveal info when judge determined the response was correct (score == 1.0)
             revealed_info_content = []
             new_info_found = False
 
@@ -525,17 +387,19 @@ class MultiStepRubric(Rubric):
                 print(f"DEBUG: answers_gt = {answers_gt}")
                 print(f"DEBUG: revealed_info_data = {revealed_info_data}")
 
-                for req_name, score in current_level_scores.items():
+                for req_name, judge_score in current_level_scores.items():
                     print(
-                        f"DEBUG: Processing {req_name} with score {score} (type: {type(score)})"
+                        f"DEBUG: Processing {req_name} with judge_score {judge_score} (type: {type(judge_score)})"
                     )
-                    if req_name in revealed_info_data:
-                        # Use ground truth answer instead of model score for revealed info lookup
+
+                    # Only proceed if judge determined the response was correct
+                    if judge_score == 1.0 and req_name in revealed_info_data:
+                        # Use ground truth answer for revealed info lookup
                         gt_answer = answers_gt.get(req_name)
                         if gt_answer is not None:
                             score_key = str(float(gt_answer))
                             print(
-                                f"DEBUG: Using ground truth answer {gt_answer} -> score_key '{score_key}'"
+                                f"DEBUG: Judge approved correct response for {req_name}, using ground truth answer {gt_answer} -> score_key '{score_key}'"
                             )
                             print(
                                 f"DEBUG: Available keys in revealed_info_data[{req_name}]: {list(revealed_info_data[req_name].keys())}"
@@ -544,7 +408,7 @@ class MultiStepRubric(Rubric):
                             if score_key in revealed_info_data[req_name]:
                                 info_key = f"{req_name}_{score_key}"
                                 if info_key not in revealed_info_set:
-                                    # Just add the raw revealed information, no prefix or formatting
+                                    # Add the revealed information
                                     revealed_info_content.append(
                                         revealed_info_data[req_name][score_key]
                                     )
@@ -563,19 +427,29 @@ class MultiStepRubric(Rubric):
                                 )
                         else:
                             print(f"DEBUG: No ground truth answer found for {req_name}")
+                    elif judge_score != 1.0:
+                        print(
+                            f"DEBUG: Judge determined incorrect response for {req_name} (score: {judge_score}), no info revealed"
+                        )
                     else:
                         print(f"DEBUG: {req_name} not in revealed_info_data")
 
             # Determine next requirements based on current level results
+            # Only follow dependencies where judge determined correctness (score == 1.0)
             next_reqs: List[str] = []
-            for req_name, score in current_level_scores.items():
+            for req_name, judge_score in current_level_scores.items():
                 req = self.name_to_req[req_name]
+                gt_answer = answers_gt.get(req_name)
+
+                # Only follow dependencies if judge says correct AND we have valid ground truth
                 if (
-                    not req.terminal()
+                    judge_score == 1.0  # Judge determined response was correct
+                    and not req.terminal()
                     and req.dependencies is not None
-                    and score in req.dependencies
+                    and gt_answer is not None
+                    and gt_answer in req.dependencies
                 ):
-                    next_reqs.extend(req.dependencies[score])
+                    next_reqs.extend(req.dependencies[gt_answer])
 
             next_reqs = list(set(next_reqs))
 

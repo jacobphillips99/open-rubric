@@ -6,7 +6,7 @@ from openai import OpenAI
 
 from verifiers.envs.multiturn_env import MultiTurnEnv
 from verifiers.envs.singleturn_env import SingleTurnEnv
-from verifiers.rubrics.multistep.enums import EvaluationMode
+
 from verifiers.rubrics.multistep.multistep_rubric import MultiStepRubric
 from verifiers.rubrics.multistep.scenario import Scenario
 
@@ -19,12 +19,10 @@ class MultiStepMultiTurnEnv(MultiTurnEnv):
     def __init__(self,
                  multistep_rubric: MultiStepRubric,
                  max_turns: int = 10,
-                 rubric_mode: EvaluationMode = EvaluationMode.REFERENCE_GUIDED,
                  **kwargs):
         # Prepare adapter before calling parent constructor.
         super().__init__(max_turns=max_turns, rubric=multistep_rubric, **kwargs)
         self.ms_rubric = multistep_rubric
-        self.rubric_mode = rubric_mode
 
     def is_completed(self, messages: List[Dict[str, Any]], state: Dict[str, Any], **kwargs) -> bool:
         """Check if the workflow is completed based on state."""
