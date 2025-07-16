@@ -229,11 +229,26 @@ scenarios = [
         prompt="You are a first responder arriving at a residential street. You come across a patient who is unconscious and not breathing, lying on the sidewalk. There are no immediate hazards visible, no electrical wires down, no fire, and no aggressive bystanders. The area appears secure.",
         completion="First, I'll check if the scene is safe. Since there are no visible hazards, I'll proceed. The patient is unconscious and not breathing, so I'll immediately check their airway and begin CPR. I'll call for advanced life support and continue resuscitation efforts.",
         answers={
-            "scene_safety": 1.0,
-            "initial_assessment": 0.0,
-            "airway_management": 0.0,
-            "breathing_support": 0.0,
-            "emergency_protocols": 1.0,
+            "scene_safety": {
+                "answer": 1.0,
+                "reasoning": "The residential street has no visible hazards, electrical wires, fire, or aggressive bystanders",
+            },
+            "initial_assessment": {
+                "answer": 0.0,
+                "reasoning": "Patient is unconscious and not breathing, requiring immediate life support",
+            },
+            "airway_management": {
+                "answer": 0.0,
+                "reasoning": "Airway needs immediate attention as patient is not breathing",
+            },
+            "breathing_support": {
+                "answer": 0.0,
+                "reasoning": "Patient is not breathing and requires immediate respiratory support",
+            },
+            "emergency_protocols": {
+                "answer": 1.0,
+                "reasoning": "CPR initiated and advanced life support called",
+            },
         },
     ),
     Scenario(
@@ -242,12 +257,30 @@ scenarios = [
         prompt="You arrive at a car accident scene on a quiet suburban road. The vehicle has come to rest safely on the shoulder, away from traffic. The patient is conscious, alert, and sitting in the driver's seat but has a deep laceration on their left arm that's bleeding heavily, soaking through their shirt.",
         completion="After confirming scene safety and ensuring no traffic hazards, I'll approach the patient. They're alert and responsive, so I'll introduce myself and explain what I'm doing. I'll immediately apply direct pressure to the arm wound to control bleeding while simultaneously assessing their vital signs and checking for other injuries. Once bleeding is controlled, I'll gather their medical history and symptoms, then prepare them for transport to the hospital.",
         answers={
-            "scene_safety": 1.0,
-            "initial_assessment": 1.0,
-            "trauma_check": 1.0,
-            "bleeding_control": 1.0,
-            "communication": 1.0,
-            "transport_decision": 1.0,
+            "scene_safety": {
+                "answer": 1.0,
+                "reasoning": "Vehicle is safely positioned on the shoulder away from traffic hazards",
+            },
+            "initial_assessment": {
+                "answer": 1.0,
+                "reasoning": "Patient is conscious, alert, and sitting upright in driver's seat",
+            },
+            "trauma_check": {
+                "answer": 1.0,
+                "reasoning": "Visible deep laceration on left arm with heavy bleeding identified",
+            },
+            "bleeding_control": {
+                "answer": 1.0,
+                "reasoning": "Direct pressure applied to arm wound to control bleeding",
+            },
+            "communication": {
+                "answer": 1.0,
+                "reasoning": "Patient is alert and responsive, able to communicate effectively",
+            },
+            "transport_decision": {
+                "answer": 1.0,
+                "reasoning": "Patient prepared for hospital transport after bleeding control",
+            },
         },
     ),
     Scenario(
@@ -256,22 +289,89 @@ scenarios = [
         prompt="You find an elderly patient (approximately 75 years old) who has fallen in their bathroom. They are awake and oriented but complaining of severe pain in their right hip (8/10 on pain scale) and are completely unable to move their right leg. They describe hearing a 'pop' when they fell. The scene is secure with no ongoing hazards.",
         completion="After ensuring scene safety, I'll assess their level of consciousness - they're alert and oriented. Given the mechanism of injury (fall), their age, the severe hip pain, inability to move the leg, and the audible 'pop', I strongly suspect a hip fracture. I'll assess their current pain level, provide initial pain management if within my scope, and carefully immobilize them in position before any movement. I'll prepare them for transport while providing comfort measures.",
         answers={
-            "scene_safety": 1.0,
-            "initial_assessment": 1.0,
-            "trauma_check": 1.0,
-            "pain_assessment": 1.0,
-            "pain_management": 1.0,
-            "immobilization": 1.0,
-            "transport_preparation": 1.0,
+            "scene_safety": {
+                "answer": 1.0,
+                "reasoning": "Bathroom environment is secure with no ongoing hazards",
+            },
+            "initial_assessment": {
+                "answer": 1.0,
+                "reasoning": "Patient is awake, oriented, and able to communicate",
+            },
+            "trauma_check": {
+                "answer": 1.0,
+                "reasoning": "Fall mechanism with audible 'pop' and inability to move leg indicates trauma",
+            },
+            "pain_assessment": {
+                "answer": 1.0,
+                "reasoning": "Severe hip pain assessed at 8/10 on pain scale",
+            },
+            "pain_management": {
+                "answer": 1.0,
+                "reasoning": "Initial pain management provided within scope of practice",
+            },
+            "immobilization": {
+                "answer": 1.0,
+                "reasoning": "Patient carefully immobilized in position due to suspected hip fracture",
+            },
+            "transport_preparation": {
+                "answer": 1.0,
+                "reasoning": "Patient prepared for transport with comfort measures",
+            },
         },
     ),
+]
+advanced_scenarios = [
     Scenario(
         name="Unsafe Construction Site",
         description="Trapped worker in hazardous environment",
         prompt="At an active construction site, you receive a call about a worker trapped under a pile of steel beams and concrete debris. Other workers are frantically trying to dig him out. There's heavy equipment still operating nearby, loose materials overhead, and unstable structures. The trapped worker is conscious and calling for help, with visible bleeding from his head and arms.",
         completion="I need to immediately assess scene safety before approaching. This scene has multiple hazards - active heavy equipment, unstable structures, and loose overhead materials that could cause secondary collapse. I cannot safely approach the patient until the scene is secured. I'll coordinate with site supervisors to shut down equipment, establish a safety perimeter, and get proper rescue equipment before attempting patient access.",
         answers={
-            "scene_safety": 0.0,
+            "scene_safety": {
+                "answer": 0.0,
+                "reasoning": "Multiple hazards present including active equipment, unstable structures, and overhead materials",
+            },
+        },
+    ),
+    Scenario(
+        name="Progressive Emergency Response",
+        description="First responder scenario with progressive information revelation",
+        prompt="You are a first responder arriving at a scene. A person is on the ground. Your view is limited.",
+        answers={
+            "scene_safety": {
+                "answer": 1.0,
+                "reasoning": "Area is secure with no traffic, electrical, or personal safety hazards",
+            },
+            "initial_assessment": {
+                "answer": 0.0,
+                "reasoning": "Patient is unconscious with no response to verbal stimuli",
+            },
+            "breathing_support": {
+                "answer": 0.0,
+                "reasoning": "Inadequate breathing pattern detected requiring immediate intervention",
+            },
+            "emergency_protocols": {
+                "answer": 1.0,
+                "reasoning": "Emergency services contacted and advanced life support en route",
+            },
+        },
+        revealed_info={
+            "scene_safety": {
+                "1.0": "🔍 Scene Assessment: The area is secure. No traffic, electrical hazards, or dangerous individuals present. Safe to approach.",
+                "0.0": "⚠️ Scene Assessment: Multiple hazards detected. Do not approach until scene is secured.",
+            },
+            "initial_assessment": {
+                "1.0": "👤 Patient Status: Adult male, conscious and alert. Responsive to voice, tracking movement with eyes.",
+                "0.0": "👤 Patient Status: Adult male, unconscious. Eyes closed, no response to verbal stimuli. Appears critical.",
+            },
+            "breathing_support": {
+                "1.0": "💨 Breathing Assessment: Patient breathing normally, clear chest rise and fall. No distress.",
+                "0.0": "💨 Breathing Assessment: Inadequate breathing detected. Shallow, irregular pattern. Immediate intervention needed.",
+            },
+            "emergency_protocols": {
+                "1.0": "📞 Emergency Response: Emergency services contacted. Advanced life support en route. Protocols active.",
+                "0.0": "📞 Emergency Response: Emergency protocols not yet initiated. Critical time window.",
+            },
         },
     ),
 ]

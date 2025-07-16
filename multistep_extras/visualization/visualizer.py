@@ -81,28 +81,41 @@ class WorkflowVisualizer:
         Returns:
             Dict with workflow metrics
         """
-        terminal_nodes = [req for req in self.requirements if req.terminal()]
-        branching_nodes = [req for req in self.requirements if not req.terminal()]
-
-        # Calculate branching factor
-        total_branches = sum(
-            len(req.dependencies) if req.dependencies else 0 for req in branching_nodes
-        )
-        avg_branching_factor = (
-            total_branches / len(branching_nodes) if branching_nodes else 0
-        )
+        # Get nodes
+        terminal_nodes = [
+            name for name, req in self.name_to_req.items() if req.terminal()
+        ]
+        branching_nodes = [
+            name
+            for name, req in self.name_to_req.items()
+            if req.dependencies is not None and len(req.dependencies) > 1
+        ]
 
         # Calculate max depth
         max_depth = len(self.levels)
 
+        # Calculate average branching factor
+        non_terminal_nodes = [req for req in self.requirements if not req.terminal()]
+        if non_terminal_nodes:
+            total_branches = sum(
+                len(req.dependencies) if req.dependencies else 0
+                for req in non_terminal_nodes
+            )
+            avg_branching_factor = total_branches / len(non_terminal_nodes)
+        else:
+            avg_branching_factor = 0.0
+
         # Find nodes with most dependencies
         dependency_counts = {
-            name: len(deps) for name, deps in self.dependencies.items()
+            name: len(deps) if deps is not None else 0
+            for name, deps in self.dependencies.items()
         }
         max_dependencies = max(dependency_counts.values()) if dependency_counts else 0
 
         # Calculate connectivity
-        total_edges = sum(len(deps) for deps in self.dependencies.values())
+        total_edges = sum(
+            len(deps) if deps is not None else 0 for deps in self.dependencies.values()
+        )
 
         metrics = {
             "total_requirements": len(self.requirements),
@@ -113,8 +126,8 @@ class WorkflowVisualizer:
             "max_dependencies": max_dependencies,
             "total_edges": total_edges,
             "levels": len(self.levels),
-            "terminal_node_names": [req.name for req in terminal_nodes],
-            "root_nodes": self.levels[0] if self.levels else [],
+            "terminal_node_names": terminal_nodes,
+            "root_nodes": list(self.levels[0]) if self.levels else [],
         }
 
         return metrics

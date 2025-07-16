@@ -293,10 +293,23 @@ class ScenarioBuilder:
         if not self._prompt:
             raise ValueError("Scenario prompt is required")
 
+        # Convert answers format to match Scenario expectations
+        formatted_answers: dict[str, dict[str, float | str]] | None = None
+        if self._answers:
+            formatted_answers = {}
+            for req_name, answer in self._answers.items():
+                if isinstance(answer, dict):
+                    formatted_answers[req_name] = answer
+                else:
+                    formatted_answers[req_name] = {
+                        "answer": answer,
+                        "reasoning": f"Generated answer for {req_name}",
+                    }
+
         return Scenario(
             prompt=self._prompt,
             completion=self._completion,
-            answers=self._answers,
+            answers=formatted_answers,
             name=self._name,
             description=self._description,
         )
@@ -336,10 +349,22 @@ def quick_scenario(prompt: str, completion: str, **answers: float) -> Scenario:
 
     Example:
         scenario = quick_scenario(
-            "What should we do?",
             "We should check safety first",
             check_safety=1.0,
             assess_patient=0.0
         )
     """
-    return Scenario(prompt=prompt, completion=completion, answers=answers)
+    # Convert answers format to match Scenario expectations
+    formatted_answers: dict[str, dict[str, float | str]] | None = None
+    if answers:
+        formatted_answers = {}
+        for req_name, answer in answers.items():
+            if isinstance(answer, dict):
+                formatted_answers[req_name] = answer
+            else:
+                formatted_answers[req_name] = {
+                    "answer": answer,
+                    "reasoning": f"Generated answer for {req_name}",
+                }
+
+    return Scenario(prompt=prompt, completion=completion, answers=formatted_answers)

@@ -2,19 +2,22 @@
 
 import asyncio
 from collections import defaultdict
-from typing import Any, Callable, Dict, List, Optional, Union
+from collections.abc import Sequence
+from typing import Any, Callable, Dict, List, Mapping, Optional, Union
 
 from verifiers.rewards.judge_reward import JudgeRewarder
 from verifiers.rubrics.multistep.enums import EvaluationMode, TerminalCondition
 from verifiers.rubrics.multistep.nodes import RequirementRewardNode
+from verifiers.rubrics.multistep.requirement import Requirement
 from verifiers.rubrics.multistep.results import EvaluationResult
 from verifiers.rubrics.multistep.reward_strategies import (
     LevelWeightedRewardStrategy, RewardStrategy)
 from verifiers.rubrics.multistep.scenario import Scenario
 from verifiers.rubrics.multistep.utils import topological_levels
+from verifiers.rubrics.rubric import Rubric
 
 
-class MultiStepRubric:
+class MultiStepRubric(Rubric):
     """
     Rubric that evaluates requirements with dependencies using different traversal modes.
 
@@ -24,7 +27,7 @@ class MultiStepRubric:
 
     def __init__(
         self,
-        requirements: List[Any],
+        requirements: Sequence[Requirement],
         judge_rewarder: JudgeRewarder,
         node_factory: Callable = RequirementRewardNode,
         reward_strategy: Optional[RewardStrategy] = None,
@@ -52,8 +55,8 @@ class MultiStepRubric:
         }
 
         # Build dependency structure for topological sorting
-        self.name_to_dependency_options: Dict[str, List[str]] = {
-            name: sum(req.dependencies.values(), []) if req.dependencies else []
+        self.name_to_dependency_options: Dict[str, Optional[List[str]]] = {
+            name: sum(req.dependencies.values(), []) if req.dependencies else None
             for name, req in self.name_to_req.items()
         }
 
@@ -75,56 +78,63 @@ class MultiStepRubric:
         Raises:
             ValueError: If validation fails
         """
-        if scenario.answers:
-            # Check unknown requirements
-            unknown_requirements = set(scenario.answers.keys()) - set(
-                self.name_to_req.keys()
-            )
-            if unknown_requirements:
-                raise ValueError(
-                    f"Scenario contains answers for unknown requirements: {unknown_requirements}"
-                )
-
-            # Check invalid answer values
-            for req_name, answer_data in scenario.answers.items():
-                requirement = self.name_to_req[req_name]
-                valid_options = requirement.judge_response_format.options
-
-                # Extract answer value from new format
-                if isinstance(answer_data, dict) and "answer" in answer_data:
-                    answer_value = answer_data["answer"]
-                else:
-                    # Fallback for old format
-                    answer_value = answer_data
-
-                if answer_value not in valid_options:
-                    raise ValueError(
-                        f"Invalid answer value {answer_value} for requirement '{req_name}'. "
-                        f"Valid options are: {valid_options}"
-                    )
-
-        # Mode-specific validation
+        # Mode-specific validation first
         if mode == EvaluationMode.REFERENCE_GUIDED:
-            ground_truth_answers = kwargs.get("ground_truth_answers")
-            if ground_truth_answers is None:
+            if not scenario.answers:
                 raise ValueError(
-                    "ground_truth_answers is required for REFERENCE_GUIDED mode"
+                    "scenario.answers is required for REFERENCE_GUIDED mode"
                 )
 
-            # Validate ground truth answers
-            for req_name, answer_value in ground_truth_answers.items():
-                if req_name not in self.name_to_req:
-                    raise ValueError(
-                        f"Ground truth answers contains unknown requirement: {req_name}"
-                    )
+        # Only validate answers when they exist and are not None
+        if scenario.answers:
+            self._validate_answers(scenario.answers)
 
-                requirement = self.name_to_req[req_name]
-                valid_options = requirement.judge_response_format.options
-                if answer_value not in valid_options:
-                    raise ValueError(
-                        f"Invalid answer value {answer_value} in ground truth answers for requirement '{req_name}'. "
-                        f"Valid options are: {valid_options}"
-                    )
+    def _validate_answers(self, answers: Mapping[str, Any]) -> None:
+        """
+        Validate answer structure and values.
+
+        Args:
+            answers: Dictionary of answers to validate
+
+        Raises:
+            ValueError: If validation fails
+        """
+        # Check for unknown requirements
+        unknown_requirements = set(answers.keys()) - set(self.name_to_req.keys())
+        if unknown_requirements:
+            raise ValueError(
+                f"Scenario contains answers for unknown requirements: {unknown_requirements}"
+            )
+
+        # Check individual answer entries
+        for req_name, answer_data in answers.items():
+            # Skip validation if answer_data is None
+            if answer_data is None:
+                continue
+
+            requirement = self.name_to_req[req_name]
+            valid_options = requirement.judge_response_format.options
+
+            # Handle different answer formats
+            if isinstance(answer_data, dict):
+                # New format: {"answer": value, "reason": "..."}
+                if "answer" not in answer_data:
+                    continue  # Skip if no answer field present
+                answer_value = answer_data["answer"]
+            else:
+                # Old format: direct value
+                answer_value = answer_data
+
+            # Skip validation if answer_value is None
+            if answer_value is None:
+                continue
+
+            # Validate the answer value
+            if answer_value not in valid_options:
+                raise ValueError(
+                    f"Invalid answer value {answer_value} for requirement '{req_name}'. "
+                    f"Valid options are: {valid_options}"
+                )
 
     async def evaluate_adaptive(
         self, scenario: Scenario, max_depth: int = 10, **kwargs
@@ -177,7 +187,7 @@ class MultiStepRubric:
                     else TerminalCondition.COMPLETED
                 )
                 return EvaluationResult(
-                    dict(state),
+                    {str(k): v for k, v in state.items()},  # Convert int keys to string
                     terminal_condition,
                     completed_requirements,
                     len(self.requirements),
@@ -193,7 +203,7 @@ class MultiStepRubric:
             terminal_condition = TerminalCondition.COMPLETED
 
         return EvaluationResult(
-            dict(state),
+            {str(k): v for k, v in state.items()},  # Convert int keys to string
             terminal_condition,
             completed_requirements,
             len(self.requirements),
@@ -234,7 +244,7 @@ class MultiStepRubric:
             level = list(set(next_level))
             i += 1
 
-        return dict(state)
+        return {str(k): v for k, v in state.items()}  # Convert int keys to string
 
     async def evaluate_reference_guided(
         self, scenario: Scenario, ground_truth_answers: Dict[str, float], **kwargs
@@ -281,7 +291,7 @@ class MultiStepRubric:
 
             print(f"level {i} scores: {level_scores}")
 
-        return dict(state)
+        return {str(k): v for k, v in state.items()}  # Convert int keys to string
 
     async def evaluate_exhaustive(
         self, scenario: Scenario, **kwargs
@@ -311,12 +321,24 @@ class MultiStepRubric:
         elif mode == EvaluationMode.REFERENCE_GUIDED:
             if "ground_truth_answers" not in kwargs:
                 # Convert scenario.answers to ground_truth_answers format
-                ground_truth_answers = {}
-                for req_name, answer_data in scenario.answers.items():
-                    if isinstance(answer_data, dict) and "answer" in answer_data:
-                        ground_truth_answers[req_name] = answer_data["answer"]
-                    else:
-                        ground_truth_answers[req_name] = answer_data
+                ground_truth_answers: Dict[str, float] = {}
+                if scenario.answers:
+                    for req_name, answer_data in scenario.answers.items():
+                        # Skip None answers
+                        if answer_data is None:
+                            continue
+                        if isinstance(answer_data, dict) and "answer" in answer_data:
+                            answer_value = answer_data["answer"]
+                            # Only include non-None answer values that are numeric
+                            if answer_value is not None and isinstance(
+                                answer_value, (int, float)
+                            ):
+                                ground_truth_answers[req_name] = float(answer_value)
+                        elif answer_data is not None and isinstance(
+                            answer_data, (int, float)
+                        ):
+                            # Old format: direct value, only if not None and numeric
+                            ground_truth_answers[req_name] = float(answer_data)
             else:
                 ground_truth_answers = kwargs.pop("ground_truth_answers")
             return await self.evaluate_reference_guided(
@@ -337,7 +359,7 @@ class MultiStepRubric:
         state: Dict[str, Any],
         task: str = "default",
         info: Optional[dict] = None,
-        mode: EvaluationMode = EvaluationMode.MODEL_GUIDED,
+        mode: EvaluationMode = EvaluationMode.REFERENCE_GUIDED,
         **kwargs,
     ) -> Dict[str, Any]:
         """

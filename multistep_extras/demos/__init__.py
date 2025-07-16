@@ -9,8 +9,6 @@ from .demo_builder import (demo_branching_template, demo_fluent_builder,
                            demo_linear_template, demo_quick_helpers,
                            demo_scenario_builder)
 from .demo_builder import run_full_demo as run_builder_demo
-from .demo_progressive_info import (create_progressive_scenario,
-                                    demo_progressive_revelation)
 from .demo_visualizer import (demo_all_possible_paths,
                               demo_debugging_visualization,
                               demo_first_responder_visualization,
@@ -29,9 +27,6 @@ __all__ = [
     "demo_quick_helpers",
     "demo_scenario_builder",
     "run_builder_demo",
-    # Progressive info demos
-    "create_progressive_scenario",
-    "demo_progressive_revelation",
     # Visualizer demos
     "demo_first_responder_visualization",
     "demo_debugging_visualization",

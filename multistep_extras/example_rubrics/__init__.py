@@ -5,6 +5,9 @@ This module contains complete example workflows with requirements and scenarios
 for different domains, showcasing the versatility of the multistep evaluation system.
 """
 
+import typing as t
+from collections.abc import Mapping
+
 # Import debugging example
 from .debugging import requirements as debugging_requirements
 from .debugging import scenarios as debugging_scenarios
@@ -22,7 +25,7 @@ debugging_scenarios = debugging_scenarios
 all_scenarios = first_responder_scenarios + debugging_scenarios
 
 # Available workflow examples
-AVAILABLE_WORKFLOWS: dict[str, dict[str, object]] = {
+AVAILABLE_WORKFLOWS: dict[str, dict[str, t.Any]] = {
     "first_responder": {
         "name": "First Responder Emergency Medical Response",
         "description": "Wide-branching workflow for emergency medical situations with parallel assessments",
@@ -50,7 +53,7 @@ AVAILABLE_WORKFLOWS: dict[str, dict[str, object]] = {
 }
 
 
-def get_workflow(name: str) -> dict[str, object]:
+def get_workflow(name: str) -> Mapping[str, t.Any]:
     """
     Get a workflow by name.
 

@@ -158,11 +158,26 @@ scenarios = [
         prompt="A user reports that the checkout process on your e-commerce website is failing with a '500 Internal Server Error' but only for orders over $100. The error started happening yesterday around 3 PM and affects about 20% of users attempting large purchases.",
         completion="I'll start by reproducing the issue with a test order over $100 to see the exact error. Looking at the server logs around 3 PM yesterday, I can see the specific error stack trace pointing to a payment processing timeout. I'll examine the payment service configuration and recent deployments to understand what changed.",
         answers={
-            "problem_reproduction": 1.0,
-            "error_analysis": 1.0,
-            "log_examination": 1.0,
-            "timeline_analysis": 1.0,
-            "hypothesis_formation": 1.0,
+            "problem_reproduction": {
+                "answer": 1.0,
+                "reasoning": "Reproducing the issue with a test order over $100 to observe the exact error behavior",
+            },
+            "error_analysis": {
+                "answer": 1.0,
+                "reasoning": "Examining the specific 500 Internal Server Error and stack trace from server logs",
+            },
+            "log_examination": {
+                "answer": 1.0,
+                "reasoning": "Looking at server logs around 3 PM yesterday to identify the error patterns and timing",
+            },
+            "timeline_analysis": {
+                "answer": 1.0,
+                "reasoning": "Analyzing the timeline of when the error started (yesterday 3 PM) and recent deployments",
+            },
+            "hypothesis_formation": {
+                "answer": 1.0,
+                "reasoning": "Forming hypothesis about payment processing timeout based on error analysis and timeline",
+            },
         },
     ),
     Scenario(
@@ -171,12 +186,30 @@ scenarios = [
         prompt="The mobile app keeps crashing on startup for iOS users with version 14.5, but works fine on other iOS versions. The crash reports show it's happening in the authentication module, but the logs don't provide clear error messages.",
         completion="Since this is specific to iOS 14.5, I'll compare the authentication flow between different iOS versions to identify compatibility issues. I'll review recent changes to the authentication module and check if we're using any APIs that behave differently in iOS 14.5. I'll also examine our dependency versions to see if any libraries have known iOS 14.5 compatibility issues.",
         answers={
-            "problem_reproduction": 1.0,
-            "error_analysis": 0.0,
-            "system_state_analysis": 1.0,
-            "environment_comparison": 1.0,
-            "code_review": 1.0,
-            "dependency_check": 1.0,
+            "problem_reproduction": {
+                "answer": 1.0,
+                "reasoning": "Testing the app startup on iOS 14.5 specifically to reproduce the crash consistently",
+            },
+            "error_analysis": {
+                "answer": 0.0,
+                "reasoning": "Logs don't provide clear error messages, making specific error analysis difficult",
+            },
+            "system_state_analysis": {
+                "answer": 1.0,
+                "reasoning": "Analyzing the authentication module state and iOS version-specific behavior differences",
+            },
+            "environment_comparison": {
+                "answer": 1.0,
+                "reasoning": "Comparing authentication flow between iOS 14.5 and other iOS versions to identify differences",
+            },
+            "code_review": {
+                "answer": 1.0,
+                "reasoning": "Reviewing recent changes to authentication module and iOS 14.5 API compatibility",
+            },
+            "dependency_check": {
+                "answer": 1.0,
+                "reasoning": "Examining dependency versions for known iOS 14.5 compatibility issues",
+            },
         },
     ),
     Scenario(
@@ -185,11 +218,26 @@ scenarios = [
         prompt="Users are reporting that search functionality has become very slow over the past week. Database queries that used to take 100ms are now taking 3-5 seconds. The search feature worked fine until recently, but no code changes were made to the search module.",
         completion="I'll first try to reproduce the slow search behavior to understand the scope. Then I'll examine the database logs to see if there are any error messages or unusual patterns. I'll analyze the query execution plans to identify what's causing the slowdown and check if there have been any database configuration changes or if indexes need rebuilding.",
         answers={
-            "problem_reproduction": 1.0,
-            "log_examination": 1.0,
-            "timeline_analysis": 1.0,
-            "configuration_validation": 1.0,
-            "system_state_analysis": 1.0,
+            "problem_reproduction": {
+                "answer": 1.0,
+                "reasoning": "Reproducing the slow search behavior to understand the scope and timing of the issue",
+            },
+            "log_examination": {
+                "answer": 1.0,
+                "reasoning": "Examining database logs for error messages, unusual patterns, and query performance metrics",
+            },
+            "timeline_analysis": {
+                "answer": 1.0,
+                "reasoning": "Analyzing when the performance degraded (past week) and correlating with system changes",
+            },
+            "configuration_validation": {
+                "answer": 1.0,
+                "reasoning": "Checking for database configuration changes or index issues that could cause slowdowns",
+            },
+            "system_state_analysis": {
+                "answer": 1.0,
+                "reasoning": "Analyzing query execution plans and database system state for performance bottlenecks",
+            },
         },
     ),
 ]

@@ -47,7 +47,7 @@ class RequirementJudgeRewardNode(RequirementRewardNode):
         question = self.requirement.question
 
         # Handle missing answers gracefully in reference-guided evaluation
-        if self.requirement.name not in scenario.answers:
+        if scenario.answers is None or self.requirement.name not in scenario.answers:
             print(
                 f"Warning: No answer provided for requirement '{self.requirement.name}', skipping evaluation"
             )
@@ -56,10 +56,10 @@ class RequirementJudgeRewardNode(RequirementRewardNode):
         # Extract answer value from the new format
         answer_data = scenario.answers[self.requirement.name]
         if isinstance(answer_data, dict) and "answer" in answer_data:
-            answer = answer_data["answer"]
+            answer: float | str = answer_data["answer"]
         else:
-            # Fallback for old format
-            answer = answer_data
+            # Fallback for old format - answer_data is the direct value
+            answer = answer_data  # type: ignore[assignment]
 
         content = scenario.to_content()
         judge_result = await self.judge_rewarder(question, content, answer, **kwargs)

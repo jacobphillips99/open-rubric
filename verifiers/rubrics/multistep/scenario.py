@@ -1,19 +1,28 @@
+"""
+Represents a scenario for evaluating multi-step rubrics.
+
+Contains a prompt (situation description), completion (response),
+and ground truth answer path for evaluation.
+"""
+
 from typing import Optional
 
+
 class Scenario:
-    """
-    Represents a scenario for evaluating multi-step rubrics.
-    
-    Contains a prompt (situation description), completion (response), 
-    and ground truth answer path for evaluation.
-    """
-    
-    def __init__(self, prompt: str, answers: dict[str, float], completion: Optional[str] = None,
-                 name: Optional[str] = None, description: Optional[str] = None,
-                 revealed_info: Optional[dict[str, dict[str, str]]] = None):
+    """Holds the information for a single scenario, to be evaluated by a rubric."""
+
+    def __init__(
+        self,
+        prompt: str,
+        answers: Optional[dict[str, dict[str, float | str]]] = None,
+        completion: Optional[str] = None,
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+        revealed_info: Optional[dict[str, dict[str, str]]] = None,
+    ):
         """
-        Initializes a scenario.
-        
+        Initialize a scenario with the given information.
+
         Args:
             prompt: The situation or question being presented
             completion: The response or actions taken
@@ -30,8 +39,9 @@ class Scenario:
         self.description = description
         self.revealed_info = revealed_info or {}
 
-    def to_content(self):
+    def to_content(self) -> str:
+        """Return a string of the content of the scenario."""
         return f"""
         prompt: {self.prompt}
         completion: {self.completion}
-        """.strip() 
+        """.strip()

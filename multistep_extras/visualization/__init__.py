@@ -6,7 +6,7 @@ and evaluation paths to help users understand complex rubrics.
 """
 
 from .visualizer import (WorkflowVisualizer, compare_workflows,
-                            visualize_workflow)
+                         visualize_workflow)
 
 __all__ = [
     "WorkflowVisualizer",

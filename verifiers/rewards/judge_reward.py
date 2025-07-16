@@ -32,45 +32,53 @@ class JudgeResponseFormat:
         try:
             # Parse JSON response
             parsed = json.loads(response.strip())
-            
+
             # Extract answer and reasoning
             if not isinstance(parsed, dict):
                 raise ValueError(f"Expected JSON object, got {type(parsed)}")
-            
+
             if "answer" not in parsed:
                 raise ValueError("Missing 'answer' field in response")
-            
+
             if "reasoning" not in parsed:
                 raise ValueError("Missing 'reasoning' field in response")
-            
+
             # Convert and validate answer
             converted_answer = self.option_type(parsed["answer"])
             if converted_answer not in self.options:
                 raise ValueError(f"Invalid answer: {parsed['answer']}; expected one of {self.options}")
-            
+
             reasoning = str(parsed["reasoning"])
-            
+
             return JudgeResponse(answer=converted_answer, reasoning=reasoning)
-        
+
         except Exception as e:
             raise ValueError(f"Error parsing response: {response}. Error: {e}")
 
 binary_responses = {1.0: "yes", 0.0: "no"}
 binary_judge_response_format = JudgeResponseFormat(list(binary_responses.keys()), meanings=binary_responses)
 
+JUDGE_PROMPT = """
+Given a question and the ground truth answer, determine if the response is correct. Respond according to the judge response format.
+
+question={question}
+response={response}
+ground truth answer={answer}
+judge response format={judge_response_format}
+"""
 
 class JudgeRewarder(Reward):
     def __init__(self, judge_prompt: str, judge_response_format: JudgeResponseFormat, judge_client: OpenAI | None = None, judge_model: str = "gpt-4.1-nano", parser: Parser = Parser(), **kwargs):
         super().__init__(**kwargs)
         self.judge_response_format = judge_response_format
         self.judge_prompt = judge_prompt
-        
+
         # Assert that judge_prompt template contains exactly the expected fields
         formatter = string.Formatter()
         field_names = {field_name for literal_text, field_name, format_spec, conversion in formatter.parse(judge_prompt) if field_name is not None}
         expected_fields = {"question", "answer", "response", "judge_response_format"}
         assert field_names == expected_fields, f"Judge prompt template must contain exactly these fields: {expected_fields}; got {field_names}"
-        
+
         self.judge_client = judge_client if judge_client is not None else OpenAI()
         self.judge_model = judge_model
         self.parser = parser
@@ -88,7 +96,7 @@ class JudgeRewarder(Reward):
         else:
             response = completion
         prompt = self.judge_prompt.format(question=question, answer=answer, response=response, judge_response_format=self.judge_response_format)
-        
+
         def _create_completion():
             return self.judge_client.chat.completions.create(
                     model=self.judge_model,
@@ -104,10 +112,9 @@ class JudgeRewarder(Reward):
         except Exception as e:
             print(f"Error in judge_rewarder: {e}")
             raise e
-        
+
         return judge_result
 
-        
 
 class BinaryJudgeRewarder(JudgeRewarder):
     def __init__(self, judge_prompt: str, judge_client: OpenAI | None = None, judge_model: str = "gpt-4.1-nano", parser: Parser = Parser(), **kwargs):
