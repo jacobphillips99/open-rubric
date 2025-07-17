@@ -7,7 +7,7 @@ This module provides three specialized visualizers for different use cases:
 3. CompletedRubricVisualizer - For visualizing evaluated rubrics with results
 """
 
-from typing import Any, Dict, List, Optional, Tuple, Union
+from typing import Any, Dict, List, Tuple
 
 from verifiers.rubrics.multistep.multistep_rubric import MultiStepRubric
 from verifiers.rubrics.multistep.requirement import Requirement
@@ -350,7 +350,7 @@ class CompletedRubricVisualizer:
 
         total_evaluated = 0
         total_correct = 0
-
+        breakpoint()
         for level_key, level_results in self.results.items():
             if level_key.isdigit():  # Only process numeric level keys
                 level_num = int(level_key)
@@ -510,10 +510,6 @@ def visualize_requirements(requirements: List[Requirement]) -> None:
     viz.print_dependency_graph()
     viz.print_workflow_structure()
     viz.print_metrics()
-
-
-
-
 
 
 def compare_requirements(
