@@ -6,7 +6,7 @@ from collections.abc import Sequence
 from copy import deepcopy
 from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple, Union
 
-from verifiers.rewards.judge_reward import JudgeRewarder
+from verifiers.rewards.judge_reward import JudgeRewarder, JudgeResponse
 from verifiers.rubrics.multistep.enums import EvaluationMode, TerminalCondition
 from verifiers.rubrics.multistep.nodes import RequirementRewardNode
 from verifiers.rubrics.multistep.requirement import Requirement
@@ -77,7 +77,7 @@ class MultiStepRubric(Rubric):
         self.name_to_req = {req.name: req for req in requirements}
 
         # Use custom node factory if provided, otherwise use default
-        self.name_to_node = {
+        self.name_to_node: Dict[str, RequirementRewardNode] = {
             name: node_factory(req, judge_rewarder)
             for name, req in self.name_to_req.items()
         }
@@ -95,7 +95,6 @@ class MultiStepRubric(Rubric):
     async def evaluate(
         self,
         scenario: Scenario,
-        ground_truth_answers: Optional[Dict[str, float]] = None,
         **kwargs,
     ) -> Dict[str, Any]:
         """
@@ -112,29 +111,23 @@ class MultiStepRubric(Rubric):
         Returns:
             Dictionary containing evaluation results by level
         """
-        # Validate that we have ground truth data
-        if ground_truth_answers is None:
-            if not scenario.answers:
-                raise ValueError(
-                    "ground_truth_answers or scenario.answers required for evaluation"
-                )
 
-            # Convert scenario.answers to ground_truth_answers format
-            ground_truth_answers = {}
-            for req_name, answer_data in scenario.answers.items():
-                # Skip None answers
-                if answer_data is None:
-                    continue
-                if isinstance(answer_data, dict) and "answer" in answer_data:
-                    answer_value = answer_data["answer"]
-                    # Only include non-None answer values that are numeric
-                    if answer_value is not None and isinstance(
-                        answer_value, (int, float)
-                    ):
-                        ground_truth_answers[req_name] = float(answer_value)
-                elif answer_data is not None and isinstance(answer_data, (int, float)):
-                    # Old format: direct value, only if not None and numeric
-                    ground_truth_answers[req_name] = float(answer_data)
+        if not scenario.answers:
+            raise ValueError(
+                "ground_truth_answers or scenario.answers required for evaluation"
+            )
+
+        # Convert scenario.answers to ground_truth_answers format
+        ground_truth_answers = {}
+        for req_name, answer_data in scenario.answers.items():
+            # Skip None answers
+            if answer_data is None:
+                continue
+            maybe_answer = answer_data.get("answer", answer_data)
+            if isinstance(maybe_answer, (int, float)):
+                ground_truth_answers[req_name] = float(maybe_answer)
+            else:
+                raise ValueError(f"Invalid answer format for {req_name}: {answer_data}")
 
         state: Dict[int, Dict[str, Any]] = defaultdict(dict)
         i = 0
@@ -155,30 +148,35 @@ class MultiStepRubric(Rubric):
 
             # Evaluate model response with judge for each requirement
             coros = [node(scenario, **kwargs) for node in nodes]
-            judge_scores = dict(zip(level_with_answers, await asyncio.gather(*coros)))
-            state[i] = judge_scores
+            judge_results: Dict[str, JudgeResponse] = dict(zip(level_with_answers, await asyncio.gather(*coros)))
+
+            # Store both answer and reasoning in state
+            state[i] = {
+                name: result.to_dict()
+                for name, result in judge_results.items()
+            }
 
             # Determine next level based on ground truth answers where judge said correct
             next_level = []
             for name in level_with_answers:
                 node = self.name_to_node[name]
-                judge_score = judge_scores[name]
                 gt_answer = ground_truth_answers[name]
 
                 # Only follow dependencies if judge determined the response was correct
-                # Judge score of 1.0 means correct, anything else means incorrect
+                # Judge answer of 1.0 means correct, anything else means incorrect
                 if (
-                    judge_score == 1.0  # Judge says model response was correct
-                    and not node.requirement.terminal()
-                    and gt_answer in node.requirement.dependencies
+                    judge_results[name].answer == 1.0  
+                    and not node.terminal()
+                    and node.dependencies
+                    and gt_answer in node.dependencies
                 ):
                     # Follow the dependency path for the ground truth answer
-                    next_level.extend(node.requirement.dependencies[gt_answer])
+                    next_level.extend(node.dependencies[gt_answer])
 
             level = list(set(next_level))
             i += 1
 
-            print(f"level {i} judge scores: {judge_scores}")
+            print(f"level {i} judge results: {judge_results}")
 
         return {str(k): v for k, v in state.items()}  # Convert int keys to string
 
@@ -341,133 +339,145 @@ class MultiStepRubric(Rubric):
 
         # Initialize state tracking
         updated_state = deepcopy(state)
-        current_level_idx = level_idx
-        current_active_reqs = active_reqs
+        revealed_info_set = state.get("revealed_info", set())
+        
+        # Process any pending requirements from previous turn
+        pending_next_reqs = updated_state.get("_pending_next_reqs", [])
+        if pending_next_reqs:
+            # Use pending requirements and advance level
+            updated_state["level_idx"] = level_idx + 1
+            updated_state["active_reqs"] = pending_next_reqs
+            updated_state.pop("_pending_next_reqs", None)
+            # No evaluation needed this turn, just advance
+            return None, updated_state, False
 
-        # Continue evaluating until we find new information or finish
-        while True:
-            # Incremental evaluation: only evaluate current active requirements
-            current_level_scores = {}
-            if current_active_reqs:
-                try:
-                    # Evaluate only the current active requirements
-                    for req_name in current_active_reqs:
-                        if req_name in self.name_to_node:
-                            node = self.name_to_node[req_name]
-                            # Use synchronous wrapper to handle nested event loops
-                            try:
-                                asyncio.get_running_loop()
-                                # We're in an async context, use thread executor
-                                import concurrent.futures
+        # Evaluate current active requirements once
+        current_level_results: Dict[str, JudgeResponse] = {}
+        if active_reqs:
+            try:
+                # Evaluate only requirements that have ground truth answers
+                for req_name in active_reqs:
+                    if req_name in self.name_to_node and req_name in answers_gt:
+                        node = self.name_to_node[req_name]
+                        # Use synchronous wrapper to handle nested event loops
+                        try:
+                            asyncio.get_running_loop()
+                            # We're in an async context, use thread executor
+                            import concurrent.futures
 
-                                with (
-                                    concurrent.futures.ThreadPoolExecutor() as executor
-                                ):
-                                    future = executor.submit(
-                                        asyncio.run, node(tmp_scenario)
-                                    )
-                                    score = future.result()
-                            except RuntimeError:
-                                # No event loop running, safe to use asyncio.run
-                                score = asyncio.run(node(tmp_scenario))
+                            with (
+                                concurrent.futures.ThreadPoolExecutor() as executor
+                            ):
+                                future = executor.submit(
+                                    asyncio.run, node(tmp_scenario)
+                                )
+                                result = future.result()
+                        except RuntimeError:
+                            # No event loop running, safe to use asyncio.run
+                            result = asyncio.run(node(tmp_scenario))
 
-                            current_level_scores[req_name] = score
-                except Exception as e:
-                    print(f"Error evaluating requirements {current_active_reqs}: {e}")
-                    # Fallback to empty scores if evaluation fails
-                    current_level_scores = {}
+                        current_level_results[req_name] = result
+                    elif req_name not in answers_gt:
+                        print(f"Warning: No answer provided for requirement '{req_name}', skipping evaluation")
+            except Exception as e:
+                print(f"Error evaluating requirements {active_reqs}: {e}")
+                # Fallback to empty results if evaluation fails
+                current_level_results = {}
 
-            # Check for revealed information from current level scores
-            # Only reveal info when judge determined the response was correct (score == 1.0)
-            revealed_info_content = []
-            new_info_found = False
+        # Check for revealed information from current level results
+        # Only reveal info when judge determined the response was correct (answer == 1.0)
+        revealed_info_content = []
+        new_info_found = False
 
-            if revealed_info_data and current_level_scores:
-                print(f"DEBUG: current_level_scores = {current_level_scores}")
-                print(f"DEBUG: answers_gt = {answers_gt}")
-                print(f"DEBUG: revealed_info_data = {revealed_info_data}")
+        if revealed_info_data and current_level_results:
+            print(f"DEBUG: current_level_results = {current_level_results}")
+            print(f"DEBUG: answers_gt = {answers_gt}")
+            print(f"DEBUG: revealed_info_data = {revealed_info_data}")
 
-                for req_name, judge_score in current_level_scores.items():
-                    print(
-                        f"DEBUG: Processing {req_name} with judge_score {judge_score} (type: {type(judge_score)})"
-                    )
+            for req_name, judge_result in current_level_results.items():                
+                print(
+                    f"DEBUG: Processing {req_name} with judge_answer {judge_result.answer} (type: {type(judge_result.answer)})"
+                )
+                if judge_result.reasoning:
+                    print(f"DEBUG: Judge reasoning: {judge_result.reasoning}")
 
-                    # Only proceed if judge determined the response was correct
-                    if judge_score == 1.0 and req_name in revealed_info_data:
-                        info_key = req_name
-                        if info_key not in revealed_info_set:
-                            # Add the revealed information
-                            revealed_info_content.append(revealed_info_data[req_name])
-                            revealed_info_set.add(info_key)
-                            new_info_found = True
-                            print(
-                                f"DEBUG: Added revealed info for {req_name}: {revealed_info_data[req_name]}"
-                            )
-                        else:
-                            print(f"DEBUG: Info already revealed for {info_key}")
-                    elif judge_score != 1.0:
+                # Only proceed if judge determined the response was correct
+                if judge_result.answer == 1.0 and req_name in revealed_info_data:
+                    info_key = req_name
+                    if info_key not in revealed_info_set:
+                        # Add the revealed information
+                        revealed_info_content.append(revealed_info_data[req_name])
+                        revealed_info_set.add(info_key)
+                        new_info_found = True
                         print(
-                            f"DEBUG: Judge determined incorrect response for {req_name} (score: {judge_score}), no info revealed"
+                            f"DEBUG: Added revealed info for {req_name}: {revealed_info_data[req_name]}"
                         )
                     else:
-                        print(f"DEBUG: {req_name} not in revealed_info_data")
-
-            # Determine next requirements based on current level results
-            # Only follow dependencies where judge determined correctness (score == 1.0)
-            next_reqs: List[str] = []
-            for req_name, judge_score in current_level_scores.items():
-                req = self.name_to_req[req_name]
-                gt_answer = answers_gt.get(req_name)
-
-                # Only follow dependencies if judge says correct AND we have valid ground truth
-                if (
-                    judge_score == 1.0  # Judge determined response was correct
-                    and not req.terminal()
-                    and req.dependencies is not None
-                    and gt_answer is not None
-                    and gt_answer in req.dependencies
-                ):
-                    next_reqs.extend(req.dependencies[gt_answer])
-
-            next_reqs = list(set(next_reqs))
-
-            # Update state with evaluation results
-            updated_state["revealed_info"] = revealed_info_set
-            updated_state["last_evaluation_scores"] = current_level_scores
-
-            # If we found new information, return it
-            if new_info_found:
-                content = "\n".join(revealed_info_content)
-
-                if next_reqs:
-                    # Keep the same level but prepare next requirements for the subsequent turn
-                    updated_state["_pending_next_reqs"] = next_reqs
-                    return content, updated_state, False
+                        print(f"DEBUG: Info already revealed for {info_key}")
+                elif judge_result.answer != 1.0:
+                    print(
+                        f"DEBUG: Judge determined incorrect response for {req_name} (answer: {judge_result.answer}), no info revealed"
+                    )
                 else:
-                    # No next requirements - conversation is ending
-                    updated_state["finished"] = True
-                    return content, updated_state, True
+                    print(f"DEBUG: {req_name} not in revealed_info_data")
 
-            # No new information found - check if we can advance
-            pending_next_reqs = updated_state.get("_pending_next_reqs", [])
-            if pending_next_reqs:
-                # Use the pending requirements and advance level
-                next_reqs = pending_next_reqs
-                current_level_idx += 1
-            elif next_reqs:
-                # Advance to next level with new requirements
-                current_level_idx += 1
+        # Determine next requirements based on current level results
+        # Only follow dependencies where judge determined correctness (answer == 1.0)
+        next_reqs: List[str] = []
+        for req_name, judge_result in current_level_results.items():
+            req = self.name_to_req[req_name]
+            gt_answer = answers_gt.get(req_name)
 
-            # Check if we can continue to next level
+            # Only follow dependencies if judge says correct AND we have valid ground truth
+            if (
+                judge_result.answer == 1.0  # Judge determined response was correct
+                and not req.terminal()
+                and req.dependencies is not None
+                and gt_answer is not None
+                and gt_answer in req.dependencies
+            ):
+                next_reqs.extend(req.dependencies[gt_answer])
+
+        next_reqs = list(set(next_reqs))
+
+        # Update state with revealed info and evaluation results for testing/debugging
+        updated_state["revealed_info"] = revealed_info_set
+        updated_state["last_evaluation_results"] = {
+            name: result.to_dict()
+            for name, result in current_level_results.items()
+        }
+        
+        # Accumulate evaluation results in level-based format for test compatibility
+        if current_level_results:
+            evaluation_results = updated_state.get("evaluation_results", {})
+            level_key = str(level_idx)
+            evaluation_results[level_key] = {
+                name: result.to_dict()
+                for name, result in current_level_results.items()
+            }
+            updated_state["evaluation_results"] = evaluation_results
+
+        # If we found new information, return it
+        if new_info_found:
+            content = "\n".join(revealed_info_content)
+
             if next_reqs:
-                # Update for next iteration
-                updated_state["level_idx"] = current_level_idx
-                updated_state["active_reqs"] = next_reqs
-                updated_state.pop("_pending_next_reqs", None)
-                current_active_reqs = next_reqs
-                # Continue the loop to evaluate the new level
-                continue
+                # Prepare next requirements for the subsequent turn
+                updated_state["_pending_next_reqs"] = next_reqs
+                return content, updated_state, False
             else:
-                # No more requirements - conversation is finished
+                # No next requirements - conversation is ending
                 updated_state["finished"] = True
-                return None, updated_state, True
+                return content, updated_state, True
+
+        # No new information found - check if we can advance directly
+        if next_reqs:
+            # Advance to next level with new requirements
+            updated_state["level_idx"] = level_idx + 1
+            updated_state["active_reqs"] = next_reqs
+            # Continue conversation without explicit environment message
+            return None, updated_state, False
+        else:
+            # No more requirements - conversation is finished
+            updated_state["finished"] = True
+            return None, updated_state, True

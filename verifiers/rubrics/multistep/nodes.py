@@ -3,7 +3,7 @@
 import asyncio
 from typing import Any
 
-from verifiers.rewards.judge_reward import BinaryJudgeRewarder, JudgeRewarder
+from verifiers.rewards.judge_reward import BinaryJudgeRewarder, JudgeResponse, JudgeRewarder
 from verifiers.rewards.reward import Reward
 from verifiers.rubrics.multistep.requirement import Requirement
 from verifiers.rubrics.multistep.scenario import Scenario
@@ -28,6 +28,17 @@ class RequirementRewardNode:
         if asyncio.iscoroutine(result):
             return await result
         return result
+    
+    def terminal(self) -> bool:
+        """Check if the requirement is terminal."""
+        return self.requirement.terminal()
+    
+    @property
+    def dependencies(self) -> dict[str, list[str]]:
+        """Get the dependencies for this requirement."""
+        return self.requirement.dependencies
+    
+
 
 
 class RequirementJudgeRewardNode(RequirementRewardNode):
@@ -42,7 +53,7 @@ class RequirementJudgeRewardNode(RequirementRewardNode):
         self.judge_rewarder = judge_rewarder
         self.name = requirement.name
 
-    async def __call__(self, scenario: Scenario, **kwargs):
+    async def __call__(self, scenario: Scenario, **kwargs) -> JudgeResponse:
         """Evaluate the requirement using judge reward against a scenario."""
         question = self.requirement.question
 
@@ -64,8 +75,7 @@ class RequirementJudgeRewardNode(RequirementRewardNode):
         content = scenario.to_content()
         judge_result = await self.judge_rewarder(question, content, answer, **kwargs)
 
-        # Extract numeric answer from JudgeResponse
-        return judge_result.answer
+        return judge_result
 
     def get_dependencies(self):
         """Get the dependencies for this requirement."""

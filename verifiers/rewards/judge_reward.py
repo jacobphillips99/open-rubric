@@ -12,6 +12,13 @@ class JudgeResponse:
     answer: Any
     reasoning: str
 
+    def to_dict(self):
+        return {"answer": self.answer, "reasoning": self.reasoning}
+    
+    def __str__(self):
+        return f"JudgeResponse(answer={self.answer}, reasoning={self.reasoning})"
+
+
 class JudgeResponseFormat:
     def __init__(self, options: list[Any], meanings: Optional[dict[Any, str]] = None):
         self.options = options

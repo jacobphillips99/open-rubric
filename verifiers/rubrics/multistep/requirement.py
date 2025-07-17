@@ -7,6 +7,7 @@ class Requirement:
     Requirements are a core building block of a multistep rubrics -- they define the questions that are asked of a scenario, and the dependencies between them.
     They host the question and the judge response format in order to select the next dependent requirement(s).
     """
+    # TODO -- check depenedencies float???
     def __init__(self, name: str, question: str, judge_response_format: JudgeResponseFormat, dependencies: Optional[dict[float, list[str]]] = None):
         self.name = name
         self.question = question

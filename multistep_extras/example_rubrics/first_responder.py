@@ -334,6 +334,14 @@ advanced_scenarios = [
                 "answer": 0.0,
                 "reasoning": "Patient is unconscious with no response to verbal stimuli",
             },
+            "vital_signs": {
+                "answer": 0.0,
+                "reasoning": "Patient vitals are unstable - unconscious with irregular breathing pattern",
+            },
+            "trauma_check": {
+                "answer": 0.0,
+                "reasoning": "No visible signs of trauma or injury observed during initial assessment",
+            },
             "breathing_support": {
                 "answer": 0.0,
                 "reasoning": "Inadequate breathing pattern detected requiring immediate intervention",
@@ -346,6 +354,8 @@ advanced_scenarios = [
         revealed_info={
             "scene_safety": "Scene Assessment: No traffic, electrical hazards, or dangerous individuals present.",
             "initial_assessment": "Patient Status: Adult male, unconscious. Eyes closed, no response to verbal stimuli.",
+            "vital_signs": "Vital Signs: Pulse weak and rapid, blood pressure dropping, skin pale and clammy.",
+            "trauma_check": "Trauma Assessment: No visible external bleeding, no obvious fractures or deformities.",
             "breathing_support": "Breathing Assessment: Shallow, irregular breathing pattern detected.",
             "emergency_protocols": "Emergency Resources: Emergency radio frequencies are available and functioning.",
         },
