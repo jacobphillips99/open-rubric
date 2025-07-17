@@ -163,7 +163,9 @@ class RequirementsVisualizer:
                         and req.dependencies
                         and answer in req.dependencies
                     ):
-                        next_requirements.update(req.dependencies[answer])
+                        next_requirements.update(
+                            req.get_dependencies_from_answer[answer]
+                        )
 
             current_requirements = list(next_requirements)
             current_level += 1
@@ -194,7 +196,7 @@ class RequirementsVisualizer:
                             and req.dependencies
                             and answer in req.dependencies
                         ):
-                            deps = req.dependencies[answer]
+                            deps = req.get_dependencies_from_answer[answer]
                             active_deps = [d for d in deps if d in next_level_reqs]
                             if active_deps:
                                 print(
@@ -248,7 +250,7 @@ class RubricVisualizer:
                 print(f"    Terminal: {node.terminal()}")
 
                 if not node.terminal() and req.dependencies:
-                    print(f"    Dependencies:")
+                    print("    Dependencies:")
                     for answer, deps in req.dependencies.items():
                         deps_str = ", ".join(deps) if deps else "STOP"
                         print(f"      └─ {answer} → {deps_str}")
@@ -350,7 +352,6 @@ class CompletedRubricVisualizer:
 
         total_evaluated = 0
         total_correct = 0
-        breakpoint()
         for level_key, level_results in self.results.items():
             if level_key.isdigit():  # Only process numeric level keys
                 level_num = int(level_key)
@@ -381,11 +382,11 @@ class CompletedRubricVisualizer:
                     )
 
         # Summary statistics
-        print(f"\nSUMMARY:")
+        print("\nSUMMARY:")
         print(f"Total Evaluated: {total_evaluated}")
         print(f"Correct: {total_correct}")
         print(
-            f"Accuracy: {total_correct/total_evaluated*100:.1f}%"
+            f"Accuracy: {total_correct / total_evaluated * 100:.1f}%"
             if total_evaluated > 0
             else "No evaluations"
         )
@@ -437,7 +438,7 @@ class CompletedRubricVisualizer:
                             and req.dependencies
                             and gt_answer in req.dependencies
                         ):
-                            next_deps = req.dependencies[gt_answer]
+                            next_deps = req.get_dependencies_from_answer[gt_answer]
                             if next_deps:
                                 print(
                                     f"  {req_name}: ✓ Correct → leads to {', '.join(next_deps)}"

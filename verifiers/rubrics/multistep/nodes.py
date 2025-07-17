@@ -4,7 +4,8 @@ import asyncio
 from typing import Any
 
 from verifiers.rewards.judge_reward import (BinaryJudgeRewarder, JudgeResponse,
-                                            JudgeRewarder)
+                                            JudgeRewarder,
+                                            UnitVectorJudgeRewarder)
 from verifiers.rewards.reward import Reward
 from verifiers.rubrics.multistep.requirement import Requirement
 from verifiers.rubrics.multistep.scenario import Scenario
@@ -81,15 +82,25 @@ class RequirementJudgeRewardNode(RequirementRewardNode):
         return self.requirement.dependencies
 
 
-class BinaryRequirementRewardNode(RequirementJudgeRewardNode):
-    """
-    Special subclass of the RequirementJudgeRewardNode for binary requirements.
-    This is the main node used in workflows with binary branching.
-    """
+class DiscreteRequirementRewardNode(RequirementJudgeRewardNode):
+    """Special subclass of the RequirementJudgeRewardNode for discrete requirements."""
+
+
+class ContinuousRequirementRewardNode(RequirementJudgeRewardNode):
+    """Special subclass of the RequirementJudgeRewardNode for continuous requirements."""
+
+
+class BinaryRequirementRewardNode(DiscreteRequirementRewardNode):
+    """Special subclass of the RequirementJudgeRewardNode for binary requirements."""
 
     def __init__(self, requirement: Any, judge_rewarder: BinaryJudgeRewarder):
         """Initialize a binary requirement judge reward node."""
         super().__init__(requirement, judge_rewarder)
 
 
-# TODO: more node types
+class UnitVectorRequirementRewardNode(ContinuousRequirementRewardNode):
+    """Special subclass of the RequirementJudgeRewardNode for unit vector requirements."""
+
+    def __init__(self, requirement: Any, judge_rewarder: UnitVectorJudgeRewarder):
+        """Initialize a unit vector requirement judge reward node."""
+        super().__init__(requirement, judge_rewarder)

@@ -5,13 +5,11 @@ This module contains reusable print utilities and test scenario functions
 that can be shared across multiple test files.
 """
 
-from multistep_extras.example_rubrics import \
-    first_responder_advanced_scenarios as ADVANCED_SCENARIOS
-from verifiers.rubrics.multistep.scenario import Scenario
-
 
 # Color codes for terminal output
 class Colors:
+    """ANSI color codes for terminal output formatting."""
+
     HEADER = "\033[95m"  # Magenta
     BLUE = "\033[94m"  # Blue
     CYAN = "\033[96m"  # Cyan

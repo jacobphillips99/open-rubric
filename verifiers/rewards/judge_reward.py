@@ -6,64 +6,8 @@ from typing import Any, Optional
 from verifiers.rewards.reward import Reward
 from openai import OpenAI
 from verifiers.parsers.parser import Parser
-
-@dataclass
-class JudgeResponse:
-    answer: Any
-    reasoning: str
-
-    def to_dict(self):
-        return {"answer": self.answer, "reasoning": self.reasoning}
-
-    def __str__(self):
-        return f"JudgeResponse(answer={self.answer}, reasoning={self.reasoning})"
-
-
-class JudgeResponseFormat:
-    def __init__(self, options: list[Any], meanings: Optional[dict[Any, str]] = None):
-        self.options = options
-        self.option_type = type(options[0])
-        self.meanings = meanings
-        assert all(isinstance(item, self.option_type) for item in options), f"Answer format must be a list of {self.option_type}; got {options} with types {[type(item) for item in options]}"
-        if meanings is not None:
-            assert all(k in options for k in meanings.keys()), f"All keys in meanings must be in options; got {meanings.keys()} not in {options}"
-
-    def __str__(self):
-        base_str = f"Respond with just a JSON object containing two fields: 'answer' and 'reasoning'. The 'answer' field must be EXACTLY one of these options: {self.options} (type {self.option_type.__name__}). The 'reasoning' field should contain your explanation for the answer."
-        if self.meanings is not None:
-            base_str += f"\nThe meaning of each answer option is: {', '.join([f'{option} (meaning {self.meanings[option]})' for option in self.options])}"
-        base_str += f"\n\nExample format: {{\"answer\": {self.options[0]}, \"reasoning\": \"Your explanation here\"}}"
-        return base_str
-
-    def convert(self, response: str) -> JudgeResponse:
-        try:
-            # Parse JSON response
-            parsed = json.loads(response.strip())
-
-            # Extract answer and reasoning
-            if not isinstance(parsed, dict):
-                raise ValueError(f"Expected JSON object, got {type(parsed)}")
-
-            if "answer" not in parsed:
-                raise ValueError("Missing 'answer' field in response")
-
-            if "reasoning" not in parsed:
-                raise ValueError("Missing 'reasoning' field in response")
-
-            # Convert and validate answer
-            converted_answer = self.option_type(parsed["answer"])
-            if converted_answer not in self.options:
-                raise ValueError(f"Invalid answer: {parsed['answer']}; expected one of {self.options}")
-
-            reasoning = str(parsed["reasoning"])
-
-            return JudgeResponse(answer=converted_answer, reasoning=reasoning)
-
-        except Exception as e:
-            raise ValueError(f"Error parsing response: {response}. Error: {e}")
-
-binary_responses = {1.0: "yes", 0.0: "no"}
-binary_judge_response_format = JudgeResponseFormat(list(binary_responses.keys()), meanings=binary_responses)
+from verifiers.rewards.judge_utils import JudgeResponseFormat, JudgeResponse
+from verifiers.rewards.judge_utils import binary_judge_response_format, unit_vector_judge_response_format
 
 JUDGE_PROMPT = """
 Given a question and the ground truth answer, determine if the response is correct. Respond according to the judge response format.
@@ -126,3 +70,7 @@ class JudgeRewarder(Reward):
 class BinaryJudgeRewarder(JudgeRewarder):
     def __init__(self, judge_prompt: str, judge_client: OpenAI | None = None, judge_model: str = "gpt-4.1-nano", parser: Parser = Parser(), **kwargs):
         super().__init__(judge_prompt, binary_judge_response_format, judge_client, judge_model, parser, **kwargs)
+
+class UnitVectorJudgeRewarder(JudgeRewarder):
+    def __init__(self, judge_prompt: str, judge_client: OpenAI | None = None, judge_model: str = "gpt-4.1-nano", parser: Parser = Parser(), **kwargs):
+        super().__init__(judge_prompt, unit_vector_judge_response_format, judge_client, judge_model, parser, **kwargs)

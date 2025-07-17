@@ -5,19 +5,19 @@ Requirements are a core building block of a multistep rubrics -- they define the
 They host the question and the judge response format in order to select the next dependent requirement(s).
 """
 
-from typing import Optional
+from typing import Any, Optional
 
-from verifiers.rewards.judge_reward import (JudgeResponseFormat,
-                                            binary_judge_response_format)
+from verifiers.rewards.judge_utils import (JudgeResponseFormat,
+                                           binary_judge_response_format,
+                                           unit_vector_judge_response_format)
 
 
 class Requirement:
     """
-    Requirements are instantiated acording to a name, question, judge response format, and dependencies.
+    Instantiate requirements according to a name, question, judge response format, and dependencies.
     The judge's response format is used to determine the next dependent requirement(s).
     """
 
-    # TODO -- check depenedencies float???
     def __init__(
         self,
         name: str,
@@ -25,7 +25,15 @@ class Requirement:
         judge_response_format: JudgeResponseFormat,
         dependencies: Optional[dict[float, list[str]]] = None,
     ):
-        """Simple init for a requirement."""
+        """
+        Initialize a requirement with name, question, judge format, and dependencies.
+
+        Args:
+            name: Unique identifier for this requirement
+            question: The question to be evaluated
+            judge_response_format: Format for judge responses
+            dependencies: Optional dict mapping answers to dependent requirements
+        """
         self.name = name
         self.question = question
         self.dependencies = dependencies
@@ -35,14 +43,56 @@ class Requirement:
             assert all(d in judge_response_format.options for d in dependencies.keys())
 
     def terminal(self) -> bool:
-        """A terminal requirement is one that has no dependencies."""
+        """Check if requirement is terminal, meaning it has no dependencies."""
         return not bool(self.dependencies)
 
+    def get_dependencies_from_answer(self, answer: Any) -> list[str]:
+        """Get the dependencies for this requirement based on the answer."""
+        raise NotImplementedError(
+            "get_dependencies_from_answer not implemented for base class"
+        )
 
-class BinaryRequirement(Requirement):
+
+class DiscreteRequirement(Requirement):
     """
-    Helper class for binary requirements; they are the most common type of requirement.
-    They have a binary response format (0.0 or 1.0) and use the binary judge response format.
+    Create discrete requirements with discrete choices for dependency options.
+    They are the most common type of requirement and use the discrete judge response formats, like binary.
+    """
+
+    def get_dependencies_from_answer(self, answer: Any) -> list[str]:
+        """Get the dependencies for this requirement based on the answer."""
+        if self.dependencies is None:
+            return []
+        elif answer not in self.dependencies:
+            raise ValueError(
+                f"Answer {answer} not in dependencies for requirement {self.name}. Found dependencies: {self.dependencies.keys()}"
+            )
+        return self.dependencies[answer]
+
+
+class ContinuousRequirement(Requirement):
+    """
+    Create continuous requirements with continuous choices for dependency options.
+    Dependency options are selected by the closest answer to the judge's response.
+    """
+
+    def get_dependencies_from_answer(self, answer: Any) -> list[str]:
+        """Get the dependencies for this requirement based on the answer."""
+        if self.dependencies is None:
+            return []
+        elif answer not in self.dependencies:
+            raise ValueError(
+                f"Answer {answer} not in dependencies for requirement {self.name}. Found dependencies: {self.dependencies.keys()}"
+            )
+        # determine which dependency key is closest to the answer
+        closest_key = min(self.dependencies.keys(), key=lambda x: abs(x - answer))
+        return self.dependencies[closest_key]
+
+
+class BinaryRequirement(DiscreteRequirement):
+    """
+    Create binary requirements with binary response format (0.0 or 1.0).
+    They are the most common type of requirement and use the binary judge response format.
     """
 
     def __init__(
@@ -51,4 +101,38 @@ class BinaryRequirement(Requirement):
         question: str,
         dependencies: Optional[dict[float, list[str]]] = None,
     ) -> None:
+        """
+        Initialize a binary requirement.
+
+        Args:
+            name: Unique identifier for this requirement
+            question: The question to be evaluated
+            dependencies: Optional dict mapping binary answers to dependent requirements
+        """
         super().__init__(name, question, binary_judge_response_format, dependencies)
+
+
+class UnitVectorRequirement(ContinuousRequirement):
+    """
+    Create unit vector requirements with unit vector response format (0.0 or 1.0).
+    They are the most common type of requirement and use the unit vector judge response format.
+    """
+
+    def __init__(
+        self,
+        name: str,
+        question: str,
+        dependencies: Optional[dict[float, list[str]]] = None,
+        **kwargs,
+    ):
+        """
+        Initialize a unit vector requirement.
+
+        Args:
+            name: Unique identifier for this requirement
+            question: The question to be evaluated
+            dependencies: Optional dict mapping unit vector answers to dependent requirements
+        """
+        super().__init__(
+            name, question, unit_vector_judge_response_format, dependencies, **kwargs
+        )

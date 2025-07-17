@@ -10,8 +10,7 @@ This demonstrates the visualization capabilities of the three specialized visual
 from multistep_extras.example_rubrics import get_workflow
 from multistep_extras.utils.print_utils import (print_debug, print_header,
                                                 print_info, print_process,
-                                                print_rubric, print_score,
-                                                print_section, print_success)
+                                                print_score, print_success)
 from multistep_extras.visualization.visualizer import (
     CompletedRubricVisualizer, RequirementsVisualizer, RubricVisualizer,
     visualize_requirements)
@@ -27,12 +26,12 @@ class MockJudgeRewarder(JudgeRewarder):
     """Mock judge rewarder for demo purposes."""
 
     def __init__(self):
-        """Simple init for demo purposes."""
+        """Initialize a simple mock judge for demo purposes."""
         self.model = "mock-judge-model"
         self.response_format = "binary"
 
     async def __call__(self, question: str, content: str, answer, **kwargs):
-        """Mock judge that returns correct for demo purposes."""
+        """Return a mock judge response that always indicates correct for demo purposes."""
         from verifiers.rewards.judge_reward import JudgeResponse
 
         return JudgeResponse(answer=1.0, reasoning="Mock evaluation for demo purposes")
@@ -115,7 +114,7 @@ def demo_rubric_visualizer(name: str, reqs: list[Requirement]):
 
 def demo_completed_rubric_visualizer(name: str = ""):
     """Demonstrate the CompletedRubricVisualizer for evaluated rubrics."""
-    print_header(f"✅ COMPLETED RUBRIC VISUALIZER DEMO")
+    print_header("✅ COMPLETED RUBRIC VISUALIZER DEMO")
     print_info("Visualizing rubrics with actual evaluation results and judge feedback.")
     print()
 
@@ -182,14 +181,13 @@ def demo_completed_rubric_visualizer(name: str = ""):
     print()
     viz = CompletedRubricVisualizer(rubric, demo_scenario, mock_results)
     viz.print_complete_evaluation()
-    breakpoint()
 
 
 def demo_advanced_features(
     name: str, reqs: list[Requirement], scenarios: list[Scenario]
 ):
     """Demonstrate advanced features of each visualizer."""
-    print_header(f"🔬 ADVANCED ANALYSIS FEATURES")
+    print_header("🔬 ADVANCED ANALYSIS FEATURES")
     print_info("Deep-dive into workflow metrics and complexity analysis.")
     print()
 
@@ -252,7 +250,6 @@ def demo_advanced_features(
 
 def run_full_demo():
     """Run the complete visualization demo showcasing all three visualizers."""
-
     workflow_name = "first_responder"
     requirements, scenarios = get_workflow(workflow_name)
 
