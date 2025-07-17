@@ -2,6 +2,8 @@
 Demo script for the WorkflowBuilder and related builder utilities.
 
 This demonstrates how to create workflows using the fluent builder interface.
+
+# TODO what am I???
 """
 
 from multistep_extras.builders.builder import (BranchingWorkflowTemplate,
@@ -9,7 +11,6 @@ from multistep_extras.builders.builder import (BranchingWorkflowTemplate,
                                                ScenarioBuilder,
                                                WorkflowBuilder, quick_scenario,
                                                quick_workflow)
-from multistep_extras.visualization.visualizer import WorkflowVisualizer
 
 
 def demo_fluent_builder():
@@ -68,7 +69,8 @@ def demo_fluent_builder():
 
     # Visualize the created workflow
     print("\nWorkflow Structure:")
-    visualizer = WorkflowVisualizer(workflow)
+    breakpoint()
+    visualizer = RequirementsVisualizer(workflow)
     visualizer.print_workflow_structure()
     visualizer.print_workflow_metrics()
 

@@ -3,7 +3,8 @@
 import asyncio
 from typing import Any
 
-from verifiers.rewards.judge_reward import BinaryJudgeRewarder, JudgeResponse, JudgeRewarder
+from verifiers.rewards.judge_reward import (BinaryJudgeRewarder, JudgeResponse,
+                                            JudgeRewarder)
 from verifiers.rewards.reward import Reward
 from verifiers.rubrics.multistep.requirement import Requirement
 from verifiers.rubrics.multistep.scenario import Scenario
@@ -28,17 +29,15 @@ class RequirementRewardNode:
         if asyncio.iscoroutine(result):
             return await result
         return result
-    
+
     def terminal(self) -> bool:
         """Check if the requirement is terminal."""
         return self.requirement.terminal()
-    
+
     @property
     def dependencies(self) -> dict[str, list[str]]:
         """Get the dependencies for this requirement."""
         return self.requirement.dependencies
-    
-
 
 
 class RequirementJudgeRewardNode(RequirementRewardNode):

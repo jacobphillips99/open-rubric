@@ -1,18 +1,22 @@
 """
 Visualization utilities for MultiStep Rubric workflows.
 
-This module provides tools to visualize workflow structures, dependencies,
-and evaluation paths to help users understand complex rubrics.
+This module provides three specialized visualizers for different use cases:
+1. RequirementsVisualizer - For analyzing requirement dependencies
+2. RubricVisualizer - For visualizing complete rubrics with nodes
+3. CompletedRubricVisualizer - For visualizing evaluated rubrics with results
 """
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Tuple, Union
 
+from verifiers.rubrics.multistep.multistep_rubric import MultiStepRubric
 from verifiers.rubrics.multistep.requirement import Requirement
+from verifiers.rubrics.multistep.scenario import Scenario
 from verifiers.rubrics.multistep.utils import topological_levels
 
 
-class WorkflowVisualizer:
-    """Utility class for visualizing multistep workflows and their dependencies."""
+class RequirementsVisualizer:
+    """Visualizer focused on requirement dependencies and workflow structure."""
 
     def __init__(self, requirements: List[Requirement]):
         """
@@ -24,7 +28,7 @@ class WorkflowVisualizer:
         self.requirements = requirements
         self.name_to_req = {req.name: req for req in requirements}
 
-        # Build dependency structure
+        # Build dependency structure for topological sorting
         self.dependencies = {
             name: sum(req.dependencies.values(), []) if req.dependencies else None
             for name, req in self.name_to_req.items()
@@ -34,10 +38,32 @@ class WorkflowVisualizer:
         self.levels = topological_levels(self.dependencies)
         self.levels.reverse()  # Start from root nodes
 
+    def print_dependency_graph(self) -> None:
+        """Print the dependency relationships between requirements."""
+        print("REQUIREMENT DEPENDENCIES")
+        print("=" * 60)
+
+        for req_name, req in self.name_to_req.items():
+            print(f"\n{req_name}:")
+            print(f"  Question: {req.question}")
+            print(f"  Response Format: {req.judge_response_format.options}")
+
+            if req.terminal():
+                print("  Dependencies: Terminal node (no dependencies)")
+            else:
+                print("  Dependencies:")
+                if req.dependencies:
+                    for answer, deps in req.dependencies.items():
+                        if deps:
+                            print(f"    └─ If answer = {answer}: {', '.join(deps)}")
+                        else:
+                            print(f"    └─ If answer = {answer}: STOP (terminal)")
+        print()
+
     def print_workflow_structure(self) -> None:
-        """Print a text-based visualization of the workflow structure."""
-        print("WORKFLOW STRUCTURE")
-        print("=" * 50)
+        """Print a level-based view of the workflow structure."""
+        print("WORKFLOW LEVELS")
+        print("=" * 60)
         print(f"Total Requirements: {len(self.requirements)}")
         print(f"Levels: {len(self.levels)}")
         print()
@@ -49,118 +75,76 @@ class WorkflowVisualizer:
                 status = "Terminal" if req.terminal() else "Branches"
                 print(f"  • {req_name} ({status})")
 
-                if not req.terminal():
-                    if req.dependencies:  # Check if dependencies is not None
-                        for answer, deps in req.dependencies.items():
-                            deps_str = ", ".join(deps) if deps else "STOP"
-                            print(f"    └─ If {answer}: {deps_str}")
-            print()
-
-    def print_dependency_graph(self) -> None:
-        """Print the dependency relationships in graph format."""
-        print("DEPENDENCY GRAPH")
-        print("=" * 50)
-
-        for req_name, req in self.name_to_req.items():
-            print(f"{req_name}:")
-            if req.terminal():
-                print("  └─ Terminal node (no dependencies)")
-            else:
-                if req.dependencies:  # Check if dependencies is not None
+                if not req.terminal() and req.dependencies:
                     for answer, deps in req.dependencies.items():
-                        if deps:
-                            print(f"  └─ {answer} → {', '.join(deps)}")
-                        else:
-                            print(f"  └─ {answer} → STOP")
+                        deps_str = ", ".join(deps) if deps else "STOP"
+                        print(f"    └─ {answer} → {deps_str}")
             print()
 
-    def analyze_workflow_metrics(self) -> Dict[str, Any]:
-        """
-        Analyze and return metrics about the workflow structure.
-
-        Returns:
-            Dict with workflow metrics
-        """
-        # Get nodes
+    def analyze_metrics(self) -> Dict[str, Any]:
+        """Analyze and return metrics about the requirement structure."""
         terminal_nodes = [
             name for name, req in self.name_to_req.items() if req.terminal()
         ]
-        branching_nodes = [
-            name
-            for name, req in self.name_to_req.items()
-            if req.dependencies is not None and len(req.dependencies) > 1
-        ]
 
-        # Calculate max depth
-        max_depth = len(self.levels)
+        branching_nodes = []
+        multi_branch_nodes = []
+        for name, req in self.name_to_req.items():
+            if req.dependencies:
+                branching_nodes.append(name)
+                if len(req.dependencies) > 2:
+                    multi_branch_nodes.append(name)
 
-        # Calculate average branching factor
-        non_terminal_nodes = [req for req in self.requirements if not req.terminal()]
-        if non_terminal_nodes:
-            total_branches = sum(
-                len(req.dependencies) if req.dependencies else 0
-                for req in non_terminal_nodes
-            )
-            avg_branching_factor = total_branches / len(non_terminal_nodes)
-        else:
-            avg_branching_factor = 0.0
+        # Calculate branching factor
+        total_branches = sum(
+            len(req.dependencies) if req.dependencies else 0
+            for req in self.requirements
+        )
+        avg_branching_factor = (
+            total_branches / len(branching_nodes) if branching_nodes else 0.0
+        )
 
-        # Find nodes with most dependencies
-        dependency_counts = {
-            name: len(deps) if deps is not None else 0
-            for name, deps in self.dependencies.items()
-        }
-        max_dependencies = max(dependency_counts.values()) if dependency_counts else 0
-
-        # Calculate connectivity
+        # Count total edges
         total_edges = sum(
             len(deps) if deps is not None else 0 for deps in self.dependencies.values()
         )
 
-        metrics = {
+        return {
             "total_requirements": len(self.requirements),
             "terminal_nodes": len(terminal_nodes),
             "branching_nodes": len(branching_nodes),
-            "max_depth": max_depth,
+            "multi_branch_nodes": len(multi_branch_nodes),
+            "max_depth": len(self.levels),
             "avg_branching_factor": avg_branching_factor,
-            "max_dependencies": max_dependencies,
             "total_edges": total_edges,
-            "levels": len(self.levels),
-            "terminal_node_names": terminal_nodes,
             "root_nodes": list(self.levels[0]) if self.levels else [],
+            "terminal_node_names": terminal_nodes,
         }
 
-        return metrics
-
-    def print_workflow_metrics(self) -> None:
+    def print_metrics(self) -> None:
         """Print analyzed workflow metrics."""
-        metrics = self.analyze_workflow_metrics()
+        metrics = self.analyze_metrics()
 
         print("WORKFLOW METRICS")
-        print("=" * 50)
+        print("=" * 60)
         print(f"Total Requirements: {metrics['total_requirements']}")
-        print(f"Terminal Nodes: {metrics['terminal_nodes']}")
+        print(
+            f"Root Nodes: {len(metrics['root_nodes'])} ({', '.join(metrics['root_nodes'])})"
+        )
+        print(
+            f"Terminal Nodes: {metrics['terminal_nodes']} ({', '.join(metrics['terminal_node_names'])})"
+        )
         print(f"Branching Nodes: {metrics['branching_nodes']}")
+        print(f"Multi-Branch Nodes: {metrics['multi_branch_nodes']}")
         print(f"Maximum Depth: {metrics['max_depth']} levels")
         print(f"Average Branching Factor: {metrics['avg_branching_factor']:.2f}")
         print(f"Total Dependency Edges: {metrics['total_edges']}")
         print()
-        print(f"Root Nodes: {', '.join(metrics['root_nodes'])}")
-        print(f"Terminal Nodes: {', '.join(metrics['terminal_node_names'])}")
-        print()
 
-    def trace_evaluation_path(
+    def trace_evaluation_paths(
         self, answers: Dict[str, float]
     ) -> List[Tuple[int, List[str]]]:
-        """
-        Trace the evaluation path given a set of answers.
-
-        Args:
-            answers: Dictionary mapping requirement names to answers
-
-        Returns:
-            List of (level, requirements) tuples showing the evaluation path
-        """
+        """Trace the evaluation path given a set of answers."""
         path = []
         current_level = 0
         current_requirements = self.levels[0] if self.levels else []
@@ -187,16 +171,11 @@ class WorkflowVisualizer:
         return path
 
     def print_evaluation_path(self, answers: Dict[str, float]) -> None:
-        """
-        Print the evaluation path for given answers.
-
-        Args:
-            answers: Dictionary mapping requirement names to answers
-        """
-        path = self.trace_evaluation_path(answers)
+        """Print the evaluation path for given answers."""
+        path = self.trace_evaluation_paths(answers)
 
         print("EVALUATION PATH")
-        print("=" * 50)
+        print("=" * 60)
         print("Given answers:", answers)
         print()
 
@@ -223,143 +202,361 @@ class WorkflowVisualizer:
                                 )
         print()
 
-    def find_possible_paths(self, max_depth: int = 10) -> List[List[str]]:
+
+class RubricVisualizer:
+    """Visualizer for complete MultiStepRubric with nodes and judge rewarders."""
+
+    def __init__(self, rubric: MultiStepRubric):
         """
-        Find all possible evaluation paths through the workflow.
+        Initialize visualizer with a MultiStepRubric.
 
         Args:
-            max_depth: Maximum depth to explore
-
-        Returns:
-            List of paths, where each path is a list of requirement names
+            rubric: MultiStepRubric object to visualize
         """
-        paths = []
+        self.rubric = rubric
+        self.requirements_viz = RequirementsVisualizer(list(rubric.requirements))
 
-        def dfs(current_path: List[str], current_level: int):
-            if current_level >= max_depth or current_level >= len(self.levels):
-                paths.append(current_path.copy())
-                return
+    def print_rubric_overview(self) -> None:
+        """Print an overview of the rubric configuration."""
+        print("RUBRIC OVERVIEW")
+        print("=" * 60)
+        print(f"Rubric Type: {type(self.rubric).__name__}")
+        print(f"Judge Rewarder: {type(self.rubric.judge_rewarder).__name__}")
+        print(f"Reward Strategy: {self.rubric.reward_strategy.name}")
+        print(f"Total Requirements: {len(self.rubric.requirements)}")
+        print(f"Total Nodes: {len(self.rubric.name_to_node)}")
+        print(f"Topological Levels: {len(self.rubric.levels)}")
+        print()
 
-            level_reqs = self.levels[current_level]
-            for req_name in level_reqs:
-                req = self.name_to_req[req_name]
-                current_path.append(req_name)
+    def print_node_structure(self) -> None:
+        """Print the node structure with their types and capabilities."""
+        print("RUBRIC NODES")
+        print("=" * 60)
 
-                if req.terminal():
-                    paths.append(current_path.copy())
+        for level_idx, level in enumerate(self.rubric.levels):
+            print(f"\nLevel {level_idx}:")
+            for req_name in level:
+                if req_name not in self.rubric.name_to_node:
+                    breakpoint()
+                node = self.rubric.name_to_node[req_name]
+                req = self.rubric.name_to_req[req_name]
+
+                print(f"  • {req_name}:")
+                print(f"    Node Type: {type(node).__name__}")
+                print(f"    Question: {req.question}")
+                print(f"    Response Format: {req.judge_response_format.options}")
+                print(f"    Terminal: {node.terminal()}")
+
+                if not node.terminal() and req.dependencies:
+                    print(f"    Dependencies:")
+                    for answer, deps in req.dependencies.items():
+                        deps_str = ", ".join(deps) if deps else "STOP"
+                        print(f"      └─ {answer} → {deps_str}")
+        print()
+
+    def print_judge_configuration(self) -> None:
+        """Print details about the judge rewarder configuration."""
+        print("JUDGE CONFIGURATION")
+        print("=" * 60)
+        judge = self.rubric.judge_rewarder
+        print(f"Judge Type: {type(judge).__name__}")
+
+        # Print judge-specific attributes if available
+        if hasattr(judge, "model"):
+            print(f"Model: {judge.model}")
+        if hasattr(judge, "client"):
+            print(f"Client: {type(judge.client).__name__}")
+        if hasattr(judge, "response_format"):
+            print(f"Response Format: {judge.response_format}")
+
+        print()
+
+    def print_reward_strategy_info(self) -> None:
+        """Print information about the reward calculation strategy."""
+        print("REWARD STRATEGY")
+        print("=" * 60)
+        strategy = self.rubric.reward_strategy
+        print(f"Strategy: {strategy.name}")
+        print(f"Type: {type(strategy).__name__}")
+
+        # Print strategy-specific parameters if available
+        if hasattr(strategy, "base_weight"):
+            print(f"Base Weight: {strategy.base_weight}")
+        if hasattr(strategy, "level_multiplier"):
+            print(f"Level Multiplier: {strategy.level_multiplier}")
+        if hasattr(strategy, "max_level_bonus"):
+            print(f"Max Level Bonus: {strategy.max_level_bonus}")
+
+        print()
+
+    def print_complete_structure(self) -> None:
+        """Print a complete view of the rubric."""
+        self.print_rubric_overview()
+        self.print_judge_configuration()
+        self.print_reward_strategy_info()
+        self.print_node_structure()
+        self.requirements_viz.print_metrics()
+
+
+class CompletedRubricVisualizer:
+    """Visualizer for rubrics that have been evaluated with results."""
+
+    def __init__(
+        self, rubric: MultiStepRubric, scenario: Scenario, results: Dict[str, Any]
+    ):
+        """
+        Initialize visualizer with evaluation results.
+
+        Args:
+            rubric: The MultiStepRubric that was evaluated
+            scenario: The scenario that was evaluated
+            results: The evaluation results from rubric.evaluate()
+        """
+        self.rubric = rubric
+        self.scenario = scenario
+        self.results = results
+        self.rubric_viz = RubricVisualizer(rubric)
+
+    def print_scenario_info(self) -> None:
+        """Print information about the evaluated scenario."""
+        print("EVALUATED SCENARIO")
+        print("=" * 60)
+        print(f"Name: {self.scenario.name or 'Unnamed'}")
+        print(f"Description: {self.scenario.description or 'No description'}")
+        print(
+            f"Prompt: {self.scenario.prompt[:200]}{'...' if len(self.scenario.prompt) > 200 else ''}"
+        )
+        print(
+            f"Completion: {self.scenario.completion[:200] if self.scenario.completion else 'None'}{'...' if self.scenario.completion and len(self.scenario.completion) > 200 else ''}"
+        )
+
+        if self.scenario.answers:
+            print(f"Ground Truth Answers: {len(self.scenario.answers)} requirements")
+            for req_name, answer_data in self.scenario.answers.items():
+                if isinstance(answer_data, dict):
+                    answer = answer_data.get("answer", "N/A")
+                    reasoning = answer_data.get("reasoning", "No reasoning provided")
+                    print(
+                        f"  • {req_name}: {answer} ({reasoning[:100]}{'...' if len(reasoning) > 100 else ''})"
+                    )
                 else:
-                    # Explore all possible answers
-                    if req.dependencies:  # Check if dependencies is not None
-                        for _answer, deps in req.dependencies.items():
-                            if deps:  # If there are dependencies, continue
-                                dfs(current_path, current_level + 1)
-                            else:  # If no dependencies, this is a terminal path
-                                paths.append(current_path.copy())
-
-                current_path.pop()
-
-        if self.levels:
-            dfs([], 0)
-
-        return paths
-
-    def print_all_possible_paths(self, max_paths: int = 20) -> None:
-        """
-        Print all possible evaluation paths through the workflow.
-
-        Args:
-            max_paths: Maximum number of paths to display
-        """
-        paths = self.find_possible_paths()
-
-        print("ALL POSSIBLE PATHS")
-        print("=" * 50)
-        print(f"Total possible paths: {len(paths)}")
-
-        if len(paths) > max_paths:
-            print(f"Showing first {max_paths} paths:")
+                    print(f"  • {req_name}: {answer_data}")
         print()
 
-        for i, path in enumerate(paths[:max_paths]):
-            print(f"Path {i + 1}: {' → '.join(path)}")
+    def print_evaluation_results(self) -> None:
+        """Print the detailed evaluation results."""
+        print("EVALUATION RESULTS")
+        print("=" * 60)
 
-        if len(paths) > max_paths:
-            print(f"... and {len(paths) - max_paths} more paths")
+        total_evaluated = 0
+        total_correct = 0
+
+        for level_key, level_results in self.results.items():
+            if level_key.isdigit():  # Only process numeric level keys
+                level_num = int(level_key)
+                print(f"\nLevel {level_num}:")
+
+                for req_name, result_data in level_results.items():
+                    total_evaluated += 1
+
+                    # Handle both dict and direct value formats
+                    if isinstance(result_data, dict):
+                        judge_answer = result_data.get("answer", "N/A")
+                        judge_reasoning = result_data.get(
+                            "reasoning", "No reasoning provided"
+                        )
+                        is_correct = judge_answer == 1.0
+                    else:
+                        judge_answer = result_data
+                        judge_reasoning = "Direct value result"
+                        is_correct = judge_answer == 1.0
+
+                    if is_correct:
+                        total_correct += 1
+
+                    status = "✓ CORRECT" if is_correct else "✗ INCORRECT"
+                    print(f"  • {req_name}: {judge_answer} {status}")
+                    print(
+                        f"    Reasoning: {judge_reasoning[:150]}{'...' if len(judge_reasoning) > 150 else ''}"
+                    )
+
+        # Summary statistics
+        print(f"\nSUMMARY:")
+        print(f"Total Evaluated: {total_evaluated}")
+        print(f"Correct: {total_correct}")
+        print(
+            f"Accuracy: {total_correct/total_evaluated*100:.1f}%"
+            if total_evaluated > 0
+            else "No evaluations"
+        )
         print()
 
-    def compare_workflows(self, other_visualizer: "WorkflowVisualizer") -> None:
-        """
-        Compare this workflow with another workflow.
+    def print_evaluation_path_taken(self) -> None:
+        """Print the actual path taken during evaluation."""
+        print("EVALUATION PATH TAKEN")
+        print("=" * 60)
 
-        Args:
-            other_visualizer: Another WorkflowVisualizer to compare against
-        """
-        metrics1 = self.analyze_workflow_metrics()
-        metrics2 = other_visualizer.analyze_workflow_metrics()
+        if not self.scenario.answers:
+            print("No ground truth answers available to trace path.")
+            return
 
-        print("WORKFLOW COMPARISON")
-        print("=" * 50)
-        print(f"{'Metric':<25} {'Workflow 1':<15} {'Workflow 2':<15}")
-        print("-" * 55)
-
-        comparison_metrics = [
-            "total_requirements",
-            "terminal_nodes",
-            "branching_nodes",
-            "max_depth",
-            "avg_branching_factor",
-            "total_edges",
-        ]
-
-        for metric in comparison_metrics:
-            val1 = metrics1[metric]
-            val2 = metrics2[metric]
-
-            if isinstance(val1, float):
-                print(f"{metric:<25} {val1:<15.2f} {val2:<15.2f}")
+        # Extract ground truth answers for path tracing
+        gt_answers = {}
+        for req_name, answer_data in self.scenario.answers.items():
+            if isinstance(answer_data, dict):
+                gt_answers[req_name] = answer_data.get("answer")
             else:
-                print(f"{metric:<25} {val1:<15} {val2:<15}")
-        print()
+                gt_answers[req_name] = answer_data
+
+        # Trace the path based on ground truth and judge results
+        path_taken = []
+
+        for level_key in sorted(self.results.keys()):
+            if level_key.isdigit():
+                level_num = int(level_key)
+                level_results = self.results[level_key]
+                evaluated_reqs = list(level_results.keys())
+                path_taken.append((level_num, evaluated_reqs))
+
+                print(f"Level {level_num}: {', '.join(evaluated_reqs)}")
+
+                # Show what happened for each requirement
+                for req_name in evaluated_reqs:
+                    result_data = level_results[req_name]
+                    judge_answer = (
+                        result_data.get("answer", "N/A")
+                        if isinstance(result_data, dict)
+                        else result_data
+                    )
+                    gt_answer = gt_answers.get(req_name, "N/A")
+
+                    if judge_answer == 1.0:
+                        req = self.rubric.name_to_req[req_name]
+                        if (
+                            not req.terminal()
+                            and req.dependencies
+                            and gt_answer in req.dependencies
+                        ):
+                            next_deps = req.dependencies[gt_answer]
+                            if next_deps:
+                                print(
+                                    f"  {req_name}: ✓ Correct → leads to {', '.join(next_deps)}"
+                                )
+                            else:
+                                print(f"  {req_name}: ✓ Correct → TERMINAL")
+                        else:
+                            print(f"  {req_name}: ✓ Correct → TERMINAL")
+                    else:
+                        print(f"  {req_name}: ✗ Incorrect → path stops here")
+
+                print()
+
+    def print_revealed_information(self) -> None:
+        """Print any information that was revealed during evaluation."""
+        if not self.scenario.revealed_info:
+            return
+
+        print("REVEALED INFORMATION")
+        print("=" * 60)
+
+        for req_name, info in self.scenario.revealed_info.items():
+            # Check if this requirement was evaluated and correct
+            req_evaluated = False
+            req_correct = False
+
+            for level_results in self.results.values():
+                if isinstance(level_results, dict) and req_name in level_results:
+                    req_evaluated = True
+                    result = level_results[req_name]
+                    judge_answer = (
+                        result.get("answer", 0.0)
+                        if isinstance(result, dict)
+                        else result
+                    )
+                    req_correct = judge_answer == 1.0
+                    break
+
+            status = ""
+            if req_evaluated:
+                status = (
+                    " [REVEALED]"
+                    if req_correct
+                    else " [NOT REVEALED - incorrect answer]"
+                )
+            else:
+                status = " [NOT EVALUATED]"
+
+            print(f"• {req_name}{status}:")
+            print(f"  {info}")
+            print()
+
+    def print_complete_evaluation(self) -> None:
+        """Print a complete view of the evaluation."""
+        self.print_scenario_info()
+        self.print_evaluation_results()
+        self.print_evaluation_path_taken()
+        self.print_revealed_information()
 
 
-def visualize_workflow(
-    requirements: List[Requirement], answers: Optional[Dict[str, float]] = None
-) -> None:
+# Convenience functions for backward compatibility and easy usage
+def visualize_requirements(requirements: List[Requirement]) -> None:
     """
-    Visualize a workflow.
+    Visualize requirement dependencies and structure.
 
     Args:
         requirements: List of requirement objects
-        answers: Optional answers to trace evaluation path
     """
-    visualizer = WorkflowVisualizer(requirements)
-
-    visualizer.print_workflow_structure()
-    visualizer.print_workflow_metrics()
-
-    if answers:
-        visualizer.print_evaluation_path(answers)
-    else:
-        visualizer.print_all_possible_paths()
+    viz = RequirementsVisualizer(requirements)
+    viz.print_dependency_graph()
+    viz.print_workflow_structure()
+    viz.print_metrics()
 
 
-def compare_workflows(
+
+
+
+
+def compare_requirements(
     workflow1: List[Requirement],
     workflow2: List[Requirement],
     names: Tuple[str, str] = ("Workflow 1", "Workflow 2"),
 ) -> None:
     """
-    Compare two workflows side by side.
+    Compare two requirement workflows side by side.
 
     Args:
         workflow1: First workflow requirements
         workflow2: Second workflow requirements
         names: Names for the workflows
     """
-    print(f"COMPARING: {names[0]} vs {names[1]}")
-    print("=" * 60)
+    print(f"COMPARING REQUIREMENTS: {names[0]} vs {names[1]}")
+    print("=" * 80)
 
-    viz1 = WorkflowVisualizer(workflow1)
-    viz2 = WorkflowVisualizer(workflow2)
+    viz1 = RequirementsVisualizer(workflow1)
+    viz2 = RequirementsVisualizer(workflow2)
 
-    viz1.compare_workflows(viz2)
+    metrics1 = viz1.analyze_metrics()
+    metrics2 = viz2.analyze_metrics()
+
+    print(f"{'Metric':<25} {names[0]:<20} {names[1]:<20}")
+    print("-" * 65)
+
+    comparison_metrics = [
+        "total_requirements",
+        "terminal_nodes",
+        "branching_nodes",
+        "multi_branch_nodes",
+        "max_depth",
+        "avg_branching_factor",
+        "total_edges",
+    ]
+
+    for metric in comparison_metrics:
+        val1 = metrics1[metric]
+        val2 = metrics2[metric]
+
+        if isinstance(val1, float):
+            print(f"{metric:<25} {val1:<20.2f} {val2:<20.2f}")
+        else:
+            print(f"{metric:<25} {val1:<20} {val2:<20}")
+    print()

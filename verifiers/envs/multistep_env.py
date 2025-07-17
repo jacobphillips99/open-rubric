@@ -13,10 +13,10 @@ from verifiers.rubrics.multistep.scenario import Scenario
 
 class ProgressionTracker:
     """Separate tracker for debugging/audit trail, not part of core workflow state."""
-    
+
     def __init__(self):
         self.steps: List[Dict[str, Any]] = []
-    
+
     def add_step(self, turn: int, step_type: str, **data) -> None:
         """Add a step to the progression tracking."""
         self.steps.append({
@@ -24,7 +24,7 @@ class ProgressionTracker:
             "step_type": step_type,
             **data
         })
-    
+
     def get_progression(self) -> List[Dict[str, Any]]:
         """Get the full progression history."""
         return self.steps.copy()
@@ -80,7 +80,7 @@ class MultiStepMultiTurnEnv(MultiTurnEnv):
             "finished": False,
             "revealed_info": set(),
             "revealed_info_data": revealed_info_data,
-            "evaluation_results": {},  
+            "evaluation_results": {},
         }
 
     def env_response(self,
@@ -115,10 +115,10 @@ class MultiStepMultiTurnEnv(MultiTurnEnv):
 
         # Initialize clean state
         state = self._initialise_state(answer)
-        
+
         # Initialize progression tracker
         self.progression_tracker = ProgressionTracker()
-        
+
         # Record initial prompt in tracker
         turn = 0
         self.progression_tracker.add_step(
@@ -165,9 +165,9 @@ class MultiStepMultiTurnEnv(MultiTurnEnv):
 
         final_state = state.copy()
         final_state["progression"] = self.progression_tracker.get_progression()
-        
+
         evaluation_results = state.get("evaluation_results", {})
         for level_key, level_data in evaluation_results.items():
             final_state[level_key] = level_data
-        
+
         return completion, final_state

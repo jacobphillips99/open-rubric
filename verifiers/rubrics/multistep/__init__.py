@@ -52,9 +52,6 @@ __all__ = [
     "BinaryRequirementRewardNode",
     # Utilities
     "topological_levels",
-    "WorkflowVisualizer",
-    "visualize_workflow",
-    "compare_workflows",
     # Builder utilities
     "WorkflowBuilder",
     "WorkflowNode",

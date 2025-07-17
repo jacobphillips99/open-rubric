@@ -6,7 +6,7 @@ from collections.abc import Sequence
 from copy import deepcopy
 from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple, Union
 
-from verifiers.rewards.judge_reward import JudgeRewarder, JudgeResponse
+from verifiers.rewards.judge_reward import JudgeResponse, JudgeRewarder
 from verifiers.rubrics.multistep.enums import EvaluationMode, TerminalCondition
 from verifiers.rubrics.multistep.nodes import RequirementRewardNode
 from verifiers.rubrics.multistep.requirement import Requirement
@@ -111,7 +111,6 @@ class MultiStepRubric(Rubric):
         Returns:
             Dictionary containing evaluation results by level
         """
-
         if not scenario.answers:
             raise ValueError(
                 "ground_truth_answers or scenario.answers required for evaluation"
@@ -148,12 +147,13 @@ class MultiStepRubric(Rubric):
 
             # Evaluate model response with judge for each requirement
             coros = [node(scenario, **kwargs) for node in nodes]
-            judge_results: Dict[str, JudgeResponse] = dict(zip(level_with_answers, await asyncio.gather(*coros)))
+            judge_results: Dict[str, JudgeResponse] = dict(
+                zip(level_with_answers, await asyncio.gather(*coros))
+            )
 
             # Store both answer and reasoning in state
             state[i] = {
-                name: result.to_dict()
-                for name, result in judge_results.items()
+                name: result.to_dict() for name, result in judge_results.items()
             }
 
             # Determine next level based on ground truth answers where judge said correct
@@ -165,7 +165,7 @@ class MultiStepRubric(Rubric):
                 # Only follow dependencies if judge determined the response was correct
                 # Judge answer of 1.0 means correct, anything else means incorrect
                 if (
-                    judge_results[name].answer == 1.0  
+                    judge_results[name].answer == 1.0
                     and not node.terminal()
                     and node.dependencies
                     and gt_answer in node.dependencies
@@ -340,7 +340,7 @@ class MultiStepRubric(Rubric):
         # Initialize state tracking
         updated_state = deepcopy(state)
         revealed_info_set = state.get("revealed_info", set())
-        
+
         # Process any pending requirements from previous turn
         pending_next_reqs = updated_state.get("_pending_next_reqs", [])
         if pending_next_reqs:
@@ -365,9 +365,7 @@ class MultiStepRubric(Rubric):
                             # We're in an async context, use thread executor
                             import concurrent.futures
 
-                            with (
-                                concurrent.futures.ThreadPoolExecutor() as executor
-                            ):
+                            with concurrent.futures.ThreadPoolExecutor() as executor:
                                 future = executor.submit(
                                     asyncio.run, node(tmp_scenario)
                                 )
@@ -378,7 +376,9 @@ class MultiStepRubric(Rubric):
 
                         current_level_results[req_name] = result
                     elif req_name not in answers_gt:
-                        print(f"Warning: No answer provided for requirement '{req_name}', skipping evaluation")
+                        print(
+                            f"Warning: No answer provided for requirement '{req_name}', skipping evaluation"
+                        )
             except Exception as e:
                 print(f"Error evaluating requirements {active_reqs}: {e}")
                 # Fallback to empty results if evaluation fails
@@ -394,7 +394,7 @@ class MultiStepRubric(Rubric):
             print(f"DEBUG: answers_gt = {answers_gt}")
             print(f"DEBUG: revealed_info_data = {revealed_info_data}")
 
-            for req_name, judge_result in current_level_results.items():                
+            for req_name, judge_result in current_level_results.items():
                 print(
                     f"DEBUG: Processing {req_name} with judge_answer {judge_result.answer} (type: {type(judge_result.answer)})"
                 )
@@ -443,17 +443,15 @@ class MultiStepRubric(Rubric):
         # Update state with revealed info and evaluation results for testing/debugging
         updated_state["revealed_info"] = revealed_info_set
         updated_state["last_evaluation_results"] = {
-            name: result.to_dict()
-            for name, result in current_level_results.items()
+            name: result.to_dict() for name, result in current_level_results.items()
         }
-        
+
         # Accumulate evaluation results in level-based format for test compatibility
         if current_level_results:
             evaluation_results = updated_state.get("evaluation_results", {})
             level_key = str(level_idx)
             evaluation_results[level_key] = {
-                name: result.to_dict()
-                for name, result in current_level_results.items()
+                name: result.to_dict() for name, result in current_level_results.items()
             }
             updated_state["evaluation_results"] = evaluation_results
 

@@ -5,11 +5,11 @@ This module provides tools to visualize workflow structures, dependencies,
 and evaluation paths to help users understand complex rubrics.
 """
 
-from .visualizer import (WorkflowVisualizer, compare_workflows,
-                         visualize_workflow)
+from .visualizer import (CompletedRubricVisualizer, RequirementsVisualizer,
+                         RubricVisualizer)
 
 __all__ = [
-    "WorkflowVisualizer",
-    "compare_workflows",
-    "visualize_workflow",
+    "RequirementsVisualizer",
+    "RubricVisualizer",
+    "CompletedRubricVisualizer",
 ]

@@ -14,7 +14,7 @@ class JudgeResponse:
 
     def to_dict(self):
         return {"answer": self.answer, "reasoning": self.reasoning}
-    
+
     def __str__(self):
         return f"JudgeResponse(answer={self.answer}, reasoning={self.reasoning})"
 
