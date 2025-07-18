@@ -6,9 +6,9 @@ from collections.abc import Sequence
 from multistep_extras.example_rubrics import (debugging_reqs,
                                               debugging_scenarios,
                                               first_responder_reqs, scenarios)
-from verifiers.rewards.judge_reward import JUDGE_PROMPT, BinaryJudgeRewarder
+from verifiers.rewards.judge_reward import (JUDGE_PROMPT, BinaryJudgeRewarder,
+                                            UnitVectorJudgeRewarder)
 from verifiers.rubrics.multistep.multistep_rubric import MultiStepRubric
-from verifiers.rubrics.multistep.nodes import BinaryRequirementRewardNode
 from verifiers.rubrics.multistep.requirement import (BinaryRequirement,
                                                      Requirement)
 from verifiers.rubrics.multistep.reward_strategies import (
@@ -22,7 +22,10 @@ class MultiStepTutorial:
 
     def __init__(self) -> None:
         """Initialize the tutorial with default judge configuration."""
-        self.judge_rewarder = BinaryJudgeRewarder(judge_prompt=JUDGE_PROMPT)
+        self.judge_options = [
+            BinaryJudgeRewarder(judge_prompt=JUDGE_PROMPT),
+            UnitVectorJudgeRewarder(judge_prompt=JUDGE_PROMPT),
+        ]
 
     def create_simple_workflow(
         self,
@@ -96,7 +99,7 @@ class MultiStepTutorial:
         print("   Follows the model's actual answers through the dependency graph")
         model_guided_rubric = MultiStepRubric(
             requirements,
-            [self.judge_rewarder],
+            [self.judge_options],
             reward_strategy=SumRewardStrategy(),
         )
         result = await model_guided_rubric.evaluate(scenario)
@@ -108,7 +111,7 @@ class MultiStepTutorial:
         print("   Follows the ground truth answers through the dependency graph")
         reference_guided_rubric = MultiStepRubric(
             requirements,
-            [self.judge_rewarder],
+            [self.judge_options],
             reward_strategy=SumRewardStrategy(),
         )
         ground_truth: dict[str, float] = {
@@ -128,7 +131,7 @@ class MultiStepTutorial:
         print("   Evaluates all requirements regardless of dependencies")
         exhaustive_rubric = MultiStepRubric(
             requirements,
-            [self.judge_rewarder],
+            [self.judge_options],
             reward_strategy=SumRewardStrategy(),
         )
         result = await exhaustive_rubric.evaluate(scenario)
@@ -140,7 +143,7 @@ class MultiStepTutorial:
         print("   Stops gracefully when no valid path forward exists")
         adaptive_rubric = MultiStepRubric(
             requirements,
-            [self.judge_rewarder],
+            [self.judge_options],
             reward_strategy=SumRewardStrategy(),
         )
         result = await adaptive_rubric.evaluate(scenario)
@@ -172,7 +175,7 @@ class MultiStepTutorial:
 
         for name, strategy in strategies:
             rubric = MultiStepRubric(
-                debugging_reqs, [self.judge_rewarder], reward_strategy=strategy
+                debugging_reqs, [self.judge_options], reward_strategy=strategy
             )
 
             # Convert scenario.answers to ground_truth_answers format
@@ -225,7 +228,7 @@ class MultiStepTutorial:
         for name, requirements, scenario in workflows:
             rubric = MultiStepRubric(
                 requirements,
-                [self.judge_rewarder],
+                [self.judge_options],
                 reward_strategy=CompletionRatioRewardStrategy(),
             )
 
@@ -283,7 +286,7 @@ class MultiStepTutorial:
 
         rubric = MultiStepRubric(
             requirements,
-            [self.judge_rewarder],
+            [self.judge_options],
             reward_strategy=LevelWeightedRewardStrategy(),
         )
 

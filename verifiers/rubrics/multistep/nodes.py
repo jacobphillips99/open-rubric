@@ -3,18 +3,19 @@
 import asyncio
 from typing import Any
 
-from verifiers.rewards.judge_reward import (BinaryJudgeRewarder, ContinuousJudgeRewarder, DiscreteJudgeRewarder, JudgeResponse,
-                                            JudgeRewarder,
+from verifiers.rewards.judge_reward import (BinaryJudgeRewarder,
+                                            ContinuousJudgeRewarder,
+                                            DiscreteJudgeRewarder,
+                                            JudgeResponse, JudgeRewarder,
                                             UnitVectorJudgeRewarder)
 from verifiers.rewards.reward import Reward
-from verifiers.rubrics.multistep.requirement import Requirement
+from verifiers.rubrics.multistep.requirement import (BinaryRequirement,
+                                                     ContinuousRequirement,
+                                                     DiscreteRequirement,
+                                                     Requirement,
+                                                     UnitVectorRequirement)
 from verifiers.rubrics.multistep.scenario import Scenario
-from verifiers.rubrics.multistep.requirement import (
-    BinaryRequirement,
-    ContinuousRequirement, 
-    DiscreteRequirement,
-    UnitVectorRequirement
-)
+
 
 class RequirementRewardNode:
     """
@@ -116,32 +117,38 @@ REQUIREMENT_TO_JUDGE_MAPPING = {
     UnitVectorRequirement: UnitVectorJudgeRewarder,
     DiscreteRequirement: DiscreteJudgeRewarder,
     ContinuousRequirement: ContinuousJudgeRewarder,
-    Requirement: JudgeRewarder
+    Requirement: JudgeRewarder,
 }
 
 
 class NodeFactory:
     """Factory class for creating the appropriate RequirementRewardNode based on requirement and judge rewarder types."""
-    
+
     @staticmethod
-    def create_node(requirement: Requirement, judge_options: list[JudgeRewarder]) -> RequirementJudgeRewardNode:
+    def create_node(
+        requirement: Requirement, judge_options: list[JudgeRewarder]
+    ) -> RequirementJudgeRewardNode:
         """
         Create the appropriate RequirementRewardNode based on the types of requirement and judge rewarder.
-        
+
         Args:
             requirement: The requirement to evaluate
             judge_rewarder: The judge rewarder to use for evaluation
-            
+
         Returns:
             The appropriate RequirementRewardNode subclass instance
         """
         # maintain order of precedence in REQUIREMENT_TO_JUDGE_MAPPING
         for requirement_type, judge_type in REQUIREMENT_TO_JUDGE_MAPPING.items():
             if isinstance(requirement, requirement_type):
-                judge_options = [jr for jr in judge_options if isinstance(jr, judge_type)]
+                judge_options = [
+                    jr for jr in judge_options if isinstance(jr, judge_type)
+                ]
                 if not judge_options:
-                    raise ValueError(f"No judge rewarder found for requirement type {requirement_type}")
+                    raise ValueError(
+                        f"No judge rewarder found for requirement type {requirement_type} from judge options {judge_options}"
+                    )
                 return RequirementJudgeRewardNode(requirement, judge_options[0])
-        raise ValueError(f"No judge rewarder found for requirement type {type(requirement)}")
-
-
+        raise ValueError(
+            f"Requirement type {type(requirement)} not found in mapping {REQUIREMENT_TO_JUDGE_MAPPING}"
+        )

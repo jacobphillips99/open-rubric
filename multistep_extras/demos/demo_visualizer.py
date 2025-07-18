@@ -9,41 +9,27 @@ This demonstrates the visualization capabilities of the three specialized visual
 
 import os
 import traceback
+
 from openai import OpenAI
+
 from multistep_extras.example_rubrics import get_workflow
-from multistep_extras.utils.print_utils import (print_debug, print_error, print_header,
-                                                print_info, print_process,
-                                                print_score, print_success)
+from multistep_extras.utils.print_utils import (print_debug, print_error,
+                                                print_header, print_info,
+                                                print_process, print_score,
+                                                print_success)
 from multistep_extras.visualization.visualizer import (
     CompletedRubricVisualizer, RequirementsVisualizer, RubricVisualizer,
     visualize_requirements)
-from verifiers.rewards.judge_reward import JUDGE_PROMPT, BinaryJudgeRewarder, JudgeRewarder
+from verifiers.rewards.judge_reward import (JUDGE_PROMPT, BinaryJudgeRewarder,
+                                            JudgeRewarder,
+                                            UnitVectorJudgeRewarder)
 # For creating mock rubrics and evaluations
 from verifiers.rubrics.multistep.multistep_rubric import MultiStepRubric
-from verifiers.rubrics.multistep.requirement import (BinaryRequirement,
-                                                     Requirement)
-from verifiers.rubrics.multistep.scenario import Scenario
-
 # Create examples of both types
-from verifiers.rubrics.multistep.requirement import BinaryRequirement, UnitVectorRequirement
-from verifiers.rewards.judge_reward import UnitVectorJudgeRewarder
-from verifiers.rubrics.multistep.multistep_rubric import MultiStepRubric
+from verifiers.rubrics.multistep.requirement import (BinaryRequirement,
+                                                     Requirement,
+                                                     UnitVectorRequirement)
 from verifiers.rubrics.multistep.scenario import Scenario
-
-
-class MockJudgeRewarder(JudgeRewarder):
-    """Mock judge rewarder for demo purposes."""
-
-    def __init__(self):
-        """Initialize a simple mock judge for demo purposes."""
-        self.model = "mock-judge-model"
-        self.response_format = "binary"
-
-    async def __call__(self, question: str, content: str, answer, **kwargs):
-        """Return a mock judge response that always indicates correct for demo purposes."""
-        from verifiers.rewards.judge_reward import JudgeResponse
-
-        return JudgeResponse(answer=1.0, reasoning="Mock evaluation for demo purposes")
 
 
 def create_simple_demo_requirements() -> list[Requirement]:
@@ -70,9 +56,7 @@ def create_simple_demo_requirements() -> list[Requirement]:
     ]
 
 
-def demo_requirements_visualizer(
-    name: str, reqs: list[Requirement]
-):
+def demo_requirements_visualizer(name: str, reqs: list[Requirement]):
     """Demonstrate the RequirementsVisualizer for pure requirement analysis."""
     print_header("📋 REQUIREMENTS VISUALIZER DEMO")
     print_info("Analyzing requirement dependencies and workflow structure.")
@@ -105,23 +89,21 @@ def demo_requirements_visualizer(
     visualize_requirements(reqs)
 
 
-def demo_rubric_visualizer():
+def demo_rubric_visualizer(judge_options: list[JudgeRewarder]):
     """Demonstrate the RubricVisualizer for complete rubrics with nodes."""
     print_header("🏗️ RUBRIC VISUALIZER DEMO")
     print_info("Visualizing complete rubrics with nodes, judges, and strategies.")
     print()
 
-    # Create a mock rubric with simple, self-contained requirements
-    mock_judge = MockJudgeRewarder()
     simple_reqs = create_simple_demo_requirements()
-    rubric = MultiStepRubric(simple_reqs, [mock_judge])
+    rubric = MultiStepRubric(simple_reqs, judge_options)
 
     print_process("🔧 Simple Demo Rubric Configuration:")
     viz = RubricVisualizer(rubric)
     viz.print_complete_structure()
 
 
-def demo_completed_rubric_visualizer():
+def demo_completed_rubric_visualizer(judge_options: list[JudgeRewarder]):
     """Demonstrate the CompletedRubricVisualizer for evaluated rubrics."""
     print_header("✅ COMPLETED RUBRIC VISUALIZER DEMO")
     print_info("Visualizing rubrics with actual evaluation results and judge feedback.")
@@ -178,9 +160,8 @@ def demo_completed_rubric_visualizer():
         },
     }
 
-    mock_judge = MockJudgeRewarder()
     simple_reqs = create_simple_demo_requirements()
-    rubric = MultiStepRubric(simple_reqs, [mock_judge])
+    rubric = MultiStepRubric(simple_reqs, judge_options)
 
     print_process("🔍 Evaluated Scenario Results:")
     print_info("This shows how the visualizer displays actual evaluation outcomes...")
@@ -189,98 +170,117 @@ def demo_completed_rubric_visualizer():
     viz.print_complete_evaluation(demo_scenario, mock_results)
 
 
-def demo_discrete_vs_continuous():
+def demo_discrete_vs_continuous(judge_options: list[JudgeRewarder]):
     """Demonstrate the difference between discrete and continuous requirements."""
     print_header("⚡ DISCRETE VS CONTINUOUS SCORING DEMO")
-    print_info("Comparing how discrete and continuous requirements display in the visualizer.")
+    print_info(
+        "Comparing how discrete and continuous requirements display in the visualizer."
+    )
     print()
 
-    
     try:
         discrete_req = BinaryRequirement(
             name="safety_check",
             question="Does the response prioritize safety?",
-            dependencies={1.0: ["next_step"], 0.0: []}
+            dependencies={1.0: ["next_step"], 0.0: []},
         )
-        
+
         # UnitVectorRequirement only supports 0.0 and 1.0 as dependency keys
         # Let's use threshold-based logic: 0.0 leads to basic_check, 1.0 leads to advanced_check
         continuous_req = UnitVectorRequirement(
-            name="quality_score", 
+            name="quality_score",
             question="How would you rate the overall quality of this response?",
-            dependencies={1.0: ["advanced_check"], 0.0: ["basic_check"]}
+            dependencies={1.0: ["advanced_check"], 0.0: ["basic_check"]},
         )
-        
+
         print_process("✅ Requirements created successfully!")
         print()
-        
+
         print_process("📋 Discrete Requirement Example:")
         print_info(f"  • Name: {discrete_req.name}")
         print_info(f"  • Format: {discrete_req.judge_response_format.options}")
         if discrete_req.judge_response_format.meanings:
-            meanings = ", ".join([f"{k}={v}" for k, v in discrete_req.judge_response_format.meanings.items()])
+            meanings = ", ".join(
+                [
+                    f"{k}={v}"
+                    for k, v in discrete_req.judge_response_format.meanings.items()
+                ]
+            )
             print_info(f"  • Meanings: {meanings}")
-        print_info(f"  • Dependencies: Exact match logic")
+        print_info("  • Dependencies: Exact match logic")
         print()
-        
+
         print_process("📈 Continuous Requirement Example:")
         print_info(f"  • Name: {continuous_req.name}")
         print_info(f"  • Format: {continuous_req.judge_response_format.options}")
         if continuous_req.judge_response_format.meanings:
-            meanings = ", ".join([f"{k}={v}" for k, v in continuous_req.judge_response_format.meanings.items()])
+            meanings = ", ".join(
+                [
+                    f"{k}={v}"
+                    for k, v in continuous_req.judge_response_format.meanings.items()
+                ]
+            )
             print_info(f"  • Meanings: {meanings}")
-        print_info(f"  • Dependencies: Threshold-based logic")
+        print_info("  • Dependencies: Threshold-based logic")
         print()
-        
-        # Create a simple rubric to test validation
-        unit_vector_judge_rewarder = UnitVectorJudgeRewarder(JUDGE_PROMPT, judge_client=OpenAI(api_key=os.getenv("OPENAI_API_KEY")))
-        binary_judge_rewarder = BinaryJudgeRewarder(JUDGE_PROMPT, judge_client=OpenAI(api_key=os.getenv("OPENAI_API_KEY")))
-        
+
         # Test validation with a mock scenario
         test_requirements = [discrete_req, continuous_req]
-        test_rubric = MultiStepRubric(test_requirements, [unit_vector_judge_rewarder, binary_judge_rewarder])
-        
+        test_rubric = MultiStepRubric(test_requirements, judge_options)
+
         print_process("🔍 Testing rubric validation:")
-        
+
         # Test with valid scenario
         valid_scenario = Scenario(
             prompt="Test prompt",
-            completion="Test completion", 
+            completion="Test completion",
             answers={
                 "safety_check": {"answer": 1.0, "reasoning": "Safe response"},
-                "quality_score": {"answer": 0.0, "reasoning": "Basic quality"}
-            }
+                "quality_score": {"answer": 0.0, "reasoning": "Basic quality"},
+            },
         )
-        
+
         try:
             test_rubric.validate(valid_scenario)
             print_info("  ✅ Valid scenario passed validation")
         except ValueError as e:
             print_info(f"  ❌ Valid scenario failed: {e}; {traceback.format_exc()}")
-        
+
         # Test with invalid scenario (invalid answer value)
         invalid_scenario = Scenario(
             prompt="Test prompt",
             completion="Test completion",
             answers={
-                "safety_check": {"answer": 2.0, "reasoning": "Invalid value"},  # Invalid: not in [0.0, 1.0]
-                "quality_score": {"answer": 0.5, "reasoning": "Mid quality"}    # Invalid: not in [0.0, 1.0]
-            }
+                "safety_check": {
+                    "answer": 2.0,
+                    "reasoning": "Invalid value",
+                },  # Invalid: not in [0.0, 1.0]
+                "quality_score": {
+                    "answer": 0.5,
+                    "reasoning": "Mid quality",
+                },  # Invalid: not in [0.0, 1.0]
+            },
         )
-        
+
         try:
             test_rubric.validate(invalid_scenario)
             print_info("  ❌ Invalid scenario unexpectedly passed validation")
         except ValueError as e:
-            print_info(f"  ✅ Invalid scenario correctly rejected: {e}; {traceback.format_exc()}")
-        
+            print_info(
+                f"  ✅ Invalid scenario correctly rejected: {e}; {traceback.format_exc()}"
+            )
+
         print()
         print_process("🎯 Key Insights:")
-        print_info("  • UnitVectorRequirement only accepts 0.0 and 1.0 as dependency keys")
-        print_info("  • BinaryRequirement uses exact matching for dependencies") 
+        print_info(
+            "  • UnitVectorRequirement only accepts 0.0 and 1.0 as dependency keys"
+        )
+        print_info("  • BinaryRequirement uses exact matching for dependencies")
         print_info("  • Always validate scenarios before evaluation")
-        print_info("  • Rubric.validate() checks answer values against valid response format options")
-        
+        print_info(
+            "  • Rubric.validate() checks answer values against valid response format options"
+        )
+
     except Exception as e:
         print_error(f"❌ Error creating requirements: {e}; {traceback.format_exc()}")
         print_info("This demonstrates the importance of validation!")
@@ -288,7 +288,9 @@ def demo_discrete_vs_continuous():
         print_process("🔧 Resolution:")
         print_info("  • Check that dependency keys match valid response format options")
         print_info("  • Use rubric.validate(scenario) before evaluation")
-        print_info("  • For custom thresholds, create custom ContinuousRequirement subclasses")
+        print_info(
+            "  • For custom thresholds, create custom ContinuousRequirement subclasses"
+        )
 
 
 def demo_advanced_features(
@@ -361,10 +363,21 @@ def run_full_demo():
     workflow_name = "first_responder"
     requirements, scenarios = get_workflow(workflow_name)
 
+    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    judge_model = "gpt-4.1-nano"
+    judge_options = [
+        BinaryJudgeRewarder(
+            judge_prompt=JUDGE_PROMPT, judge_client=client, judge_model=judge_model
+        ),
+        UnitVectorJudgeRewarder(
+            judge_prompt=JUDGE_PROMPT, judge_client=client, judge_model=judge_model
+        ),
+    ]
+
     demo_requirements_visualizer(workflow_name, requirements)
-    demo_rubric_visualizer()
-    demo_completed_rubric_visualizer()
-    demo_discrete_vs_continuous() 
+    demo_rubric_visualizer(judge_options)
+    demo_completed_rubric_visualizer(judge_options)
+    demo_discrete_vs_continuous(judge_options)
     demo_advanced_features(workflow_name, requirements, scenarios)
 
     print_success("🎉 DEMO JOURNEY COMPLETE!")

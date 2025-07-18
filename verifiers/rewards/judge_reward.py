@@ -65,7 +65,7 @@ class JudgeRewarder(Reward):
             raise e
 
         return judge_result
-    
+
 
 class DiscreteJudgeRewarder(JudgeRewarder):
     pass

@@ -39,8 +39,11 @@ class Requirement:
         self.dependencies = dependencies
         self.judge_response_format = judge_response_format
 
-    def validate_dependencies(self):
-        raise NotImplementedError("validate_dependencies not implemented for base class")
+    def validate_dependencies(self) -> None:
+        """Validate the dependencies for this requirement."""
+        raise NotImplementedError(
+            "validate_dependencies not implemented for base class"
+        )
 
     def terminal(self) -> bool:
         """Check if requirement is terminal, meaning it has no dependencies."""
@@ -59,9 +62,13 @@ class DiscreteRequirement(Requirement):
     They are the most common type of requirement and use the discrete judge response formats, like binary.
     """
 
-    def validate_dependencies(self):
+    def validate_dependencies(self) -> None:
+        """Validate the dependencies for this requirement."""
         if self.dependencies is not None:
-            assert all(d in self.judge_response_format.options for d in self.dependencies.keys())
+            assert all(
+                d in self.judge_response_format.options
+                for d in self.dependencies.keys()
+            )
 
     def get_dependencies_from_answer(self, answer: Any) -> list[str]:
         """Get the dependencies for this requirement based on the answer."""
@@ -80,9 +87,15 @@ class ContinuousRequirement(Requirement):
     Dependency options are selected by the closest answer to the judge's response.
     """
 
-    def validate_dependencies(self):
+    def validate_dependencies(self) -> None:
+        """Validate the dependencies for this requirement."""
         if self.dependencies is not None:
-            assert all(self.judge_response_format.options[0] <= d <= self.judge_response_format.options[1] for d in self.dependencies.keys())
+            assert all(
+                self.judge_response_format.options[0]
+                <= d
+                <= self.judge_response_format.options[1]
+                for d in self.dependencies.keys()
+            )
 
     def get_dependencies_from_answer(self, answer: Any) -> list[str]:
         """Get the dependencies for this requirement based on the answer."""

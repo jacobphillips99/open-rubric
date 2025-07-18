@@ -4,18 +4,18 @@ import asyncio
 from collections import defaultdict
 from collections.abc import Sequence
 from copy import deepcopy
-from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple, Union
+from typing import Any, Dict, List, Mapping, Optional, Tuple, Union
 
 from verifiers.rewards.judge_reward import JudgeResponse, JudgeRewarder
 from verifiers.rubrics.multistep.enums import EvaluationMode, TerminalCondition
-from verifiers.rubrics.multistep.nodes import NodeFactory, RequirementRewardNode
+from verifiers.rubrics.multistep.nodes import (NodeFactory,
+                                               RequirementRewardNode)
 from verifiers.rubrics.multistep.requirement import Requirement
 from verifiers.rubrics.multistep.reward_strategies import (
     LevelWeightedRewardStrategy, RewardStrategy)
 from verifiers.rubrics.multistep.scenario import Scenario
 from verifiers.rubrics.multistep.utils import topological_levels
 from verifiers.rubrics.rubric import Rubric
-
 
 
 class MultiStepRubric(Rubric):
@@ -435,7 +435,7 @@ class MultiStepRubric(Rubric):
                 and gt_answer is not None
                 and gt_answer in req.dependencies
             ):
-                next_reqs.extend(req.get_dependencies_from_answer[gt_answer])
+                next_reqs.extend(req.get_dependencies_from_answer(gt_answer))
 
         next_reqs = list(set(next_reqs))
 

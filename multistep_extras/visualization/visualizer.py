@@ -9,13 +9,15 @@ This module provides three specialized visualizers for different use cases:
 
 from typing import Any, Dict, List, Tuple
 
+from verifiers.rewards.judge_reward import JUDGE_PROMPT
+from verifiers.rewards.judge_utils import (ContinuousJudgeResponseFormat,
+                                           DiscreteJudgeResponseFormat)
 from verifiers.rubrics.multistep.multistep_rubric import MultiStepRubric
-from verifiers.rubrics.multistep.requirement import (
-    Requirement, DiscreteRequirement, ContinuousRequirement
-)
+from verifiers.rubrics.multistep.requirement import (ContinuousRequirement,
+                                                     DiscreteRequirement,
+                                                     Requirement)
 from verifiers.rubrics.multistep.scenario import Scenario
 from verifiers.rubrics.multistep.utils import topological_levels
-from verifiers.rewards.judge_utils import DiscreteJudgeResponseFormat, ContinuousJudgeResponseFormat
 
 
 class RequirementsVisualizer:
@@ -49,12 +51,17 @@ class RequirementsVisualizer:
         for req_name, req in self.name_to_req.items():
             print(f"\n{req_name}:")
             print(f"  Question: {req.question}")
-            
+
             # Enhanced format display
             if isinstance(req.judge_response_format, DiscreteJudgeResponseFormat):
                 format_info = f"Discrete: {req.judge_response_format.options}"
                 if req.judge_response_format.meanings:
-                    meanings = ", ".join([f"{opt}={meaning}" for opt, meaning in req.judge_response_format.meanings.items()])
+                    meanings = ", ".join(
+                        [
+                            f"{opt}={meaning}"
+                            for opt, meaning in req.judge_response_format.meanings.items()
+                        ]
+                    )
                     format_info += f" ({meanings})"
             elif isinstance(req.judge_response_format, ContinuousJudgeResponseFormat):
                 bounds = req.judge_response_format.options
@@ -64,7 +71,7 @@ class RequirementsVisualizer:
                     format_info += f" ({bounds[0]}={meanings.get(bounds[0], 'low')}, {bounds[1]}={meanings.get(bounds[1], 'high')})"
             else:
                 format_info = f"{req.judge_response_format.options}"
-            
+
             print(f"  Response Format: {format_info}")
 
             if req.terminal():
@@ -245,7 +252,9 @@ class RubricVisualizer:
         print("RUBRIC OVERVIEW")
         print("=" * 60)
         print(f"Rubric Type: {type(self.rubric).__name__}")
-        print(f"Judge Rewarder: {type(self.rubric.judge_rewarder).__name__}")
+        print(
+            f"Judge Rewarders: {[type(jr).__name__ for jr in self.rubric.judge_options]}"
+        )
         print(f"Reward Strategy: {self.rubric.reward_strategy.name}")
         print(f"Total Requirements: {len(self.rubric.requirements)}")
         print(f"Total Nodes: {len(self.rubric.name_to_node)}")
@@ -282,16 +291,13 @@ class RubricVisualizer:
         """Print details about the judge rewarder configuration."""
         print("JUDGE CONFIGURATION")
         print("=" * 60)
-        judge = self.rubric.judge_rewarder
-        print(f"Judge Type: {type(judge).__name__}")
-
-        # Print judge-specific attributes if available
-        if hasattr(judge, "model"):
-            print(f"Model: {judge.model}")
-        if hasattr(judge, "client"):
-            print(f"Client: {type(judge.client).__name__}")
-        if hasattr(judge, "response_format"):
-            print(f"Response Format: {judge.response_format}")
+        for judge in self.rubric.judge_options:
+            print(f"Judge type: {type(judge).__name__}")
+            print(f"Judge model: {judge.judge_model}")
+            print(f"Judge client: {type(judge.judge_client).__name__}")
+            print(f"Judge response format: {judge.judge_response_format}")
+            if judge.judge_prompt != JUDGE_PROMPT:
+                print(f"Special Judge prompt: {judge.judge_prompt}")
 
         print()
 
@@ -361,7 +367,9 @@ class CompletedRubricVisualizer:
                     print(f"  • {req_name}: {answer_data}")
         print()
 
-    def print_evaluation_results(self, scenario: Scenario, results: Dict[str, Any]) -> None:
+    def print_evaluation_results(
+        self, scenario: Scenario, results: Dict[str, Any]
+    ) -> None:
         """Print the detailed evaluation results."""
         print("EVALUATION RESULTS")
         print("=" * 60)
@@ -391,15 +399,22 @@ class CompletedRubricVisualizer:
                     if isinstance(req, DiscreteRequirement):
                         is_correct = judge_answer == 1.0
                         score_display = f"{judge_answer}"
-                        if req.judge_response_format.meanings and judge_answer in req.judge_response_format.meanings:
+                        if (
+                            req.judge_response_format.meanings
+                            and judge_answer in req.judge_response_format.meanings
+                        ):
                             meaning = req.judge_response_format.meanings[judge_answer]
                             score_display += f" ({meaning})"
                     elif isinstance(req, ContinuousRequirement):
                         # For continuous, consider >0.5 as "correct" for summary stats
                         is_correct = judge_answer > 0.5
                         bounds = req.judge_response_format.options
-                        percentage = (judge_answer - bounds[0]) / (bounds[1] - bounds[0]) * 100
-                        score_display = f"{judge_answer}/{bounds[1]} ({percentage:.0f}%)"
+                        percentage = (
+                            (judge_answer - bounds[0]) / (bounds[1] - bounds[0]) * 100
+                        )
+                        score_display = (
+                            f"{judge_answer}/{bounds[1]} ({percentage:.0f}%)"
+                        )
                     else:
                         # Fallback for base Requirement class
                         is_correct = judge_answer == 1.0
@@ -425,7 +440,9 @@ class CompletedRubricVisualizer:
         )
         print()
 
-    def print_evaluation_path_taken(self, scenario: Scenario, results: Dict[str, Any]) -> None:
+    def print_evaluation_path_taken(
+        self, scenario: Scenario, results: Dict[str, Any]
+    ) -> None:
         """Print the actual path taken during evaluation."""
         print("EVALUATION PATH TAKEN")
         print("=" * 60)
@@ -466,14 +483,23 @@ class CompletedRubricVisualizer:
                     if isinstance(req, DiscreteRequirement):
                         is_correct = judge_answer == 1.0
                     elif isinstance(req, ContinuousRequirement):
-                        is_correct = judge_answer > 0.5  # Or whatever threshold makes sense
+                        is_correct = (
+                            judge_answer > 0.5
+                        )  # Or whatever threshold makes sense
                     else:
                         is_correct = judge_answer == 1.0
 
-                    if is_correct and not req.terminal() and req.dependencies and gt_answer in req.dependencies:
+                    if (
+                        is_correct
+                        and not req.terminal()
+                        and req.dependencies
+                        and gt_answer in req.dependencies
+                    ):
                         next_deps = req.get_dependencies_from_answer(gt_answer)
                         if next_deps:
-                            print(f"  {req_name}: ✓ Correct → leads to {', '.join(next_deps)}")
+                            print(
+                                f"  {req_name}: ✓ Correct → leads to {', '.join(next_deps)}"
+                            )
                         else:
                             print(f"  {req_name}: ✓ Correct → TERMINAL")
                     elif is_correct:
@@ -482,7 +508,9 @@ class CompletedRubricVisualizer:
                         print(f"  {req_name}: ✗ Incorrect → path stops here")
                 print()
 
-    def print_revealed_information(self, scenario: Scenario, results: Dict[str, Any]) -> None:
+    def print_revealed_information(
+        self, scenario: Scenario, results: Dict[str, Any]
+    ) -> None:
         """Print any information that was revealed during evaluation."""
         if not scenario.revealed_info:
             return
@@ -521,7 +549,9 @@ class CompletedRubricVisualizer:
             print(f"  {info}")
             print()
 
-    def print_complete_evaluation(self, scenario: Scenario, results: Dict[str, Any]) -> None:
+    def print_complete_evaluation(
+        self, scenario: Scenario, results: Dict[str, Any]
+    ) -> None:
         """Print a complete view of the evaluation."""
         self.print_scenario_info(scenario)
         self.print_evaluation_results(scenario, results)
