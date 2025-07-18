@@ -67,8 +67,8 @@ class RequirementsVisualizer:
                 bounds = req.judge_response_format.options
                 format_info = f"Continuous: {bounds[0]} to {bounds[1]}"
                 if req.judge_response_format.meanings:
-                    meanings = req.judge_response_format.meanings
-                    format_info += f" ({bounds[0]}={meanings.get(bounds[0], 'low')}, {bounds[1]}={meanings.get(bounds[1], 'high')})"
+                    meanings_dict = req.judge_response_format.meanings
+                    format_info += f" ({bounds[0]}={meanings_dict.get(bounds[0], 'low')}, {bounds[1]}={meanings_dict.get(bounds[1], 'high')})"
             else:
                 format_info = f"{req.judge_response_format.options}"
 
@@ -358,8 +358,10 @@ class CompletedRubricVisualizer:
             print(f"Ground Truth Answers: {len(scenario.answers)} requirements")
             for req_name, answer_data in scenario.answers.items():
                 if isinstance(answer_data, dict):
-                    answer = answer_data.get("answer", "N/A")
-                    reasoning = answer_data.get("reasoning", "No reasoning provided")
+                    answer: float = answer_data["answer"]
+                    reasoning: str = answer_data.get(
+                        "reasoning", "No reasoning provided"
+                    )
                     print(
                         f"  • {req_name}: {answer} ({reasoning[:100]}{'...' if len(reasoning) > 100 else ''})"
                     )

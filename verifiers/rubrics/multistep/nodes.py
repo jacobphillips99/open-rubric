@@ -42,7 +42,7 @@ class RequirementRewardNode:
         return self.requirement.terminal()
 
     @property
-    def dependencies(self) -> dict[str, list[str]]:
+    def dependencies(self) -> dict[str, list[str]] | None:
         """Get the dependencies for this requirement."""
         return self.requirement.dependencies
 
@@ -65,10 +65,9 @@ class RequirementJudgeRewardNode(RequirementRewardNode):
 
         # Handle missing answers gracefully in reference-guided evaluation
         if scenario.answers is None or self.requirement.name not in scenario.answers:
-            print(
-                f"Warning: No answer provided for requirement '{self.requirement.name}', skipping evaluation"
+            raise ValueError(
+                f"No answer provided for requirement '{self.requirement.name}' in scenario {scenario.name}; only have answers for {scenario.answers.keys()}"
             )
-            return 0.0  # Return neutral score when answer is missing
 
         # Extract answer value from the new format
         answer_data = scenario.answers[self.requirement.name]

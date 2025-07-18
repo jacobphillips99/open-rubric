@@ -1,4 +1,3 @@
-import asyncio
 from copy import deepcopy
 from typing import Any, Dict, List, Tuple, Union
 
@@ -8,13 +7,13 @@ from verifiers.envs.multiturn_env import MultiTurnEnv
 from verifiers.envs.singleturn_env import SingleTurnEnv
 
 from verifiers.rubrics.multistep.multistep_rubric import MultiStepRubric
-from verifiers.rubrics.multistep.scenario import Scenario
 
 
 class ProgressionTracker:
     """Separate tracker for debugging/audit trail, not part of core workflow state."""
 
-    def __init__(self):
+    def __init__(self) -> None:
+        """Initialize the progression tracker."""
         self.steps: List[Dict[str, Any]] = []
 
     def add_step(self, turn: int, step_type: str, **data) -> None:

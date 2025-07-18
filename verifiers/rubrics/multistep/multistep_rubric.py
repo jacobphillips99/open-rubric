@@ -170,7 +170,9 @@ class MultiStepRubric(Rubric):
                     and gt_answer in node.dependencies
                 ):
                     # Follow the dependency path for the ground truth answer
-                    next_level.extend(node.get_dependencies_from_answer(gt_answer))
+                    next_level.extend(
+                        node.requirement.get_dependencies_from_answer(gt_answer)
+                    )
 
             level = list(set(next_level))
             i += 1
