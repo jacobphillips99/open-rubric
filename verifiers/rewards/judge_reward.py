@@ -6,7 +6,7 @@ from typing import Any, Optional
 from verifiers.rewards.reward import Reward
 from openai import OpenAI
 from verifiers.parsers.parser import Parser
-from verifiers.rewards.judge_utils import JudgeResponseFormat, JudgeResponse
+from verifiers.rewards.judge_utils import DiscreteJudgeResponseFormat, JudgeResponseFormat, JudgeResponse
 from verifiers.rewards.judge_utils import binary_judge_response_format, unit_vector_judge_response_format
 
 JUDGE_PROMPT = """
@@ -65,9 +65,15 @@ class JudgeRewarder(Reward):
             raise e
 
         return judge_result
+    
 
+class DiscreteJudgeRewarder(JudgeRewarder):
+    pass
 
-class BinaryJudgeRewarder(JudgeRewarder):
+class ContinuousJudgeRewarder(JudgeRewarder):
+    pass
+
+class BinaryJudgeRewarder(DiscreteJudgeRewarder):
     def __init__(self, judge_prompt: str, judge_client: OpenAI | None = None, judge_model: str = "gpt-4.1-nano", parser: Parser = Parser(), **kwargs):
         super().__init__(judge_prompt, binary_judge_response_format, judge_client, judge_model, parser, **kwargs)
 

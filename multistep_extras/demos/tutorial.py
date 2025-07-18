@@ -96,8 +96,7 @@ class MultiStepTutorial:
         print("   Follows the model's actual answers through the dependency graph")
         model_guided_rubric = MultiStepRubric(
             requirements,
-            self.judge_rewarder,
-            node_factory=BinaryRequirementRewardNode,
+            [self.judge_rewarder],
             reward_strategy=SumRewardStrategy(),
         )
         result = await model_guided_rubric.evaluate(scenario)
@@ -109,8 +108,7 @@ class MultiStepTutorial:
         print("   Follows the ground truth answers through the dependency graph")
         reference_guided_rubric = MultiStepRubric(
             requirements,
-            self.judge_rewarder,
-            node_factory=BinaryRequirementRewardNode,
+            [self.judge_rewarder],
             reward_strategy=SumRewardStrategy(),
         )
         ground_truth: dict[str, float] = {
@@ -130,8 +128,7 @@ class MultiStepTutorial:
         print("   Evaluates all requirements regardless of dependencies")
         exhaustive_rubric = MultiStepRubric(
             requirements,
-            self.judge_rewarder,
-            node_factory=BinaryRequirementRewardNode,
+            [self.judge_rewarder],
             reward_strategy=SumRewardStrategy(),
         )
         result = await exhaustive_rubric.evaluate(scenario)
@@ -143,8 +140,7 @@ class MultiStepTutorial:
         print("   Stops gracefully when no valid path forward exists")
         adaptive_rubric = MultiStepRubric(
             requirements,
-            self.judge_rewarder,
-            node_factory=BinaryRequirementRewardNode,
+            [self.judge_rewarder],
             reward_strategy=SumRewardStrategy(),
         )
         result = await adaptive_rubric.evaluate(scenario)
@@ -176,7 +172,7 @@ class MultiStepTutorial:
 
         for name, strategy in strategies:
             rubric = MultiStepRubric(
-                debugging_reqs, self.judge_rewarder, reward_strategy=strategy
+                debugging_reqs, [self.judge_rewarder], reward_strategy=strategy
             )
 
             # Convert scenario.answers to ground_truth_answers format
@@ -229,7 +225,7 @@ class MultiStepTutorial:
         for name, requirements, scenario in workflows:
             rubric = MultiStepRubric(
                 requirements,
-                self.judge_rewarder,
+                [self.judge_rewarder],
                 reward_strategy=CompletionRatioRewardStrategy(),
             )
 
@@ -287,7 +283,7 @@ class MultiStepTutorial:
 
         rubric = MultiStepRubric(
             requirements,
-            self.judge_rewarder,
+            [self.judge_rewarder],
             reward_strategy=LevelWeightedRewardStrategy(),
         )
 

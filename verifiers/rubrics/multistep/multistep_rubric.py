@@ -8,13 +8,14 @@ from typing import Any, Callable, Dict, List, Mapping, Optional, Tuple, Union
 
 from verifiers.rewards.judge_reward import JudgeResponse, JudgeRewarder
 from verifiers.rubrics.multistep.enums import EvaluationMode, TerminalCondition
-from verifiers.rubrics.multistep.nodes import RequirementRewardNode
+from verifiers.rubrics.multistep.nodes import NodeFactory, RequirementRewardNode
 from verifiers.rubrics.multistep.requirement import Requirement
 from verifiers.rubrics.multistep.reward_strategies import (
     LevelWeightedRewardStrategy, RewardStrategy)
 from verifiers.rubrics.multistep.scenario import Scenario
 from verifiers.rubrics.multistep.utils import topological_levels
 from verifiers.rubrics.rubric import Rubric
+
 
 
 class MultiStepRubric(Rubric):
@@ -56,8 +57,7 @@ class MultiStepRubric(Rubric):
     def __init__(
         self,
         requirements: Sequence[Requirement],
-        judge_rewarder: JudgeRewarder,
-        node_factory: Callable = RequirementRewardNode,
+        judge_options: list[JudgeRewarder],
         reward_strategy: Optional[RewardStrategy] = None,
     ):
         """
@@ -65,12 +65,11 @@ class MultiStepRubric(Rubric):
 
         Args:
             requirements: List of requirement objects with name, dependencies, etc.
-            judge_rewarder: Rewarder for evaluating requirements
-            node_factory: Optional factory function to create custom nodes
+            judge_options: List of judge rewarders for evaluating requirements
             reward_strategy: Strategy for calculating rewards from evaluation results
         """
         self.requirements = requirements
-        self.judge_rewarder = judge_rewarder
+        self.judge_options = judge_options
         self.reward_strategy = reward_strategy or LevelWeightedRewardStrategy()
 
         # Build lookup structures
@@ -78,7 +77,7 @@ class MultiStepRubric(Rubric):
 
         # Use custom node factory if provided, otherwise use default
         self.name_to_node: Dict[str, RequirementRewardNode] = {
-            name: node_factory(req, judge_rewarder)
+            name: NodeFactory.create_node(req, judge_options)
             for name, req in self.name_to_req.items()
         }
 
