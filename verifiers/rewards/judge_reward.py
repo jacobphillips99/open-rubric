@@ -80,3 +80,18 @@ class BinaryJudgeRewarder(DiscreteJudgeRewarder):
 class UnitVectorJudgeRewarder(JudgeRewarder):
     def __init__(self, judge_prompt: str, judge_client: OpenAI | None = None, judge_model: str = "gpt-4.1-nano", parser: Parser = Parser(), **kwargs):
         super().__init__(judge_prompt, unit_vector_judge_response_format, judge_client, judge_model, parser, **kwargs)
+
+NAME_TO_JUDGE_REWARDER_CLASS = {
+    "binary": BinaryJudgeRewarder,
+    "unit_vector": UnitVectorJudgeRewarder,
+    "discrete": DiscreteJudgeRewarder,
+    "continuous": ContinuousJudgeRewarder,
+}
+
+def make_judge_rewarder(judge_rewarder_type: str, **kwargs) -> JudgeRewarder:
+    """Make a judge rewarder based on the judge_rewarder_type."""
+    return NAME_TO_JUDGE_REWARDER_CLASS[judge_rewarder_type](**kwargs)
+
+def make_judge_rewarders(judge_rewarders: list[dict]) -> list[JudgeRewarder]:
+    """Make a list of judge rewarders based on the judge_rewarders."""
+    return [make_judge_rewarder(j["type"], **j) for j in judge_rewarders]

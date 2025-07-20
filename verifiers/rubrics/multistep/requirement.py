@@ -157,3 +157,18 @@ class UnitVectorRequirement(ContinuousRequirement):
         super().__init__(
             name, question, unit_vector_judge_response_format, dependencies, **kwargs
         )
+
+NAME_TO_REQUIREMENT_CLASS = {
+    "binary": BinaryRequirement,
+    "unit_vector": UnitVectorRequirement,
+    "discrete": DiscreteRequirement,
+    "continuous": ContinuousRequirement,
+}
+
+def make_requirement(requirement_type: str, **kwargs) -> Requirement:
+    """Make a requirement based on the requirement_type."""
+    return NAME_TO_REQUIREMENT_CLASS[requirement_type](**kwargs)
+
+def make_requirements(requirements: list[dict]) -> list[Requirement]:
+    """Make a list of requirements based on the requirements."""
+    return [make_requirement(r["type"], **r) for r in requirements]
