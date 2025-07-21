@@ -4,15 +4,17 @@ import asyncio
 from collections import defaultdict
 from collections.abc import Sequence
 from copy import deepcopy
+from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Tuple, Union
+import yaml
 
-from verifiers.rewards.judge_reward import JudgeResponse, JudgeRewarder
+from verifiers.rewards.judge_reward import JudgeResponse, JudgeRewarder, make_judge_rewarders
 from verifiers.rubrics.multistep.enums import EvaluationMode, TerminalCondition
 from verifiers.rubrics.multistep.nodes import (NodeFactory,
                                                RequirementRewardNode)
 from verifiers.rubrics.multistep.requirement import Requirement
 from verifiers.rubrics.multistep.reward_strategies import (
-    LevelWeightedRewardStrategy, RewardStrategy)
+    LevelWeightedRewardStrategy, RewardStrategy, make_reward_strategy)
 from verifiers.rubrics.multistep.scenario import Scenario
 from verifiers.rubrics.multistep.utils import topological_levels
 from verifiers.rubrics.rubric import Rubric
@@ -481,10 +483,121 @@ class MultiStepRubric(Rubric):
             updated_state["finished"] = True
             return None, updated_state, True
 
-    def to_code(self, save_path: str) -> None:
-        # TODO: implement
-        pass
+    def save(
+        self,
+        directory: Union[str, Path],
+        name: str = "rubric",
+    ) -> None:
+        """
+        Save this MultiStepRubric to a directory with separate files.
+        
+        Args:
+            directory: Directory to save files in
+            name: Base name for the files
+        """
+        directory = Path(directory)
+        directory.mkdir(exist_ok=True)
+        
+        # Save requirements
+        Requirement.save_multiple(self.requirements, directory / f"{name}_requirements.yaml")
+        
+        # Save rubric configuration (judges and reward strategy)
+        self._save_config(directory / f"{name}_config.yaml", name)
+        
+        print(f"Saved rubric to {directory}/")
+        print(f"  - {name}_requirements.yaml")
+        print(f"  - {name}_config.yaml")
 
-    def to_yaml(self, save_path: str) -> None:
-        # TODO: implement
-        pass
+    def _save_config(
+        self,
+        file_path: Union[str, Path],
+        name: Optional[str] = None,
+        description: Optional[str] = None,
+    ) -> None:
+        """Save rubric configuration to YAML file."""
+        config_data: Dict[str, Any] = {}
+        
+        if name:
+            config_data["name"] = name
+        if description:
+            config_data["description"] = description
+        
+        # Serialize judge options
+        judges_data = []
+        for judge in self.judge_options:
+            judge_data = {
+                "type": judge.__class__.__name__.replace("JudgeRewarder", "").lower(),
+                "judge_prompt": judge.judge_prompt,
+                "judge_model": judge.judge_model,
+            }
+            judges_data.append(judge_data)
+        config_data["judge_options"] = judges_data
+        
+        # Serialize reward strategy
+        strategy_data = {
+            "type": self.reward_strategy.__class__.__name__.replace("RewardStrategy", "").lower(),
+        }
+        
+        # Add all strategy parameters automatically
+        for attr_name in dir(self.reward_strategy):
+            # Skip private attributes, methods, and built-in attributes
+            if (not attr_name.startswith('_') and 
+                not callable(getattr(self.reward_strategy, attr_name)) and
+                attr_name not in ['name']):  # Skip the 'name' property
+                strategy_data[attr_name] = getattr(self.reward_strategy, attr_name)
+        
+        config_data["reward_strategy"] = strategy_data
+        
+        with open(file_path, 'w') as f:
+            yaml.dump(config_data, f, default_flow_style=False, indent=2)
+
+    @classmethod
+    def load(
+        cls,
+        directory: Union[str, Path],
+        name: str = "rubric",
+    ) -> 'MultiStepRubric':
+        """
+        Load a MultiStepRubric from a directory.
+        
+        Args:
+            directory: Directory containing the files
+            name: Base name for the files
+            
+        Returns:
+            MultiStepRubric object
+        """
+        directory = Path(directory)
+        
+        # Load requirements
+        requirements = Requirement.load_multiple(directory / f"{name}_requirements.yaml")
+        
+        # Load configuration
+        config = cls._load_config(directory / f"{name}_config.yaml")
+        
+        return cls(
+            requirements=requirements,
+            judge_options=config["judge_options"],
+            reward_strategy=config["reward_strategy"],
+        )
+
+    @classmethod
+    def _load_config(cls, file_path: Union[str, Path]) -> Dict[str, Any]:
+        """Load rubric configuration from YAML file."""
+        with open(file_path, 'r') as f:
+            config_data = yaml.safe_load(f)
+        
+        # Load judge options
+        judge_options = make_judge_rewarders(config_data["judge_options"])
+        
+        # Load reward strategy
+        strategy_config = config_data["reward_strategy"].copy()
+        strategy_type = strategy_config.pop("type")
+        reward_strategy = make_reward_strategy(strategy_type, **strategy_config)
+        
+        return {
+            "judge_options": judge_options,
+            "reward_strategy": reward_strategy,
+            "name": config_data.get("name"),
+            "description": config_data.get("description"),
+        }

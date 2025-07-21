@@ -70,6 +70,14 @@ class JudgeResponseFormat:
 
         except Exception as e:
             raise ValueError(f"Error parsing response: {response}. Error: {e}")
+        
+    def to_dict(self):
+        return {"options": self.options, "meanings": self.meanings, "base_str": self.base_str, "reasoning_str": self.reasoning_str}
+    
+    @classmethod
+    def from_dict(cls, data: dict):
+        return cls(data["options"], data["meanings"], data["base_str"], data["reasoning_str"])
+
 
 class DiscreteJudgeResponseFormat(JudgeResponseFormat):
     def make_base_str(self):
