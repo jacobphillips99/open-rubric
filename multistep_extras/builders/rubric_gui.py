@@ -2,17 +2,17 @@
 Streamlit GUI for building MultiStep rubrics using the RubricBuilder.
 
 Run with:
-    streamlit run multistep_extras/rubric_gui.py
+    streamlit run multistep_extras/builders/rubric_gui.py
 
 This GUI allows you to build a MultiStepRubric by adding judge rewarders, requirements, and a reward strategy.
 """
 
 import json
-import os
 from pathlib import Path
 from typing import Any
 
 import streamlit as st
+import yaml
 
 from multistep_extras.builders.builder import RubricBuilder
 from verifiers.rewards.judge_reward import (JUDGE_PROMPT,
@@ -24,7 +24,7 @@ from verifiers.rubrics.multistep.reward_strategies import (
     NAME_TO_REWARD_STRATEGY_CLASS, make_reward_strategy)
 
 # Default save directory
-DEFAULT_SAVE_DIR = Path("outputs/rubrics")
+DEFAULT_SAVE_DIR = Path("outputs/workflows")
 
 
 def configure_page() -> None:
@@ -46,6 +46,9 @@ def initialize_session_state() -> None:
     if "reward_strategy" not in st.session_state:
         st.session_state.reward_strategy = None
 
+    # Create default save directory
+    DEFAULT_SAVE_DIR.mkdir(parents=True, exist_ok=True)
+
 
 def render_sidebar_overview() -> None:
     """Render the configuration overview in the sidebar."""
@@ -63,84 +66,202 @@ def render_sidebar_overview() -> None:
 
 
 def _render_save_load_section() -> None:
-    """Render the save/load section in the sidebar."""
+    """Render the enhanced save/load section with directory browsing."""
     st.subheader("💾 Save/Load")
-    
-    # Create save directory if it doesn't exist
-    DEFAULT_SAVE_DIR.mkdir(parents=True, exist_ok=True)
-    
-    # Load section
-    st.markdown("**Load Existing Rubric:**")
-    saved_rubrics = _get_saved_rubrics()
-    
-    if saved_rubrics:
-        selected_rubric = st.selectbox(
-            "Select rubric to load:",
-            options=[""] + saved_rubrics,
-            key="load_rubric_select"
+
+    # Directory selection
+    st.markdown("**Browse Directory:**")
+
+    # Initialize session state for current directory
+    if "current_directory" not in st.session_state:
+        st.session_state.current_directory = str(DEFAULT_SAVE_DIR)
+
+    col1, col2 = st.columns([3, 1])
+    with col1:
+        browse_dir = st.text_input(
+            "Directory path:",
+            value=st.session_state.current_directory,
+            key="browse_directory_input",
+            help="Enter path to browse for rubrics and scenarios",
         )
-        
+
+    with col2:
+        st.markdown("<br>", unsafe_allow_html=True)
+        if st.button("🔍 Browse"):
+            st.session_state.current_directory = browse_dir
+            st.rerun()
+
+    # Scan current directory
+    try:
+        browse_path = Path(browse_dir)
+        if browse_path.exists() and browse_path.is_dir():
+            _render_directory_contents(browse_path)
+        else:
+            st.warning(f"Directory '{browse_dir}' does not exist or is not accessible")
+    except Exception as e:
+        st.error(f"Error accessing directory: {str(e)}")
+
+    st.divider()
+
+    # Save section (only show if there's something to save)
+    if (
+        st.session_state.judge_rewarders
+        or st.session_state.requirements
+        or st.session_state.reward_strategy
+    ):
+        st.markdown("**Save Current Configuration:**")
+
         col1, col2 = st.columns(2)
         with col1:
-            if st.button("📂 Load", disabled=not selected_rubric):
-                if selected_rubric:
-                    _load_rubric_to_session(selected_rubric)
-        
+            save_name = st.text_input(
+                "Rubric name:", placeholder="my_rubric", key="save_name_input"
+            )
+
         with col2:
-            if st.button("🗑️ Delete", disabled=not selected_rubric):
-                if selected_rubric:
-                    _delete_saved_rubric(selected_rubric)
-    else:
-        st.info("No saved rubrics found")
-    
-    # Save section (only show if there's something to save)
-    if (st.session_state.judge_rewarders or 
-        st.session_state.requirements or 
-        st.session_state.reward_strategy):
-        
-        st.markdown("**Save Current Configuration:**")
-        save_name = st.text_input(
-            "Rubric name:",
-            placeholder="my_rubric",
-            key="save_name_input"
-        )
-        
+            save_dir = st.text_input(
+                "Save to directory:",
+                value=st.session_state.current_directory,
+                key="save_directory_input",
+            )
+
         if st.button("💾 Save Config", disabled=not save_name):
-            if save_name:
-                _save_current_config(save_name)
+            if save_name and save_dir:
+                _save_current_config_to_dir(save_name, save_dir)
 
 
-def _get_saved_rubrics() -> list[str]:
-    """Get list of saved rubric names."""
-    if not DEFAULT_SAVE_DIR.exists():
+def _render_directory_contents(directory: Path) -> None:
+    """Render the contents of a directory with rubrics and scenarios."""
+    # Scan for rubrics
+    rubrics = _get_rubrics_in_directory(directory)
+
+    # Scan for scenarios
+    scenarios = _get_scenarios_in_directory(directory)
+
+    if rubrics or scenarios:
+        col1, col2 = st.columns(2)
+
+        with col1:
+            st.markdown("**📋 Rubrics:**")
+            if rubrics:
+                for rubric_name in rubrics:
+                    with st.expander(f"🏗️ {rubric_name}", expanded=False):
+                        st.text(f"Path: {directory / f'{rubric_name}_config.yaml'}")
+                        col_load, col_del = st.columns(2)
+
+                        with col_load:
+                            if st.button("📂 Load", key=f"load_rubric_{rubric_name}"):
+                                _load_rubric_from_directory(rubric_name, directory)
+
+                        with col_del:
+                            if st.button(
+                                "🗑️ Delete", key=f"delete_rubric_{rubric_name}"
+                            ):
+                                _delete_rubric_from_directory(rubric_name, directory)
+            else:
+                st.info("No rubrics found")
+
+        with col2:
+            st.markdown("**🎭 Scenarios:**")
+            if scenarios:
+                for scenario_file in scenarios:
+                    with st.expander(f"🎯 {scenario_file['name']}", expanded=False):
+                        st.text(f"Type: {scenario_file['type']}")
+                        st.text(f"Count: {scenario_file['count']} scenario(s)")
+                        st.text(f"Path: {scenario_file['path']}")
+
+                        if st.button(
+                            "👁️ Preview",
+                            key=f"preview_scenario_{scenario_file['name']}",
+                        ):
+                            _preview_scenarios(scenario_file)
+
+                        if st.button(
+                            "📂 Load as Example",
+                            key=f"load_scenario_{scenario_file['name']}",
+                        ):
+                            _load_scenarios_as_example(scenario_file)
+            else:
+                st.info("No scenarios found")
+    else:
+        st.info("No rubrics or scenarios found in this directory")
+
+
+def _get_rubrics_in_directory(directory: Path) -> list[str]:
+    """Get list of rubric names in a directory."""
+    if not directory.exists():
         return []
-    
-    # Look for config files and extract rubric names
-    config_files = list(DEFAULT_SAVE_DIR.glob("*_config.yaml"))
+
+    config_files = list(directory.glob("*_config.yaml"))
     rubric_names = []
-    
+
     for config_file in config_files:
-        # Extract name by removing _config.yaml suffix
         name = config_file.stem.replace("_config", "")
-        # Check if corresponding requirements file exists
-        req_file = DEFAULT_SAVE_DIR / f"{name}_requirements.yaml"
+        req_file = directory / f"{name}_requirements.yaml"
         if req_file.exists():
             rubric_names.append(name)
-    
+
     return sorted(rubric_names)
 
 
-def _load_rubric_to_session(rubric_name: str) -> None:
-    """Load a saved rubric into the session state."""
+def _get_scenarios_in_directory(directory: Path) -> list[dict]:
+    """Get list of scenario files in a directory."""
+    if not directory.exists():
+        return []
+
+    scenario_files = []
+
+    # Look for YAML files that might contain scenarios
+    yaml_files = list(directory.glob("*.yaml")) + list(directory.glob("*.yml"))
+
+    for yaml_file in yaml_files:
+        # Skip rubric files
+        if "_config.yaml" in str(yaml_file) or "_requirements.yaml" in str(yaml_file):
+            continue
+
+        try:
+            with open(yaml_file, "r") as f:
+                data = yaml.safe_load(f)
+
+            if isinstance(data, dict):
+                if "scenarios" in data:
+                    # Multiple scenarios file
+                    scenario_files.append(
+                        {
+                            "name": yaml_file.stem,
+                            "type": "Multiple scenarios",
+                            "count": len(data["scenarios"]),
+                            "path": yaml_file,
+                            "data": data,
+                        }
+                    )
+                elif "scenario" in data:
+                    # Single scenario file
+                    scenario_files.append(
+                        {
+                            "name": yaml_file.stem,
+                            "type": "Single scenario",
+                            "count": 1,
+                            "path": yaml_file,
+                            "data": data,
+                        }
+                    )
+        except Exception:
+            # Not a valid scenario file, skip
+            continue
+
+    return sorted(scenario_files, key=lambda x: x["name"])
+
+
+def _load_rubric_from_directory(rubric_name: str, directory: Path) -> None:
+    """Load a rubric from a specific directory."""
     try:
-        # Load the rubric
-        rubric = MultiStepRubric.load(DEFAULT_SAVE_DIR, rubric_name)
-        
+        rubric = MultiStepRubric.load(directory, rubric_name)
+
         # Clear current session state
         st.session_state.judge_rewarders = []
         st.session_state.requirements = []
         st.session_state.reward_strategy = None
-        
+
         # Populate judge rewarders
         for judge in rubric.judge_options:
             judge_data = {
@@ -149,7 +270,7 @@ def _load_rubric_to_session(rubric_name: str) -> None:
                 "judge_model": judge.judge_model,
             }
             st.session_state.judge_rewarders.append(judge_data)
-        
+
         # Populate requirements
         for req in rubric.requirements:
             req_data = {
@@ -159,61 +280,145 @@ def _load_rubric_to_session(rubric_name: str) -> None:
                 "dependencies": req.dependencies,
             }
             st.session_state.requirements.append(req_data)
-        
+
         # Populate reward strategy
         strategy = rubric.reward_strategy
         strategy_data = {
             "type": strategy.__class__.__name__.replace("RewardStrategy", "").lower(),
         }
-        
+
         # Add strategy parameters
         for attr_name in dir(strategy):
-            if (not attr_name.startswith("_") and 
-                not callable(getattr(strategy, attr_name)) and 
-                attr_name not in ["name"]):
+            if (
+                not attr_name.startswith("_")
+                and not callable(getattr(strategy, attr_name))
+                and attr_name not in ["name"]
+            ):
                 strategy_data[attr_name] = getattr(strategy, attr_name)
-        
+
         st.session_state.reward_strategy = strategy_data
-        
-        st.success(f"✅ Loaded rubric '{rubric_name}' successfully!")
+
+        st.success(f"✅ Loaded rubric '{rubric_name}' from {directory}!")
         st.rerun()
-        
+
     except Exception as e:
         st.error(f"Error loading rubric: {str(e)}")
 
 
-def _save_current_config(save_name: str) -> None:
-    """Save the current configuration without building the full rubric."""
+def _delete_rubric_from_directory(rubric_name: str, directory: Path) -> None:
+    """Delete a rubric from a specific directory."""
     try:
-        # Build the rubric first
-        rubric = _build_rubric()
-        
-        # Save the rubric
-        rubric.save(DEFAULT_SAVE_DIR, save_name)
-        
-        st.success(f"✅ Saved configuration as '{save_name}'!")
-        st.rerun()
-        
-    except Exception as e:
-        st.error(f"Error saving configuration: {str(e)}")
+        config_file = directory / f"{rubric_name}_config.yaml"
+        req_file = directory / f"{rubric_name}_requirements.yaml"
 
-
-def _delete_saved_rubric(rubric_name: str) -> None:
-    """Delete a saved rubric."""
-    try:
-        config_file = DEFAULT_SAVE_DIR / f"{rubric_name}_config.yaml"
-        req_file = DEFAULT_SAVE_DIR / f"{rubric_name}_requirements.yaml"
-        
         if config_file.exists():
             config_file.unlink()
         if req_file.exists():
             req_file.unlink()
-            
-        st.success(f"✅ Deleted rubric '{rubric_name}'!")
+
+        st.success(f"✅ Deleted rubric '{rubric_name}' from {directory}!")
         st.rerun()
-        
+
     except Exception as e:
         st.error(f"Error deleting rubric: {str(e)}")
+
+
+def _save_current_config_to_dir(save_name: str, save_dir: str) -> None:
+    """Save the current configuration to a specific directory."""
+    try:
+        save_path = Path(save_dir)
+        save_path.mkdir(parents=True, exist_ok=True)
+
+        # Build the rubric first
+        rubric = _build_rubric()
+
+        # Save the rubric
+        rubric.save(save_path, save_name)
+
+        st.success(f"✅ Saved configuration as '{save_name}' to {save_path}!")
+        st.rerun()
+
+    except Exception as e:
+        st.error(f"Error saving configuration: {str(e)}")
+
+
+def _preview_scenarios(scenario_file: dict) -> None:
+    """Preview scenarios in a popup."""
+    from verifiers.rubrics.multistep.scenario import Scenario
+
+    try:
+        if scenario_file["type"] == "Multiple scenarios":
+            scenarios = Scenario.load_multiple(scenario_file["path"])
+
+            st.markdown("**Scenarios Preview:**")
+            for i, scenario in enumerate(scenarios[:3]):  # Show first 3
+                with st.expander(
+                    f"Scenario {i + 1}: {scenario.name or 'Unnamed'}", expanded=False
+                ):
+                    st.markdown(
+                        f"**Description:** {scenario.description or 'No description'}"
+                    )
+                    st.markdown(f"**Prompt:** {scenario.prompt[:200]}...")
+                    if scenario.answers:
+                        st.markdown(f"**Answer keys:** {list(scenario.answers.keys())}")
+
+            if len(scenarios) > 3:
+                st.info(f"... and {len(scenarios) - 3} more scenarios")
+
+        else:  # Single scenario
+            scenario = Scenario.load(scenario_file["path"])
+            st.markdown("**Scenario Preview:**")
+            st.markdown(f"**Name:** {scenario.name or 'Unnamed'}")
+            st.markdown(f"**Description:** {scenario.description or 'No description'}")
+            st.markdown(f"**Prompt:** {scenario.prompt}")
+            if scenario.answers:
+                st.markdown(f"**Answer keys:** {list(scenario.answers.keys())}")
+
+    except Exception as e:
+        st.error(f"Error previewing scenarios: {str(e)}")
+
+
+def _load_scenarios_as_example(scenario_file: dict) -> None:
+    """Load scenarios as examples (for demonstration/testing)."""
+    from verifiers.rubrics.multistep.scenario import Scenario
+
+    try:
+        if scenario_file["type"] == "Multiple scenarios":
+            scenarios = Scenario.load_multiple(scenario_file["path"])
+        else:
+            scenarios = [Scenario.load(scenario_file["path"])]
+
+        # Store in session state for potential use
+        st.session_state.loaded_scenarios = scenarios
+
+        st.success(f"✅ Loaded {len(scenarios)} scenario(s) as examples!")
+        st.info(
+            "Scenarios are now available in session state for testing with your rubric."
+        )
+
+    except Exception as e:
+        st.error(f"Error loading scenarios: {str(e)}")
+
+
+# Legacy functions for backward compatibility
+def _get_saved_rubrics() -> list[str]:
+    """Get list of saved rubric names in default directory."""
+    return _get_rubrics_in_directory(DEFAULT_SAVE_DIR)
+
+
+def _load_rubric_to_session(rubric_name: str) -> None:
+    """Load a saved rubric from default directory into the session state."""
+    _load_rubric_from_directory(rubric_name, DEFAULT_SAVE_DIR)
+
+
+def _save_current_config(save_name: str) -> None:
+    """Save the current configuration to default directory."""
+    _save_current_config_to_dir(save_name, str(DEFAULT_SAVE_DIR))
+
+
+def _delete_saved_rubric(rubric_name: str) -> None:
+    """Delete a saved rubric from default directory."""
+    _delete_rubric_from_directory(rubric_name, DEFAULT_SAVE_DIR)
 
 
 def _render_judge_rewarders_overview() -> None:
@@ -615,33 +820,36 @@ def _render_build_button() -> None:
     """Render the build rubric button and handle building."""
     # Add input field for rubric name
     col1, col2 = st.columns([3, 1])
-    
+
     with col1:
         rubric_name = st.text_input(
             "Rubric name for saving:",
             placeholder="my_rubric",
             key="build_rubric_name",
-            help="The rubric will be automatically saved with this name"
+            help="The rubric will be automatically saved with this name",
         )
-    
+
     with col2:
         st.markdown("<br>", unsafe_allow_html=True)  # Add space to align with input
         if st.button("🏗️ Build & Save Rubric", type="primary", key="build_main"):
-            if not st.session_state.judge_rewarders or not st.session_state.requirements:
+            if (
+                not st.session_state.judge_rewarders
+                or not st.session_state.requirements
+            ):
                 st.error("Need at least one judge rewarder and one requirement!")
                 return
-            
+
             if not rubric_name.strip():
                 st.error("Please provide a name for the rubric!")
                 return
 
             try:
                 rubric = _build_rubric()
-                
+
                 # Save the rubric
                 DEFAULT_SAVE_DIR.mkdir(parents=True, exist_ok=True)
                 rubric.save(DEFAULT_SAVE_DIR, rubric_name.strip())
-                
+
                 st.success("✅ Rubric built and saved successfully!")
                 st.info(
                     f"**Rubric Details:**\n"
@@ -696,8 +904,8 @@ def main() -> None:
     render_sidebar_overview()
 
     # Main content area with tabs
-    tab1, tab2, tab3 = st.tabs(
-        ["🔨 Judge Rewarders", "📋 Requirements", "🎯 Reward Strategy"]
+    tab1, tab2, tab3, tab4 = st.tabs(
+        ["🔨 Judge Rewarders", "📋 Requirements", "🎯 Reward Strategy", "🎭 Scenarios"]
     )
 
     with tab1:
@@ -709,6 +917,9 @@ def main() -> None:
     with tab3:
         render_reward_strategy_tab()
 
+    with tab4:
+        render_scenarios_tab()
+
     render_configuration_preview()
 
     # Footer
@@ -717,6 +928,243 @@ def main() -> None:
         "View source code on [GitHub](https://github.com/jacobphillips99/open-rubric)",
         unsafe_allow_html=True,
     )
+
+
+def render_scenarios_tab() -> None:
+    """Render the scenarios management tab."""
+    st.header("Scenarios")
+    st.markdown("Manage and preview loaded scenarios for testing your rubrics.")
+
+    # Show loaded scenarios if any
+    if "loaded_scenarios" in st.session_state and st.session_state.loaded_scenarios:
+        scenarios = st.session_state.loaded_scenarios
+
+        st.success(f"📊 **{len(scenarios)} scenario(s) currently loaded**")
+
+        # Scenario selector
+        scenario_names = [
+            f"{i + 1}. {s.name or 'Unnamed'}" for i, s in enumerate(scenarios)
+        ]
+        selected_idx = st.selectbox(
+            "Select scenario to view:",
+            range(len(scenarios)),
+            format_func=lambda x: scenario_names[x],
+            key="selected_scenario",
+        )
+
+        if selected_idx is not None:
+            scenario = scenarios[selected_idx]
+            _render_scenario_details(scenario, selected_idx)
+
+        # Actions for loaded scenarios
+        st.divider()
+        col1, col2, col3 = st.columns(3)
+
+        with col1:
+            if st.button("🗑️ Clear All Scenarios"):
+                st.session_state.loaded_scenarios = []
+                st.rerun()
+
+        with col2:
+            if st.button("💾 Save Scenarios"):
+                _save_loaded_scenarios()
+
+        with col3:
+            if st.button("🧪 Test with Current Rubric"):
+                _test_scenarios_with_rubric()
+
+    else:
+        st.info("No scenarios loaded yet.")
+        st.markdown(
+            "Use the **Save/Load** section in the sidebar to load scenarios from directories."
+        )
+
+        # Option to load example scenarios
+        st.divider()
+        st.markdown("**Load Example Scenarios:**")
+
+        example_options = {
+            "First Responder": "first_responder",
+            "Debugging": "debugging",
+        }
+
+        col1, col2 = st.columns(2)
+        with col1:
+            selected_example = st.selectbox(
+                "Choose example:",
+                options=list(example_options.keys()),
+                key="example_scenarios_select",
+            )
+
+        with col2:
+            st.markdown("<br>", unsafe_allow_html=True)
+            if st.button("📂 Load Example"):
+                _load_example_scenarios(example_options[selected_example])
+
+
+def _render_scenario_details(scenario, index: int) -> None:
+    """Render detailed view of a scenario."""
+    st.subheader(f"Scenario {index + 1}: {scenario.name or 'Unnamed'}")
+
+    # Basic info
+    col1, col2 = st.columns(2)
+    with col1:
+        st.markdown(f"**Name:** {scenario.name or 'N/A'}")
+        st.markdown(f"**Description:** {scenario.description or 'N/A'}")
+
+    with col2:
+        if scenario.answers:
+            st.markdown(f"**Answer Keys:** {len(scenario.answers)}")
+            st.markdown(f"**Requirements:** {', '.join(scenario.answers.keys())}")
+        else:
+            st.markdown("**No answer keys defined**")
+
+    # Content
+    with st.expander("📝 Prompt", expanded=True):
+        st.text_area(
+            "Scenario prompt:", value=scenario.prompt, height=150, disabled=True
+        )
+
+    if scenario.completion:
+        with st.expander("💬 Completion", expanded=False):
+            st.text_area(
+                "Scenario completion:",
+                value=scenario.completion,
+                height=100,
+                disabled=True,
+            )
+
+    if scenario.answers:
+        with st.expander("🎯 Answers", expanded=False):
+            st.json(scenario.answers)
+
+    if scenario.revealed_info:
+        with st.expander("🔍 Revealed Info", expanded=False):
+            st.json(scenario.revealed_info)
+
+
+def _save_loaded_scenarios() -> None:
+    """Save the currently loaded scenarios to a file."""
+    if (
+        "loaded_scenarios" not in st.session_state
+        or not st.session_state.loaded_scenarios
+    ):
+        st.error("No scenarios to save!")
+        return
+
+    from verifiers.rubrics.multistep.scenario import Scenario
+
+    # Get save parameters
+    with st.form("save_scenarios_form"):
+        st.markdown("**Save Scenarios:**")
+
+        col1, col2 = st.columns(2)
+        with col1:
+            filename = st.text_input(
+                "Filename:",
+                placeholder="my_scenarios",
+                help="File will be saved as .yaml",
+            )
+
+        with col2:
+            save_dir = st.text_input(
+                "Directory:",
+                value=st.session_state.get("current_directory", str(DEFAULT_SAVE_DIR)),
+            )
+
+        submitted = st.form_submit_button("💾 Save")
+
+        if submitted and filename:
+            try:
+                save_path = Path(save_dir)
+                save_path.mkdir(parents=True, exist_ok=True)
+
+                file_path = save_path / f"{filename}.yaml"
+                Scenario.save_multiple(st.session_state.loaded_scenarios, file_path)
+
+                st.success(
+                    f"✅ Saved {len(st.session_state.loaded_scenarios)} scenarios to {file_path}!"
+                )
+
+            except Exception as e:
+                st.error(f"Error saving scenarios: {str(e)}")
+
+
+def _test_scenarios_with_rubric() -> None:
+    """Test loaded scenarios with the current rubric configuration."""
+    if not st.session_state.judge_rewarders or not st.session_state.requirements:
+        st.error("Please configure judges and requirements first!")
+        return
+
+    if (
+        "loaded_scenarios" not in st.session_state
+        or not st.session_state.loaded_scenarios
+    ):
+        st.error("No scenarios loaded!")
+        return
+
+    try:
+        # Build the rubric
+        rubric = _build_rubric()
+        scenarios = st.session_state.loaded_scenarios
+
+        st.info("🧪 Testing scenarios with current rubric...")
+
+        # Quick compatibility check
+        compatible_scenarios = []
+        for scenario in scenarios:
+            if scenario.answers:
+                # Check if scenario has answers for rubric requirements
+                rubric_req_names = {req.name for req in rubric.requirements}
+                scenario_req_names = set(scenario.answers.keys())
+
+                if rubric_req_names.intersection(scenario_req_names):
+                    compatible_scenarios.append(scenario)
+
+        if compatible_scenarios:
+            st.success(
+                f"✅ Found {len(compatible_scenarios)} compatible scenarios out of {len(scenarios)}"
+            )
+
+            # Show compatibility details
+            with st.expander("Compatibility Details", expanded=False):
+                for i, scenario in enumerate(compatible_scenarios):
+                    rubric_reqs = {req.name for req in rubric.requirements}
+                    scenario_reqs = set(scenario.answers.keys())
+                    matching = rubric_reqs.intersection(scenario_reqs)
+
+                    st.markdown(f"**{scenario.name or f'Scenario {i + 1}'}:**")
+                    st.markdown(f"- Matching requirements: {', '.join(matching)}")
+                    st.markdown(
+                        f"- Coverage: {len(matching)}/{len(rubric_reqs)} requirements"
+                    )
+        else:
+            st.warning(
+                "⚠️ No scenarios are compatible with the current rubric requirements."
+            )
+            st.info(
+                "Scenarios need answer keys that match your rubric's requirement names."
+            )
+
+    except Exception as e:
+        st.error(f"Error testing scenarios: {str(e)}")
+
+
+def _load_example_scenarios(example_name: str) -> None:
+    """Load example scenarios from the multistep_extras package."""
+    try:
+        from multistep_extras.example_rubrics import get_workflow
+
+        _, scenarios = get_workflow(example_name)
+        st.session_state.loaded_scenarios = scenarios
+
+        st.success(
+            f"✅ Loaded {len(scenarios)} example scenarios from '{example_name}'!"
+        )
+        st.rerun()
+
+    except Exception as e:
+        st.error(f"Error loading example scenarios: {str(e)}")
 
 
 if __name__ == "__main__":

@@ -37,7 +37,7 @@ class JudgeResponseFormat:
         raise NotImplementedError("make_meanings_str not implemented for base class")
 
     def make_example_format(self):
-        return f"\n\nExample format: {{\"answer\": {self.options[0]}, \"reasoning\": \"Your explanation here\"}}"
+        return f"\n\nExample format: {{\"reasoning\": \"Your explanation here\", \"answer\": {self.options[0]}}}"
 
     def __str__(self) -> str:
         str_rep = self.make_base_str()
