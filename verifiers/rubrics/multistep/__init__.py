@@ -52,5 +52,4 @@ __all__ = [
     "BinaryRequirementRewardNode",
     # Utilities
     "topological_levels",
-
 ]

@@ -480,13 +480,11 @@ class MultiStepRubric(Rubric):
             # No more requirements - conversation is finished
             updated_state["finished"] = True
             return None, updated_state, True
-        
+
     def to_code(self, save_path: str) -> None:
         # TODO: implement
         pass
 
-    
     def to_yaml(self, save_path: str) -> None:
         # TODO: implement
         pass
-            
