@@ -19,6 +19,51 @@ judge response format={judge_response_format}
 """.strip()
 JUDGE_PROMPT_VARIABLES = ["question", "answer", "response", "judge_response_format"]
 
+
+def create_openai_client(base_url: Optional[str] = None, api_key: Optional[str] = None, **kwargs) -> OpenAI:
+    """Create an OpenAI client with optional custom configuration."""
+    client_kwargs = {}
+    if base_url is not None:
+        client_kwargs["base_url"] = base_url
+    if api_key is not None:
+        client_kwargs["api_key"] = api_key
+    client_kwargs.update(kwargs)
+    return OpenAI(**client_kwargs)
+
+
+CLIENT_TYPE_TO_FACTORY = {
+    "openai": lambda: OpenAI(),
+    "openai_custom": create_openai_client,
+}
+
+
+def make_client(client_type: str, **kwargs) -> OpenAI:
+    """Create a client based on the client type and configuration."""
+    if client_type not in CLIENT_TYPE_TO_FACTORY:
+        raise ValueError(f"Unknown client type: {client_type}. Available types: {list(CLIENT_TYPE_TO_FACTORY.keys())}")
+    
+    factory = CLIENT_TYPE_TO_FACTORY[client_type]
+    return factory(**kwargs)
+
+
+def detect_client_type(client: OpenAI) -> tuple[str, dict[str, Any]]:
+    """
+    Detect the client type and extract serializable configuration.
+    
+    Returns:
+        Tuple of (client_type, config_dict)
+    """
+    config = {}
+    
+    # Check if it's a custom OpenAI client (non-standard base_url)
+    if client.base_url and str(client.base_url) != "https://api.openai.com/v1/":
+        config["base_url"] = str(client.base_url)
+        return "openai_custom", config
+    
+    # Default OpenAI client
+    return "openai", config
+
+
 class JudgeRewarder(Reward):
     def __init__(self, judge_prompt: str, judge_response_format: JudgeResponseFormat, judge_client: OpenAI | None = None, judge_model: str = "gpt-4.1-nano", parser: Parser = Parser(), **kwargs):
         super().__init__(**kwargs)
@@ -90,6 +135,12 @@ NAME_TO_JUDGE_REWARDER_CLASS = {
 
 def make_judge_rewarder(judge_rewarder_type: str, **kwargs) -> JudgeRewarder:
     """Make a judge rewarder based on the judge_rewarder_type."""
+    # Handle client creation if client info is provided
+    if "client_type" in kwargs:
+        client_type = kwargs.pop("client_type")
+        client_config = kwargs.pop("client_config", {})
+        kwargs["judge_client"] = make_client(client_type, **client_config)
+    
     return NAME_TO_JUDGE_REWARDER_CLASS[judge_rewarder_type](**kwargs)
 
 def make_judge_rewarders(judge_rewarders: list[dict]) -> list[JudgeRewarder]:

@@ -5,9 +5,10 @@ Requirements are a core building block of a multistep rubrics -- they define the
 They host the question and the judge response format in order to select the next dependent requirement(s).
 """
 
-import yaml
 from pathlib import Path
-from typing import Any, Optional, Union, List
+from typing import Any, List, Optional, Union
+
+import yaml
 
 from verifiers.rewards.judge_utils import (JudgeResponseFormat,
                                            binary_judge_response_format,
@@ -70,41 +71,48 @@ class Requirement:
     def save(self, file_path: Union[str, Path]) -> None:
         """
         Save this requirement to a YAML file.
-        
+
         Args:
             file_path: Path to save the YAML file
         """
         req_data = self.to_dict()
-        with open(file_path, 'w') as f:
+        with open(file_path, "w") as f:
             yaml.dump({"requirement": req_data}, f, default_flow_style=False, indent=2)
 
     @classmethod
-    def save_multiple(cls, requirements: List['Requirement'], file_path: Union[str, Path]) -> None:
+    def save_multiple(
+        cls, requirements: List["Requirement"], file_path: Union[str, Path]
+    ) -> None:
         """
         Save multiple requirements to a YAML file.
-        
+
         Args:
             requirements: List of Requirement objects
             file_path: Path to save the YAML file
         """
         requirements_data = [req.to_dict() for req in requirements]
-        with open(file_path, 'w') as f:
-            yaml.dump({"requirements": requirements_data}, f, default_flow_style=False, indent=2)
+        with open(file_path, "w") as f:
+            yaml.dump(
+                {"requirements": requirements_data},
+                f,
+                default_flow_style=False,
+                indent=2,
+            )
 
     @classmethod
-    def load_multiple(cls, file_path: Union[str, Path]) -> List['Requirement']:
+    def load_multiple(cls, file_path: Union[str, Path]) -> List["Requirement"]:
         """
         Load multiple requirements from a YAML file.
-        
+
         Args:
             file_path: Path to the YAML file
-            
+
         Returns:
             List of Requirement objects
         """
-        with open(file_path, 'r') as f:
+        with open(file_path, "r") as f:
             data = yaml.safe_load(f)
-        
+
         requirements_data = data["requirements"]
         return make_requirements(requirements_data)
 
@@ -211,6 +219,7 @@ class UnitVectorRequirement(ContinuousRequirement):
             name, question, unit_vector_judge_response_format, dependencies, **kwargs
         )
 
+
 NAME_TO_REQUIREMENT_CLASS = {
     "binary": BinaryRequirement,
     "unit_vector": UnitVectorRequirement,
@@ -218,9 +227,11 @@ NAME_TO_REQUIREMENT_CLASS = {
     "continuous": ContinuousRequirement,
 }
 
+
 def make_requirement(requirement_type: str, **kwargs) -> Requirement:
     """Make a requirement based on the requirement_type."""
     return NAME_TO_REQUIREMENT_CLASS[requirement_type](**kwargs)
+
 
 def make_requirements(requirements: list[dict]) -> list[Requirement]:
     """Make a list of requirements based on the requirements."""

@@ -5,9 +5,10 @@ Contains a prompt (initial situation description), completion (response),
 and ground truth answer path for evaluation.
 """
 
-import yaml
 from pathlib import Path
-from typing import Optional, Union, List
+from typing import List, Optional, Union
+
+import yaml
 
 # TODO: Scenario Generation from Full Description
 # ================================================
@@ -102,57 +103,63 @@ class Scenario:
     def save(self, file_path: Union[str, Path]) -> None:
         """
         Save this scenario to a YAML file.
-        
+
         Args:
             file_path: Path to save the YAML file
         """
         scenario_data = self.to_dict()
-        with open(file_path, 'w') as f:
-            yaml.dump({"scenario": scenario_data}, f, default_flow_style=False, indent=2)
+        with open(file_path, "w") as f:
+            yaml.dump(
+                {"scenario": scenario_data}, f, default_flow_style=False, indent=2
+            )
 
     @classmethod
-    def load(cls, file_path: Union[str, Path]) -> 'Scenario':
+    def load(cls, file_path: Union[str, Path]) -> "Scenario":
         """
         Load a scenario from a YAML file.
-        
+
         Args:
             file_path: Path to the YAML file
-            
+
         Returns:
             Scenario object
         """
-        with open(file_path, 'r') as f:
+        with open(file_path, "r") as f:
             data = yaml.safe_load(f)
-        
+
         scenario_data = data["scenario"]
         return cls(**scenario_data)
 
     @classmethod
-    def save_multiple(cls, scenarios: List['Scenario'], file_path: Union[str, Path]) -> None:
+    def save_multiple(
+        cls, scenarios: List["Scenario"], file_path: Union[str, Path]
+    ) -> None:
         """
         Save multiple scenarios to a YAML file.
-        
+
         Args:
             scenarios: List of Scenario objects
             file_path: Path to save the YAML file
         """
         scenarios_data = [scenario.to_dict() for scenario in scenarios]
-        with open(file_path, 'w') as f:
-            yaml.dump({"scenarios": scenarios_data}, f, default_flow_style=False, indent=2)
+        with open(file_path, "w") as f:
+            yaml.dump(
+                {"scenarios": scenarios_data}, f, default_flow_style=False, indent=2
+            )
 
     @classmethod
-    def load_multiple(cls, file_path: Union[str, Path]) -> List['Scenario']:
+    def load_multiple(cls, file_path: Union[str, Path]) -> List["Scenario"]:
         """
         Load multiple scenarios from a YAML file.
-        
+
         Args:
             file_path: Path to the YAML file
-            
+
         Returns:
             List of Scenario objects
         """
-        with open(file_path, 'r') as f:
+        with open(file_path, "r") as f:
             data = yaml.safe_load(f)
-        
+
         scenarios_data = data["scenarios"]
         return [cls(**scenario_data) for scenario_data in scenarios_data]
