@@ -9,6 +9,10 @@ from verifiers.rewards.judge_reward import JudgeRewarder, make_judge_rewarder
 from verifiers.rubrics.multistep.multistep_rubric import MultiStepRubric
 from verifiers.rubrics.multistep.requirement import Requirement, make_requirement
 from verifiers.rubrics.multistep.reward_strategies import RewardStrategy
+from verifiers.rubrics.multistep.scenario import Scenario
+from verifiers.rubrics.multistep.requirement import make_requirements, NAME_TO_REQUIREMENT_CLASS
+from verifiers.rubrics.multistep.reward_strategies import make_reward_strategy, NAME_TO_REWARD_STRATEGY_CLASS
+from verifiers.rewards.judge_reward import JudgeRewarder, make_judge_rewarder, NAME_TO_JUDGE_REWARDER_CLASS
 
 
 class RubricBuilder:
@@ -41,3 +45,6 @@ class RubricBuilder:
 
     def make_rubric(self) -> MultiStepRubric:
         return MultiStepRubric(self.requirements, self.judge_options, self.reward_strategy)
+
+class ScenarioBuilder:
+    pass

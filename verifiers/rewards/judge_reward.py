@@ -17,6 +17,7 @@ response={response}
 ground truth answer={answer}
 judge response format={judge_response_format}
 """
+JUDGE_PROMPT_VARIABLES = ["question", "answer", "response", "judge_response_format"]
 
 class JudgeRewarder(Reward):
     def __init__(self, judge_prompt: str, judge_response_format: JudgeResponseFormat, judge_client: OpenAI | None = None, judge_model: str = "gpt-4.1-nano", parser: Parser = Parser(), **kwargs):
@@ -27,8 +28,7 @@ class JudgeRewarder(Reward):
         # Assert that judge_prompt template contains exactly the expected fields
         formatter = string.Formatter()
         field_names = {field_name for literal_text, field_name, format_spec, conversion in formatter.parse(judge_prompt) if field_name is not None}
-        expected_fields = {"question", "answer", "response", "judge_response_format"}
-        assert field_names == expected_fields, f"Judge prompt template must contain exactly these fields: {expected_fields}; got {field_names}"
+        assert field_names == JUDGE_PROMPT_VARIABLES, f"Judge prompt template must contain exactly these fields: {JUDGE_PROMPT_VARIABLES}; got {field_names}"
 
         self.judge_client = judge_client if judge_client is not None else OpenAI()
         self.judge_model = judge_model

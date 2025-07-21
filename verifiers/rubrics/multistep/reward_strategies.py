@@ -327,3 +327,20 @@ class ProgressiveRewardStrategy(RewardStrategy):
                 total_reward += level_multiplier * level_sum
 
         return total_reward
+
+NAME_TO_REWARD_STRATEGY_CLASS = {
+    "level_weighted": LevelWeightedRewardStrategy,
+    "sum": SumRewardStrategy,
+    "mean": MeanRewardStrategy,
+    "level_based": LevelBasedRewardStrategy,
+    "completion_ratio": CompletionRatioRewardStrategy,
+    "progressive": ProgressiveRewardStrategy,
+}
+
+def make_reward_strategy(reward_strategy_type: str, **kwargs) -> RewardStrategy:
+    """Make a reward strategy based on the reward_strategy_type."""
+    return NAME_TO_REWARD_STRATEGY_CLASS[reward_strategy_type](**kwargs)
+
+def make_reward_strategies(reward_strategies: list[dict]) -> list[RewardStrategy]:
+    """Make a list of reward strategies based on the reward_strategies."""
+    return [make_reward_strategy(r["type"], **r) for r in reward_strategies]

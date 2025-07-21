@@ -47,7 +47,8 @@ all = [
     "reasoning-gym",
     "smolagents>=1.15.0",
     "textarena",
-    "nltk"
+    "nltk",
+    "streamlit",
 ]
 
 docs = [
@@ -66,7 +67,7 @@ tests = [
 vf-vllm = "verifiers.inference.vllm_server:cli_main"
 
 [tool.setuptools]
-packages = ["verifiers"]
+packages = ["verifiers", "multistep_extras"]
 
 [build-system]
 requires = ["setuptools>=68.0"]
