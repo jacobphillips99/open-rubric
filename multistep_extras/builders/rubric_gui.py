@@ -13,16 +13,12 @@ from typing import Any
 import streamlit as st
 
 from multistep_extras.builders.builder import RubricBuilder
-from verifiers.rewards.judge_reward import (
-    JUDGE_PROMPT,
-    JUDGE_PROMPT_VARIABLES,
-    NAME_TO_JUDGE_REWARDER_CLASS,
-)
+from verifiers.rewards.judge_reward import (JUDGE_PROMPT,
+                                            JUDGE_PROMPT_VARIABLES,
+                                            NAME_TO_JUDGE_REWARDER_CLASS)
 from verifiers.rubrics.multistep.requirement import NAME_TO_REQUIREMENT_CLASS
 from verifiers.rubrics.multistep.reward_strategies import (
-    NAME_TO_REWARD_STRATEGY_CLASS,
-    make_reward_strategy,
-)
+    NAME_TO_REWARD_STRATEGY_CLASS, make_reward_strategy)
 
 
 def configure_page() -> None:
@@ -64,12 +60,12 @@ def _render_judge_rewarders_overview() -> None:
     if st.session_state.judge_rewarders:
         for i, judge in enumerate(st.session_state.judge_rewarders):
             with st.container():
-                st.markdown(f"**{i+1}.** `{judge['type']}`")
+                st.markdown(f"**{i + 1}.** `{judge['type']}`")
                 st.caption(f"Model: {judge['judge_model']}")
                 prompt_preview = (
                     f"{judge['judge_prompt'][:47]}..."
                     if len(judge["judge_prompt"]) > 50
-                    else judge['judge_prompt']
+                    else judge["judge_prompt"]
                 )
                 st.caption(f"Prompt: {prompt_preview}")
         st.markdown(f"*Total: {len(st.session_state.judge_rewarders)} judges*")
@@ -83,9 +79,11 @@ def _render_requirements_overview() -> None:
     if st.session_state.requirements:
         for i, req in enumerate(st.session_state.requirements):
             with st.container():
-                st.markdown(f"**{i+1}.** `{req['name']}`")
+                st.markdown(f"**{i + 1}.** `{req['name']}`")
                 st.caption(f"Type: {req['type']}")
-                deps_count = len(req.get("dependencies", {})) if req.get("dependencies") else 0
+                deps_count = (
+                    len(req.get("dependencies", {})) if req.get("dependencies") else 0
+                )
                 if deps_count > 0:
                     st.caption(f"Has {deps_count} dependency rule(s)")
                 else:
@@ -124,7 +122,7 @@ def render_judge_rewarders_tab() -> None:
     """Render the judge rewarders configuration tab."""
     st.header("Judge Rewarders")
     st.markdown("Configure how responses will be evaluated by judges.")
-    
+
     _render_judge_rewarder_form()
     _render_existing_judge_rewarders()
 
@@ -158,11 +156,13 @@ def _render_judge_rewarder_form() -> None:
 def _add_judge_rewarder(judge_type: str, judge_model: str, judge_prompt: str) -> None:
     """Add a new judge rewarder to the session state."""
     if not all(var in judge_prompt for var in JUDGE_PROMPT_VARIABLES):
-        st.error(f"Judge prompt must contain the following variables: {JUDGE_PROMPT_VARIABLES}")
+        st.error(
+            f"Judge prompt must contain the following variables: {JUDGE_PROMPT_VARIABLES}"
+        )
         return
     breakpoint()
     # need to construct template string from prompt
-    
+
     new_judge = {
         "type": judge_type,
         "judge_prompt": judge_prompt,
@@ -176,15 +176,28 @@ def _add_judge_rewarder(judge_type: str, judge_model: str, judge_prompt: str) ->
 def _render_existing_judge_rewarders() -> None:
     """Render the list of existing judge rewarders."""
     for i, judge in enumerate(st.session_state.judge_rewarders):
-        with st.expander(f"Judge {i+1}: {judge['type']}", expanded=False):
+        with st.expander(f"Judge {i + 1}: {judge['type']}", expanded=False):
             col1, col2, col3 = st.columns([2, 2, 1])
 
             with col1:
-                st.text_input("Type", value=judge["type"], disabled=True, key=f"judge_type_{i}")
-                st.text_input("Model", value=judge["judge_model"], disabled=True, key=f"judge_model_{i}")
+                st.text_input(
+                    "Type", value=judge["type"], disabled=True, key=f"judge_type_{i}"
+                )
+                st.text_input(
+                    "Model",
+                    value=judge["judge_model"],
+                    disabled=True,
+                    key=f"judge_model_{i}",
+                )
 
             with col2:
-                st.text_area("Prompt", value=judge["judge_prompt"], height=100, disabled=True, key=f"judge_prompt_{i}")
+                st.text_area(
+                    "Prompt",
+                    value=judge["judge_prompt"],
+                    height=100,
+                    disabled=True,
+                    key=f"judge_prompt_{i}",
+                )
 
             with col3:
                 if st.button("🗑️ Remove", key=f"remove_judge_{i}"):
@@ -196,7 +209,7 @@ def render_requirements_tab() -> None:
     """Render the requirements configuration tab."""
     st.header("Requirements")
     st.markdown("Define the questions and dependency structure for your rubric.")
-    
+
     _render_requirement_form()
     _render_existing_requirements()
 
@@ -225,7 +238,9 @@ def _render_requirement_form() -> None:
             key="new_req_question",
         )
 
-    st.markdown("**Dependencies** (JSON format - maps answers to dependent requirements)")
+    st.markdown(
+        "**Dependencies** (JSON format - maps answers to dependent requirements)"
+    )
     st.markdown('*Example:* `{"1.0": ["assess_breathing", "check_pulse"], "0.0": []}`')
 
     req_dependencies = st.text_area(
@@ -239,7 +254,9 @@ def _render_requirement_form() -> None:
         _add_requirement(req_type, req_name, req_question, req_dependencies)
 
 
-def _add_requirement(req_type: str, req_name: str, req_question: str, req_dependencies: str) -> None:
+def _add_requirement(
+    req_type: str, req_name: str, req_question: str, req_dependencies: str
+) -> None:
     """Add a new requirement to the session state."""
     if not req_name or not req_question:
         st.error("Name and question are required!")
@@ -267,15 +284,25 @@ def _add_requirement(req_type: str, req_name: str, req_question: str, req_depend
 def _render_existing_requirements() -> None:
     """Render the list of existing requirements."""
     for i, req in enumerate(st.session_state.requirements):
-        with st.expander(f"Requirement {i+1}: {req['name']}", expanded=False):
+        with st.expander(f"Requirement {i + 1}: {req['name']}", expanded=False):
             col1, col2, col3 = st.columns([2, 3, 1])
 
             with col1:
-                st.text_input("Type", value=req["type"], disabled=True, key=f"req_type_{i}")
-                st.text_input("Name", value=req["name"], disabled=True, key=f"req_name_{i}")
+                st.text_input(
+                    "Type", value=req["type"], disabled=True, key=f"req_type_{i}"
+                )
+                st.text_input(
+                    "Name", value=req["name"], disabled=True, key=f"req_name_{i}"
+                )
 
             with col2:
-                st.text_area("Question", value=req["question"], height=80, disabled=True, key=f"req_question_{i}")
+                st.text_area(
+                    "Question",
+                    value=req["question"],
+                    height=80,
+                    disabled=True,
+                    key=f"req_question_{i}",
+                )
                 if req.get("dependencies"):
                     st.json(req["dependencies"])
                 else:
@@ -297,7 +324,7 @@ def render_reward_strategy_tab() -> None:
         if st.session_state.reward_strategy
         else "level_weighted"
     )
-    
+
     strategy_type = st.selectbox(
         "Strategy Type",
         options=list(NAME_TO_REWARD_STRATEGY_CLASS.keys()),
@@ -318,30 +345,46 @@ def _render_strategy_parameters(strategy_type: str) -> dict[str, Any]:
     if strategy_type == "level_weighted":
         col1, col2 = st.columns(2)
         with col1:
-            strategy_params["base_weight"] = st.number_input("Base Weight", value=1.0, step=0.1)
+            strategy_params["base_weight"] = st.number_input(
+                "Base Weight", value=1.0, step=0.1
+            )
         with col2:
-            strategy_params["level_multiplier"] = st.number_input("Level Multiplier", value=1.0, step=0.1)
+            strategy_params["level_multiplier"] = st.number_input(
+                "Level Multiplier", value=1.0, step=0.1
+            )
 
     elif strategy_type == "level_based":
         col1, col2 = st.columns(2)
         with col1:
-            strategy_params["max_level_bonus"] = st.number_input("Max Level Bonus", value=1.0, step=0.1)
+            strategy_params["max_level_bonus"] = st.number_input(
+                "Max Level Bonus", value=1.0, step=0.1
+            )
         with col2:
-            strategy_params["completion_bonus"] = st.number_input("Completion Bonus", value=0.5, step=0.1)
+            strategy_params["completion_bonus"] = st.number_input(
+                "Completion Bonus", value=0.5, step=0.1
+            )
 
     elif strategy_type == "completion_ratio":
         col1, col2 = st.columns(2)
         with col1:
-            strategy_params["ratio_weight"] = st.number_input("Ratio Weight", value=1.0, step=0.1)
+            strategy_params["ratio_weight"] = st.number_input(
+                "Ratio Weight", value=1.0, step=0.1
+            )
         with col2:
-            strategy_params["quality_weight"] = st.number_input("Quality Weight", value=0.5, step=0.1)
+            strategy_params["quality_weight"] = st.number_input(
+                "Quality Weight", value=0.5, step=0.1
+            )
 
     elif strategy_type == "progressive":
         col1, col2 = st.columns(2)
         with col1:
-            strategy_params["base_reward"] = st.number_input("Base Reward", value=1.0, step=0.1)
+            strategy_params["base_reward"] = st.number_input(
+                "Base Reward", value=1.0, step=0.1
+            )
         with col2:
-            strategy_params["growth_factor"] = st.number_input("Growth Factor", value=1.5, step=0.1)
+            strategy_params["growth_factor"] = st.number_input(
+                "Growth Factor", value=1.5, step=0.1
+            )
 
     elif strategy_type in ["sum", "mean"]:
         st.info(f"The {strategy_type} strategy requires no additional parameters.")
@@ -369,7 +412,9 @@ def render_configuration_preview() -> None:
             _render_preview_strategy()
             _render_build_button()
     else:
-        st.info("Configure your judge rewarders, requirements, and reward strategy to see a preview.")
+        st.info(
+            "Configure your judge rewarders, requirements, and reward strategy to see a preview."
+        )
 
 
 def _render_preview_judges() -> None:
@@ -377,7 +422,7 @@ def _render_preview_judges() -> None:
     st.subheader("Judge Rewarders")
     if st.session_state.judge_rewarders:
         for i, judge in enumerate(st.session_state.judge_rewarders):
-            st.markdown(f"**{i+1}.** {judge['type']} ({judge['judge_model']})")
+            st.markdown(f"**{i + 1}.** {judge['type']} ({judge['judge_model']})")
     else:
         st.warning("No judge rewarders configured")
 
@@ -389,10 +434,10 @@ def _render_preview_requirements() -> None:
         for i, req in enumerate(st.session_state.requirements):
             deps_info = (
                 f" → {list(req['dependencies'].keys())}"
-                if req.get('dependencies')
+                if req.get("dependencies")
                 else " → terminal"
             )
-            st.markdown(f"**{i+1}.** {req['name']} ({req['type']}){deps_info}")
+            st.markdown(f"**{i + 1}.** {req['name']} ({req['type']}){deps_info}")
     else:
         st.warning("No requirements configured")
 
@@ -445,7 +490,9 @@ def _build_rubric():
     if st.session_state.reward_strategy:
         strategy = make_reward_strategy(
             st.session_state.reward_strategy["type"],
-            **{k: v for k, v in st.session_state.reward_strategy.items() if k != "type"},
+            **{
+                k: v for k, v in st.session_state.reward_strategy.items() if k != "type"
+            },
         )
         builder.set_reward_strategy(strategy)
 
@@ -453,17 +500,21 @@ def _build_rubric():
 
 
 def main() -> None:
-    """Main application entry point."""
+    """Entry point for the rubric builder GUI."""
     configure_page()
     initialize_session_state()
 
     st.title("🏗️ MultiStep Rubric Builder")
-    st.markdown("Build complex multi-step rubrics with dependencies, judges, and reward strategies.")
+    st.markdown(
+        "Build complex multi-step rubrics with dependencies, judges, and reward strategies."
+    )
 
     render_sidebar_overview()
 
     # Main content area with tabs
-    tab1, tab2, tab3 = st.tabs(["🔨 Judge Rewarders", "📋 Requirements", "🎯 Reward Strategy"])
+    tab1, tab2, tab3 = st.tabs(
+        ["🔨 Judge Rewarders", "📋 Requirements", "🎯 Reward Strategy"]
+    )
 
     with tab1:
         render_judge_rewarders_tab()
@@ -480,7 +531,7 @@ def main() -> None:
     st.divider()
     st.markdown(
         "View source code on [GitHub](https://github.com/jacobphillips99/open-rubric)",
-        unsafe_allow_html=True
+        unsafe_allow_html=True,
     )
 
 

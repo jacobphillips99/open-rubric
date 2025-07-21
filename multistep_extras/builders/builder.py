@@ -5,18 +5,19 @@ The builder classes are meant to simply and easily create rubrics and scenarios.
 or LLM in order to create rubrics and scenarios, and may power a UI to create these objects by hand.
 """
 
-from verifiers.rewards.judge_reward import (JudgeRewarder, make_judge_rewarder)
+from verifiers.rewards.judge_reward import JudgeRewarder, make_judge_rewarder
 from verifiers.rubrics.multistep.multistep_rubric import MultiStepRubric
 from verifiers.rubrics.multistep.requirement import (Requirement,
-                                                     make_requirement,)
-from verifiers.rubrics.multistep.reward_strategies import (RewardStrategy, make_reward_strategy)
+                                                     make_requirement)
+from verifiers.rubrics.multistep.reward_strategies import (
+    RewardStrategy, make_reward_strategy)
 
 
 class RubricBuilder:
     """Builder for creating a MultiStepRubric."""
 
     def __init__(self) -> None:
-        """ Initialize the RubricBuilder."""
+        """Initialize the RubricBuilder."""
         self.requirements = []
         self.judge_options = []
         self.reward_strategy = None
@@ -49,7 +50,9 @@ class RubricBuilder:
         """Set the reward strategy for the RubricBuilder."""
         if isinstance(reward_strategy, dict):
             reward_strategy_type = reward_strategy.pop("type")
-            reward_strategy = make_reward_strategy(reward_strategy_type, **reward_strategy)
+            reward_strategy = make_reward_strategy(
+                reward_strategy_type, **reward_strategy
+            )
         self.reward_strategy = reward_strategy
 
     def make_rubric(self) -> MultiStepRubric:
@@ -61,4 +64,5 @@ class RubricBuilder:
 
 class ScenarioBuilder:
     """Builder for creating a Scenario."""
+
     pass
