@@ -228,11 +228,20 @@ NAME_TO_REQUIREMENT_CLASS = {
 }
 
 
-def make_requirement(requirement_type: str, **kwargs) -> Requirement:
-    """Make a requirement based on the requirement_type."""
-    return NAME_TO_REQUIREMENT_CLASS[requirement_type](**kwargs)
+def make_requirement(type: str, **kwargs) -> Requirement:
+    """Make a requirement based on the type."""
+    # Filter out judge_response_format for requirement types that set it automatically
+    base_types = ["discrete", "continuous"]
+    if type not in base_types:
+        kwargs.pop("judge_response_format", None)
+    return NAME_TO_REQUIREMENT_CLASS[type](**kwargs)
 
 
 def make_requirements(requirements: list[dict]) -> list[Requirement]:
     """Make a list of requirements based on the requirements."""
-    return [make_requirement(r["type"], **r) for r in requirements]
+    result = []
+    for r in requirements:
+        # Create a copy without the 'type' key to avoid conflicts
+        kwargs = {k: v for k, v in r.items() if k != "type"}
+        result.append(make_requirement(r["type"], **kwargs))
+    return result

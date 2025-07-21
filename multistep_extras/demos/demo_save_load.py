@@ -20,7 +20,6 @@ from verifiers.rubrics.multistep.scenario import Scenario
 
 def main():
     """Demonstrate saving and loading workflows using object methods."""
-
     judge_options = [
         BinaryJudgeRewarder(judge_prompt=JUDGE_PROMPT, judge_model="gpt-4o-mini")
     ]
@@ -56,7 +55,7 @@ def main():
     )
 
     # Verify it loaded correctly
-    print(f"\nLoaded rubric successfully!")
+    print("\nLoaded rubric successfully!")
     print(f"Requirements: {len(loaded_rubric.requirements)}")
     print(f"Judge options: {len(loaded_rubric.judge_options)}")
     print(f"Reward strategy: {loaded_rubric.reward_strategy.__class__.__name__}")
@@ -65,7 +64,7 @@ def main():
     # Show some requirements
     print("\nFirst few requirements:")
     for i, req in enumerate(loaded_rubric.requirements[:3]):
-        print(f"  {i+1}. {req.name}: {req.question}")
+        print(f"  {i + 1}. {req.name}: {req.question}")
         if req.dependencies:
             print(f"     Dependencies: {req.dependencies}")
 

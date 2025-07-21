@@ -330,11 +330,11 @@ class ProgressiveRewardStrategy(RewardStrategy):
 
 
 NAME_TO_REWARD_STRATEGY_CLASS = {
-    "level_weighted": LevelWeightedRewardStrategy,
+    "levelweighted": LevelWeightedRewardStrategy,
     "sum": SumRewardStrategy,
     "mean": MeanRewardStrategy,
-    "level_based": LevelBasedRewardStrategy,
-    "completion_ratio": CompletionRatioRewardStrategy,
+    "levelbased": LevelBasedRewardStrategy,
+    "completionratio": CompletionRatioRewardStrategy,
     "progressive": ProgressiveRewardStrategy,
 }
 

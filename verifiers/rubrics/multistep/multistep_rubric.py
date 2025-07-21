@@ -10,7 +10,8 @@ from typing import Any, Dict, List, Mapping, Optional, Tuple, Union
 import yaml
 
 from verifiers.rewards.judge_reward import (JudgeResponse, JudgeRewarder,
-                                            make_judge_rewarders, detect_client_type)
+                                            detect_client_type,
+                                            make_judge_rewarders)
 from verifiers.rubrics.multistep.enums import EvaluationMode, TerminalCondition
 from verifiers.rubrics.multistep.nodes import (NodeFactory,
                                                RequirementRewardNode)
@@ -531,7 +532,7 @@ class MultiStepRubric(Rubric):
         for judge in self.judge_options:
             # Detect client type and configuration
             client_type, client_config = detect_client_type(judge.judge_client)
-            
+
             judge_data = {
                 "type": judge.__class__.__name__.replace("JudgeRewarder", "").lower(),
                 "judge_prompt": judge.judge_prompt,

@@ -8,6 +8,8 @@ This GUI allows you to build a MultiStepRubric by adding judge rewarders, requir
 """
 
 import json
+import os
+from pathlib import Path
 from typing import Any
 
 import streamlit as st
@@ -16,9 +18,13 @@ from multistep_extras.builders.builder import RubricBuilder
 from verifiers.rewards.judge_reward import (JUDGE_PROMPT,
                                             JUDGE_PROMPT_VARIABLES,
                                             NAME_TO_JUDGE_REWARDER_CLASS)
+from verifiers.rubrics.multistep.multistep_rubric import MultiStepRubric
 from verifiers.rubrics.multistep.requirement import NAME_TO_REQUIREMENT_CLASS
 from verifiers.rubrics.multistep.reward_strategies import (
     NAME_TO_REWARD_STRATEGY_CLASS, make_reward_strategy)
+
+# Default save directory
+DEFAULT_SAVE_DIR = Path("outputs/rubrics")
 
 
 def configure_page() -> None:
@@ -51,7 +57,163 @@ def render_sidebar_overview() -> None:
         st.divider()
         _render_reward_strategy_overview()
         st.divider()
+        _render_save_load_section()
+        st.divider()
         _render_clear_all_button()
+
+
+def _render_save_load_section() -> None:
+    """Render the save/load section in the sidebar."""
+    st.subheader("💾 Save/Load")
+    
+    # Create save directory if it doesn't exist
+    DEFAULT_SAVE_DIR.mkdir(parents=True, exist_ok=True)
+    
+    # Load section
+    st.markdown("**Load Existing Rubric:**")
+    saved_rubrics = _get_saved_rubrics()
+    
+    if saved_rubrics:
+        selected_rubric = st.selectbox(
+            "Select rubric to load:",
+            options=[""] + saved_rubrics,
+            key="load_rubric_select"
+        )
+        
+        col1, col2 = st.columns(2)
+        with col1:
+            if st.button("📂 Load", disabled=not selected_rubric):
+                if selected_rubric:
+                    _load_rubric_to_session(selected_rubric)
+        
+        with col2:
+            if st.button("🗑️ Delete", disabled=not selected_rubric):
+                if selected_rubric:
+                    _delete_saved_rubric(selected_rubric)
+    else:
+        st.info("No saved rubrics found")
+    
+    # Save section (only show if there's something to save)
+    if (st.session_state.judge_rewarders or 
+        st.session_state.requirements or 
+        st.session_state.reward_strategy):
+        
+        st.markdown("**Save Current Configuration:**")
+        save_name = st.text_input(
+            "Rubric name:",
+            placeholder="my_rubric",
+            key="save_name_input"
+        )
+        
+        if st.button("💾 Save Config", disabled=not save_name):
+            if save_name:
+                _save_current_config(save_name)
+
+
+def _get_saved_rubrics() -> list[str]:
+    """Get list of saved rubric names."""
+    if not DEFAULT_SAVE_DIR.exists():
+        return []
+    
+    # Look for config files and extract rubric names
+    config_files = list(DEFAULT_SAVE_DIR.glob("*_config.yaml"))
+    rubric_names = []
+    
+    for config_file in config_files:
+        # Extract name by removing _config.yaml suffix
+        name = config_file.stem.replace("_config", "")
+        # Check if corresponding requirements file exists
+        req_file = DEFAULT_SAVE_DIR / f"{name}_requirements.yaml"
+        if req_file.exists():
+            rubric_names.append(name)
+    
+    return sorted(rubric_names)
+
+
+def _load_rubric_to_session(rubric_name: str) -> None:
+    """Load a saved rubric into the session state."""
+    try:
+        # Load the rubric
+        rubric = MultiStepRubric.load(DEFAULT_SAVE_DIR, rubric_name)
+        
+        # Clear current session state
+        st.session_state.judge_rewarders = []
+        st.session_state.requirements = []
+        st.session_state.reward_strategy = None
+        
+        # Populate judge rewarders
+        for judge in rubric.judge_options:
+            judge_data = {
+                "type": judge.__class__.__name__.replace("JudgeRewarder", "").lower(),
+                "judge_prompt": judge.judge_prompt,
+                "judge_model": judge.judge_model,
+            }
+            st.session_state.judge_rewarders.append(judge_data)
+        
+        # Populate requirements
+        for req in rubric.requirements:
+            req_data = {
+                "type": req.__class__.__name__.replace("Requirement", "").lower(),
+                "name": req.name,
+                "question": req.question,
+                "dependencies": req.dependencies,
+            }
+            st.session_state.requirements.append(req_data)
+        
+        # Populate reward strategy
+        strategy = rubric.reward_strategy
+        strategy_data = {
+            "type": strategy.__class__.__name__.replace("RewardStrategy", "").lower(),
+        }
+        
+        # Add strategy parameters
+        for attr_name in dir(strategy):
+            if (not attr_name.startswith("_") and 
+                not callable(getattr(strategy, attr_name)) and 
+                attr_name not in ["name"]):
+                strategy_data[attr_name] = getattr(strategy, attr_name)
+        
+        st.session_state.reward_strategy = strategy_data
+        
+        st.success(f"✅ Loaded rubric '{rubric_name}' successfully!")
+        st.rerun()
+        
+    except Exception as e:
+        st.error(f"Error loading rubric: {str(e)}")
+
+
+def _save_current_config(save_name: str) -> None:
+    """Save the current configuration without building the full rubric."""
+    try:
+        # Build the rubric first
+        rubric = _build_rubric()
+        
+        # Save the rubric
+        rubric.save(DEFAULT_SAVE_DIR, save_name)
+        
+        st.success(f"✅ Saved configuration as '{save_name}'!")
+        st.rerun()
+        
+    except Exception as e:
+        st.error(f"Error saving configuration: {str(e)}")
+
+
+def _delete_saved_rubric(rubric_name: str) -> None:
+    """Delete a saved rubric."""
+    try:
+        config_file = DEFAULT_SAVE_DIR / f"{rubric_name}_config.yaml"
+        req_file = DEFAULT_SAVE_DIR / f"{rubric_name}_requirements.yaml"
+        
+        if config_file.exists():
+            config_file.unlink()
+        if req_file.exists():
+            req_file.unlink()
+            
+        st.success(f"✅ Deleted rubric '{rubric_name}'!")
+        st.rerun()
+        
+    except Exception as e:
+        st.error(f"Error deleting rubric: {str(e)}")
 
 
 def _render_judge_rewarders_overview() -> None:
@@ -160,8 +322,6 @@ def _add_judge_rewarder(judge_type: str, judge_model: str, judge_prompt: str) ->
             f"Judge prompt must contain the following variables: {JUDGE_PROMPT_VARIABLES}"
         )
         return
-    breakpoint()
-    # need to construct template string from prompt
 
     new_judge = {
         "type": judge_type,
@@ -320,9 +480,9 @@ def render_reward_strategy_tab() -> None:
     st.markdown("Configure how rewards are calculated from evaluation results.")
 
     current_strategy_type = (
-        st.session_state.reward_strategy.get("type", "level_weighted")
+        st.session_state.reward_strategy.get("type", "levelweighted")
         if st.session_state.reward_strategy
-        else "level_weighted"
+        else "levelweighted"
     )
 
     strategy_type = st.selectbox(
@@ -342,7 +502,7 @@ def _render_strategy_parameters(strategy_type: str) -> dict[str, Any]:
     """Render parameter inputs for the selected strategy type and return the values."""
     strategy_params = {}
 
-    if strategy_type == "level_weighted":
+    if strategy_type == "levelweighted":
         col1, col2 = st.columns(2)
         with col1:
             strategy_params["base_weight"] = st.number_input(
@@ -453,25 +613,49 @@ def _render_preview_strategy() -> None:
 
 def _render_build_button() -> None:
     """Render the build rubric button and handle building."""
-    if st.button("🏗️ Build Rubric", type="primary", key="build_main"):
-        if not st.session_state.judge_rewarders or not st.session_state.requirements:
-            st.error("Need at least one judge rewarder and one requirement!")
-            return
+    # Add input field for rubric name
+    col1, col2 = st.columns([3, 1])
+    
+    with col1:
+        rubric_name = st.text_input(
+            "Rubric name for saving:",
+            placeholder="my_rubric",
+            key="build_rubric_name",
+            help="The rubric will be automatically saved with this name"
+        )
+    
+    with col2:
+        st.markdown("<br>", unsafe_allow_html=True)  # Add space to align with input
+        if st.button("🏗️ Build & Save Rubric", type="primary", key="build_main"):
+            if not st.session_state.judge_rewarders or not st.session_state.requirements:
+                st.error("Need at least one judge rewarder and one requirement!")
+                return
+            
+            if not rubric_name.strip():
+                st.error("Please provide a name for the rubric!")
+                return
 
-        try:
-            rubric = _build_rubric()
-            st.success("✅ Rubric built successfully!")
-            st.info(
-                f"**Rubric Details:**\n"
-                f"- {len(rubric.requirements)} requirements\n"
-                f"- {len(rubric.judge_options)} judge options\n"
-                f"- Reward strategy: {rubric.reward_strategy.name}"
-            )
-            st.session_state.built_rubric = rubric
+            try:
+                rubric = _build_rubric()
+                
+                # Save the rubric
+                DEFAULT_SAVE_DIR.mkdir(parents=True, exist_ok=True)
+                rubric.save(DEFAULT_SAVE_DIR, rubric_name.strip())
+                
+                st.success("✅ Rubric built and saved successfully!")
+                st.info(
+                    f"**Rubric Details:**\n"
+                    f"- Name: {rubric_name.strip()}\n"
+                    f"- {len(rubric.requirements)} requirements\n"
+                    f"- {len(rubric.judge_options)} judge options\n"
+                    f"- Reward strategy: {rubric.reward_strategy.name}\n"
+                    f"- Saved to: {DEFAULT_SAVE_DIR / rubric_name.strip()}"
+                )
+                st.session_state.built_rubric = rubric
 
-        except Exception as e:
-            st.error(f"Error building rubric: {str(e)}")
-            st.exception(e)
+            except Exception as e:
+                st.error(f"Error building/saving rubric: {str(e)}")
+                st.exception(e)
 
 
 def _build_rubric():
