@@ -5,6 +5,7 @@ The builder classes are meant to simply and easily create rubrics and scenarios.
 or LLM in order to create rubrics and scenarios, and may power a UI to create these objects by hand.
 """
 
+from typing import Optional
 from verifiers.rewards.judge_reward import JudgeRewarder, make_judge_rewarder
 from verifiers.rubrics.multistep.multistep_rubric import MultiStepRubric
 from verifiers.rubrics.multistep.requirement import (Requirement,
@@ -18,9 +19,9 @@ class RubricBuilder:
 
     def __init__(self) -> None:
         """Initialize the RubricBuilder."""
-        self.requirements = []
-        self.judge_options = []
-        self.reward_strategy = None
+        self.requirements: list[Requirement] = []
+        self.judge_options: list[JudgeRewarder] = []
+        self.reward_strategy: Optional[RewardStrategy] = None
 
     def add_requirement(self, requirement: Requirement | dict) -> None:
         """Add a requirement to the RubricBuilder."""

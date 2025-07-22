@@ -63,7 +63,7 @@ def generate_scenario_from_hidden_description(
     name: Optional[str] = None,
     description: Optional[str] = None,
     model: str = "gpt-4.1-nano",
-    client: OpenAI = OpenAI(),
+    client: Optional[OpenAI] = None,
     model_kwargs: Optional[dict] = None,
 ) -> Scenario:
     """
@@ -102,6 +102,9 @@ def generate_scenario_from_hidden_description(
     """
     if model_kwargs is None:
         model_kwargs = {}
+
+    if client is None:
+        client = OpenAI()
 
     # Build the generation prompt
     requirements_text = _format_requirements_for_prompt(requirements)
@@ -160,7 +163,10 @@ if __name__ == "__main__":
     from multistep_extras.example_rubrics import get_workflow
 
     reqs, scenarios = get_workflow("first_responder")
-    hidden_description = scenarios[0]._hidden_description
+    hidden_descriptions = [scenario._hidden_description for scenario in scenarios if scenario._hidden_description]
+    if not hidden_descriptions:
+        raise ValueError("No hidden descriptions found")
+    hidden_description = hidden_descriptions[0]
 
     new_scenario = generate_scenario_from_hidden_description(
         hidden_description=hidden_description,
