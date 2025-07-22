@@ -1,14 +1,11 @@
 import verifiers as vf
 from verifiers.tools import python
-from verifiers.utils import load_example_dataset
+from verifiers.utils.data_utils import load_example_dataset
 
 """
 Multi-GPU training (single node, 4 training + 4 inference)
 
-CUDA_VISIBLE_DEVICES=0,1,2,3 python verifiers/inference/vllm_serve.py --model 'Qwen/Qwen2.5-7B-Instruct' \
-    --tensor_parallel_size 4 --max_model_len 8192 --dtype bfloat16 \
-    --gpu_memory_utilization 0.9 --enable_prefix_caching True \
-    --host 0.0.0.0 --port 8000
+CUDA_VISIBLE_DEVICES=0,1,2,3 vf-vllm --model 'willcb/Qwen2.5-7B-Math-Python-SFT' --tensor-parallel-size 4
 
 CUDA_VISIBLE_DEVICES=4,5,6,7 accelerate launch --config-file configs/zero3.yaml verifiers/examples/math_train.py
 """
@@ -53,7 +50,8 @@ vf_env = vf.ToolEnv(
     system_prompt=TOOL_PROMPT,
     few_shot=[],
     tools=[python],
-    max_steps=3
+    max_steps=3,
+    sampling_args={"extra_body": {"logprobs": True}}
 )
 print(vf_env.system_prompt)
 

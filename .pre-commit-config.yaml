@@ -1,45 +1,10 @@
-
 repos:
--   repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.5.0
-    files: ^(multistep_extras/|verifiers/rubrics/multistep/)
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.12.3
     hooks:
-    -   id: trailing-whitespace
-    -   id: end-of-file-fixer
-    -   id: check-yaml
-    -   id: check-added-large-files
-    -   id: debug-statements
-    -   id: check-ast
-
--   repo: https://github.com/psf/black
-    rev: 24.2.0
-    hooks:
-    -   id: black
-        files: ^(multistep_extras/|verifiers/rubrics/multistep/).*\.py$
-
--   repo: https://github.com/pycqa/isort
-    rev: 5.13.2
-    hooks:
-    -   id: isort
-        files: ^(multistep_extras/|verifiers/rubrics/multistep/).*\.py$
-
--   repo: https://github.com/pycqa/flake8
-    rev: 7.0.0
-    hooks:
-    -   id: flake8
-        files: ^(multistep_extras/|verifiers/rubrics/multistep/).*\.py$
-        args: ['--max-line-length=100', '--ignore=E203,W503,D205,B950,E501']
-        additional_dependencies:
-            - flake8-docstrings
-            - flake8-bugbear
-
--   repo: https://github.com/pre-commit/mirrors-mypy
-    rev: v1.9.0
-    hooks:
-    -   id: mypy
-        files: ^(multistep_extras/|verifiers/rubrics/multistep/).*\.py$
-        additional_dependencies:
-        - types-PyYAML
-        - types-requests
-        - types-setuptools
-        - types-python-dateutil
+      # Run the linter.
+      - id: ruff
+        args: [--fix, --config=pyproject.toml]
+      # Run the formatter.
+      - id: ruff-format
+        args: [--config=pyproject.toml]

@@ -1,10 +1,9 @@
 from datasets import load_dataset
 import verifiers as vf
 
-#model = 'Qwen/Qwen2.5-1.5B-Instruct'
 """
 inference:
-CUDA_VISIBLE_DEVICES=0 vf-vllm --model willcb/Qwen2.5-0.5B-Reverse-SFT
+CUDA_VISIBLE_DEVICES=0 vf-vllm --model willcb/Qwen2.5-0.5B-Reverse-SFT --enforce-eager
 
 training:
 CUDA_VISIBLE_DEVICES=1 accelerate launch --num-processes 1 --config-file configs/zero3.yaml verifiers/examples/reverse_text.py
@@ -13,9 +12,10 @@ CUDA_VISIBLE_DEVICES=1 accelerate launch --num-processes 1 --config-file configs
 
 model_name = 'willcb/Qwen2.5-0.5B-Reverse-SFT'
 dataset = load_dataset('agentlans/wikipedia-paragraphs', split='train').map(lambda x: {'question': x['text'], 'answer': x['text'][::-1]})
-# evaluate on the first 32 examples, train on the rest
-eval_dataset = dataset.select(range(32)) # type: ignore
-train_dataset = dataset.select(range(32, len(dataset))) # type: ignore
+TRAIN_SIZE = 100
+EVAL_SIZE = 10
+train_dataset = dataset.select(range(TRAIN_SIZE)) # type: ignore
+eval_dataset = dataset.select(range(TRAIN_SIZE, TRAIN_SIZE + EVAL_SIZE)) # type: ignore
 
 parser = vf.XMLParser(['think', 'answer'], answer_field='answer')
 system_prompt = f"""Reverse the given text.
@@ -49,13 +49,12 @@ vf_env = vf.SingleTurnEnv(
     rubric=rubric
 )
 args = vf.grpo_defaults(run_name='reverse_text_warmup')
-args.num_iterations = 2
-args.per_device_train_batch_size = 10
-args.num_generations = 10
-args.gradient_accumulation_steps = 4
-args.eval_strategy = "steps"
-args.eval_steps = 10
+args.per_device_train_batch_size = 12
+args.num_generations = 12
+args.gradient_accumulation_steps = 8
 args.max_steps = 100
+args.eval_strategy = 'steps'
+args.eval_steps = 2
 
 model, tokenizer = vf.get_model_and_tokenizer(model_name)
 trainer = vf.GRPOTrainer(
@@ -63,6 +62,6 @@ trainer = vf.GRPOTrainer(
     processing_class=tokenizer,
     env=vf_env,
     #peft_config=vf.lora_defaults(),
-    args=args
+    args=args,
 )
 trainer.train()

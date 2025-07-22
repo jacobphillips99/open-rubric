@@ -9,6 +9,10 @@ Respond in the following format, using careful step-by-step reasoning.
 </answer>
 """
 
+THINK_ANSWER_PROMPT = """
+Think step-by-step inside <think>...</think> tags, then give your final answer inside <answer>...</answer> tags.
+"""
+
 CODE_PROMPT = """\
 Given a math problem, use step-by-step reasoning and code execution to solve the problem. 
 

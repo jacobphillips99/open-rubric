@@ -1,11 +1,15 @@
 import inspect
 import json
-from typing import List, Dict, Any, Callable, Optional, Type
+from typing import List, Dict, Any, Callable, Optional, Type, Tuple
 
 from datasets import Dataset
 
-from verifiers import RewardFunc
-from verifiers.envs.multiturn_env import MultiTurnEnv
+from verifiers import (
+    RewardFunc,
+    ChatMessage,
+    State,
+    MultiTurnEnv,
+)
 from verifiers.parsers.smola_parser import SmolaParser
 from verifiers.prompts import DEFAULT_TOOL_PROMPT_TEMPLATE
 from verifiers.rubrics.smola_tool_rubric import SmolaToolRubric
@@ -29,7 +33,6 @@ class SmolaToolEnv(MultiTurnEnv):
             few_shot=few_shot,
             mask_env_response=mask_env_response,
             max_steps=max_steps,
-            sampling_args=sampling_args,
             **kwargs
         )
         self.dataset_name = dataset
@@ -61,7 +64,7 @@ class SmolaToolEnv(MultiTurnEnv):
     def get_reward_weights(self, **kwargs: Any) -> List[float]:
         return self.rubric.get_reward_weights()
 
-    def _get_step_count(self, messages: List[Dict[str, str]]) -> int:
+    def _get_step_count(self, messages: List[ChatMessage]) -> int:
         """Count the number of tool uses in the message history, excluding few-shot examples."""
         step_count = 0
         
@@ -79,7 +82,7 @@ class SmolaToolEnv(MultiTurnEnv):
                 step_count += 1
         return step_count
     
-    def is_completed(self, messages: List[Dict[str, str]], state: Dict[str, Any], **kwargs: Any) -> bool:
+    def is_completed(self, messages: List[ChatMessage], state: State, **kwargs: Any) -> bool:
         try:
             # Check if we've hit max steps by counting tool uses in the message history
             step_count = self._get_step_count(messages)
@@ -119,7 +122,7 @@ class SmolaToolEnv(MultiTurnEnv):
         except Exception as e:
             return f"Error: {str(e)}. " + "Please format your tool call as '{\"name\": \"tool_name\", \"args\": {\"arg1\": \"value1\", \"arg2\": \"value2\"}}'"
 
-    def env_response(self, messages: List[Dict[str, str]], state: Dict[str, Any], **kwargs: Any) -> Dict[str, str]:
+    def env_response(self, messages: List[ChatMessage], state: State, **kwargs: Any) -> Tuple[ChatMessage, State]:
         try:
             parsed = self.llm_parser.parse(messages[-1]["content"])
             # Check if we got a valid tool field (not just None from failed parsing)
