@@ -282,6 +282,12 @@ scenarios = [
                 "reasoning": "Patient prepared for hospital transport after bleeding control",
             },
         },
+        _hidden_description="""
+        Complete scene details: A 28-year-old female driver lost control of her sedan on a wet suburban road around 2 PM during light rain. Vehicle skidded off the road and collided with a roadside sign post at approximately 25 mph before coming to rest completely on the grass shoulder, 15 feet from active traffic lanes. Vehicle sustained front-end damage but no structural compromise to passenger compartment.
+        Patient status: Driver was wearing seatbelt and remained conscious throughout incident. No head impact with steering wheel or windows. Deep 4-inch laceration on left forearm from broken side window glass during impact. Bleeding is arterial but controllable with direct pressure. No other visible injuries. Patient reports pain level 6/10 at injury site, neck and back feel fine. No dizziness, nausea, or vision changes. Fully alert and oriented to person, place, and time.
+        Environmental conditions: Scene is stable with no ongoing hazards. Vehicle is off roadway with hazard lights activated. Good visibility and weather has improved. No fuel leaks, electrical hazards, or structural collapse risks. Other motorists are giving appropriate distance. Patient has cell phone and was able to call for help. No other occupants in vehicle.
+        Medical history: Patient reports no significant medical history, no current medications, no allergies. Last meal was lunch 2 hours ago. Not pregnant. Lives locally and has family members who can meet at hospital.
+        """,
     ),
     Scenario(
         name="Elderly Fall with Hip Injury",
@@ -318,6 +324,17 @@ scenarios = [
                 "reasoning": "Patient prepared for transport with comfort measures",
             },
         },
+        _hidden_description="""
+        Complete incident details: Margaret Thompson, 75-year-old retired teacher, lives alone in a single-story home. Around 6 AM while getting ready for the day, she stepped out of her shower onto a slightly wet bath mat. The mat slipped on the tile floor, causing her to fall backwards and land hard on her right side, striking her hip against the edge of the bathtub.
+
+        Patient condition: Right hip fracture (displaced femoral neck fracture). Patient heard and felt distinct 'pop' during impact. Severe pain rated 8/10, localized to right hip and radiating down thigh. Right leg is externally rotated and shortened by approximately 1 inch compared to left leg. Cannot bear any weight or move right leg voluntarily. Pain increases dramatically with any attempted movement.
+
+        Patient status: Fully conscious and oriented to person, place, time. Vital signs: BP 150/90 (elevated due to pain), HR 95, RR 18, temp 98.6°F. Skin pale and diaphoretic from pain but no signs of shock. No head injury, no loss of consciousness. Alert and cooperative but distressed from pain. No other injuries identified.
+
+        Environment and access: Bathroom floor is now dry and safe. Patient is lying on bathroom floor next to bathtub. Space is adequate for responder access and equipment. Front door was unlocked - patient called neighbor who let responders in. Heat is on, patient has blanket over torso. No obstacles or hazards present.
+
+        Medical history: Osteoporosis (takes calcium and vitamin D), mild hypertension (on lisinopril), no other significant medical conditions. No drug allergies. Last meal was evening snack around 9 PM yesterday. Lives independently, very active for her age, does her own shopping and cooking.
+        """,
     ),
 ]
 advanced_scenarios = [
@@ -359,5 +376,13 @@ advanced_scenarios = [
             "breathing_support": "Breathing Assessment: Shallow, irregular breathing pattern detected.",
             "emergency_protocols": "Emergency Resources: Emergency radio frequencies are available and functioning.",
         },
+        _hidden_description="""
+        Complete incident details: James Rodriguez, 42-year-old construction supervisor, was inspecting a residential construction site at 7:30 AM when he suffered a massive heart attack (STEMI - ST-elevation myocardial infarction) due to undiagnosed severe coronary artery disease. He collapsed instantly while standing on level ground near the foundation of a house under construction.
+        Patient medical status: Acute anterior wall myocardial infarction with complete blockage of the left anterior descending (LAD) coronary artery. Patient is in cardiogenic shock with severely compromised cardiac output. Blood pressure: 70/40 and dropping, heart rate: 140 irregular (ventricular tachycardia), respiratory rate: 6-8 irregular and shallow. Oxygen saturation: 78%. Skin is cold, clammy, pale, and cyanotic around lips and fingernails.
+        Consciousness and neurological: Patient is unconscious due to poor cerebral perfusion from cardiogenic shock. No response to verbal stimuli, minimal response to painful stimuli. Pupils are equal and reactive but sluggish. No signs of head trauma or seizure activity. Glasgow Coma Scale: 6 (E1 V1 M4).
+        Physical assessment: No external trauma, no visible bleeding, no obvious fractures. Patient fell straight down when he collapsed, so no mechanism for traumatic injury. Breathing is agonal - irregular, gasping pattern indicating brainstem response to severe hypoxia. Chest appears symmetrical but patient will likely need immediate advanced cardiac life support.
+        Environmental conditions: Construction site is secure with no active hazards. Site has been cleared of workers and equipment. Good access for emergency vehicles. Weather is clear and dry. Scene is well-lit and safe to approach. No electrical hazards, no structural dangers, no traffic concerns. Emergency communications are available and functional.
+        Timeline and prognosis: Collapse occurred approximately 5 minutes before responder arrival. For this type of cardiac event, immediate advanced life support and rapid transport to a cardiac catheterization lab is critical. Patient will need immediate CPR, defibrillation, cardiac medications, and emergency PCI (percutaneous coronary intervention) to survive.
+        """,
     ),
 ]

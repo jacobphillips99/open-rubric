@@ -61,6 +61,7 @@ class Scenario:
         name: Optional[str] = None,
         description: Optional[str] = None,
         revealed_info: Optional[dict[str, str]] = None,
+        _hidden_description: Optional[str] = None,
     ):
         """
         Initialize a scenario with the given information.
@@ -73,6 +74,10 @@ class Scenario:
             description: Optional description of what this scenario tests
             revealed_info: Optional mapping of requirement names to revealed information
                           Format: {"requirement_name": "information to reveal when correct"}
+            _hidden_description: Optional full-information view of the entire scene and setup,
+                               containing all ground truth details that could inform the correct
+                               answers. This serves as the source of truth for generating
+                               prompts, answers, and revealed_info.
         """
         self.prompt = prompt
         self.answers = answers
@@ -80,13 +85,19 @@ class Scenario:
         self.name = name
         self.description = description
         self.revealed_info = revealed_info or {}
+        self._hidden_description = _hidden_description
 
     def to_content(self) -> str:
         """Return a string of the content of the scenario."""
-        return f"""
+        content = f"""
         prompt: {self.prompt}
         completion: {self.completion}
         """.strip()
+        
+        if self._hidden_description:
+            content += f"\n_hidden_description: {self._hidden_description}"
+            
+        return content
 
     def to_dict(self) -> dict:
         """Convert scenario to dictionary for serialization."""
@@ -97,6 +108,7 @@ class Scenario:
             "completion": self.completion,
             "answers": self.answers,
             "revealed_info": self.revealed_info,
+            "_hidden_description": self._hidden_description,
         }
         return scenario_data
 

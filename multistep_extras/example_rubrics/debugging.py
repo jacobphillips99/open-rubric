@@ -179,6 +179,14 @@ scenarios = [
                 "reasoning": "Forming hypothesis about payment processing timeout based on error analysis and timeline",
             },
         },
+        _hidden_description="""
+        Root cause and complete technical context: The e-commerce platform uses a third-party payment processor (StripeConnect) with a tiered fraud detection system. Yesterday at 2:45 PM, the payment processor automatically updated their fraud detection algorithms and reduced the timeout threshold for "high-value" transactions from 30 seconds to 15 seconds as part of a security enhancement.
+        Technical details: Orders over $100 are classified as "high-value" and trigger additional fraud checks including real-time identity verification, address validation, and velocity checking. These checks typically take 18-22 seconds to complete. With the new 15-second timeout, 20% of these transactions (those taking longer than 15 seconds) now fail with a SocketTimeoutException that manifests as a 500 error to end users.
+        System behavior: The application's payment service wrapper catches the timeout exception and logs it as "Payment processing timeout for order ${orderId}" with stack trace pointing to the StripeConnect API call. The error occurs specifically in the PaymentProcessor.processHighValueOrder() method at line 127 where it waits for the fraud check response.
+        Deployment and configuration: No code deployments occurred yesterday. The payment service configuration file still shows the old 30-second timeout expectation. The application assumes the external service will respond within 30 seconds, but the service now cuts off at 15 seconds. The issue is intermittent because fraud check duration varies based on customer history and transaction complexity.
+        Environmental factors: The issue affects all environments (dev, staging, prod) equally. Logs show consistent patterns: all failed transactions are >$100, all have timestamp around when fraud checks would timeout, and all have the same stack trace signature. The payment processor's status page doesn't show any reported issues since this was an intentional security update on their side.
+        Customer impact: Customers see generic "payment failed" message and assume their card was declined. Cart contents are preserved and they can retry, but customer satisfaction is declining. Customer service is receiving increased calls about "card declined" issues that actually aren't card problems.
+        """,
     ),
     Scenario(
         name="iOS App Crash",
@@ -239,5 +247,13 @@ scenarios = [
                 "reasoning": "Analyzing query execution plans and database system state for performance bottlenecks",
             },
         },
+        _hidden_description="""
+        Complete technical situation: The application is a product catalog system with a PostgreSQL database containing 2.5 million product records. The search functionality uses a complex query with multiple JOINs across products, categories, brands, and inventory tables, along with full-text search on product descriptions.
+        Root cause analysis: Eight days ago, the marketing team bulk-imported 500,000 new product records for a seasonal catalog expansion. This import process ran over the weekend and completed successfully. However, the bulk import bypassed the normal incremental index maintenance that occurs during regular product additions.
+        Database state details: The critical composite index on (category_id, brand_id, availability_status) that the search query relies on has become severely fragmented due to the bulk insert. Index fragmentation is at 87% (normal is <10%). The PostgreSQL query planner is now choosing table scans over index seeks because the fragmented index is less efficient than sequential reads for large result sets.
+        Performance metrics: Query execution plans show the problematic query now performs full table scans on the products table (2.5M rows) and categories table (15K rows) instead of using the optimized index path. Disk I/O has increased 40x for search operations. Memory usage spikes during searches due to larger working sets needed for table scans.
+        System behavior: The search slowdown affects all search queries, but is most pronounced for broad category searches that would normally benefit most from the index. Specific product ID lookups are still fast because they use the primary key index which wasn't affected. Database CPU utilization spikes to 80%+ during search operations, and query queue depths increase significantly during peak usage.
+        Related symptoms: The nightly VACUUM ANALYZE job is taking 3x longer to complete due to the larger dataset and fragmented indexes. Application connection pool is occasionally exhausting during peak search times. No errors are logged - just poor performance metrics.
+        """,
     ),
 ]
