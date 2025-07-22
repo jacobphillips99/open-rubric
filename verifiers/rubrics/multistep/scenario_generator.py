@@ -1,19 +1,20 @@
 """
 LLM-based scenario generation from hidden descriptions and rubrics.
 
-This module provides functionality to generate complete scenarios (prompt, answers, 
-revealed_info, etc.) from a comprehensive hidden description and a rubric using 
+This module provides functionality to generate complete scenarios (prompt, answers,
+revealed_info, etc.) from a comprehensive hidden description and a rubric using
 language model calls.
 """
 
 import json
-import typing as t
+import traceback
 from typing import Optional
 
 from openai import OpenAI
 
-from .requirement import Requirement
-from .scenario import Scenario
+from verifiers.parsers.xml_parser import XMLParser
+from verifiers.rubrics.multistep.requirement import Requirement
+from verifiers.rubrics.multistep.scenario import Scenario
 
 SCENARIO_GENERATION_PROMPT = """
 You are an expert scenario designer for evaluation rubrics. Your task is to generate a complete scenario from a comprehensive hidden description.
@@ -27,9 +28,7 @@ RUBRIC REQUIREMENTS:
 Based on the hidden description, generate:
 
 1. INITIAL PROMPT: A brief initial situation description that presents limited information to start the evaluation. This should be what the responder initially sees/knows.
-
 2. GROUND TRUTH ANSWERS: For each requirement, determine the correct answer (1.0 or 0.0) based on what the hidden description reveals, along with reasoning.
-
 3. REVEALED INFO: For requirements that should reveal additional information when satisfied, provide progressive information snippets that gradually unveil details from the hidden description.
 
 Format your response as valid JSON:
@@ -54,7 +53,7 @@ Important guidelines:
 - Use exact requirement names from the provided list
 
 Begin the response by first thinking about the response. Start with <think> and end with </think> once you have thought about your response.
-Begin the actual valid JSON response inside <answer> and </answer>. 
+Begin the actual valid JSON response inside <answer> and </answer>.
 """
 
 
@@ -65,17 +64,17 @@ def generate_scenario_from_hidden_description(
     description: Optional[str] = None,
     model: str = "gpt-4.1-nano",
     client: OpenAI = OpenAI(),
-    model_kwargs: dict = {},
+    model_kwargs: Optional[dict] = None,
 ) -> Scenario:
     """
     Generate a complete scenario from a hidden description and rubric requirements.
-    
+
     This function takes a comprehensive hidden description containing all the ground truth
     details and uses an LLM to generate:
     - An appropriate initial prompt (with limited information)
     - Ground truth answers for each requirement
     - Revealed information snippets for progressive disclosure
-    
+
     Args:
         hidden_description: Complete ground truth description of the scenario
         requirements: List of requirements from the rubric to evaluate against
@@ -83,10 +82,10 @@ def generate_scenario_from_hidden_description(
         description: Optional description of what this scenario tests
         llm_call_func: Optional custom LLM function. If None, uses a default implementation
         temperature: Temperature setting for LLM generation (default: 0.1 for consistency)
-        
+
     Returns:
         Complete Scenario object with generated components
-        
+
     Example:
         hidden_description = '''
         A 34-year-old electrician was working on power lines when electrocuted and fell
@@ -96,11 +95,13 @@ def generate_scenario_from_hidden_description(
         on a busy highway with ongoing traffic. Additional crew needed for electrical
         safety before approach.
         '''
-        
+
         scenario = generate_scenario_from_hidden_description(
             hidden_description, first_responder_requirements
         )
     """
+    if model_kwargs is None:
+        model_kwargs = {}
 
     # Build the generation prompt
     requirements_text = _format_requirements_for_prompt(requirements)
@@ -108,27 +109,27 @@ def generate_scenario_from_hidden_description(
         hidden_description=hidden_description,
         requirements_text=requirements_text,
     )
-
+    parser = XMLParser(fields=["think", "answer"])
     response = client.chat.completions.create(
         model=model,
-        messages=[
-            {"role": "user", "content": prompt}
-        ],
+        messages=[{"role": "user", "content": prompt}],
         max_tokens=2000,
         **model_kwargs,
     )
-    
+    parsed = parser.parse(response.choices[0].message.content)
     try:
-        generated_data = json.loads(response)
+        generated_data = json.loads(parsed.answer)
     except json.JSONDecodeError as e:
-        raise ValueError(f"LLM response was not valid JSON: {e}") from e
-    
+        raise ValueError(
+            f"LLM response was not valid JSON: {e}; {traceback.format_exc()}"
+        ) from e
+
     # Validate the generated data has required fields
     if "prompt" not in generated_data:
         raise ValueError("Generated data missing 'prompt' field")
     if "answers" not in generated_data:
         raise ValueError("Generated data missing 'answers' field")
-    
+
     # Create and return the scenario
     return Scenario(
         name=name,
@@ -154,8 +155,10 @@ def _format_requirements_for_prompt(requirements: list[Requirement]) -> str:
                 req_text += f"  Dependencies: {'; '.join(dep_info)}\n"
     return req_text
 
+
 if __name__ == "__main__":
     from multistep_extras.example_rubrics import get_workflow
+
     reqs, scenarios = get_workflow("first_responder")
     hidden_description = scenarios[0]._hidden_description
 

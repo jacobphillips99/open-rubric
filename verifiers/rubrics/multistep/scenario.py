@@ -87,16 +87,21 @@ class Scenario:
         self.revealed_info = revealed_info or {}
         self._hidden_description = _hidden_description
 
+        if self.revealed_info and self.answers:
+            assert all(
+                k in self.answers for k in self.revealed_info
+            ), f"All revealed_info keys must be in answers; got revealed_info keys {list(self.revealed_info.keys())} but answers keys {list(self.answers.keys())}"
+
     def to_content(self) -> str:
         """Return a string of the content of the scenario."""
         content = f"""
         prompt: {self.prompt}
         completion: {self.completion}
         """.strip()
-        
+
         if self._hidden_description:
             content += f"\n_hidden_description: {self._hidden_description}"
-            
+
         return content
 
     def to_dict(self) -> dict:
