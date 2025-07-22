@@ -1,14 +1,15 @@
 [project]
-name = "verifiers"
+name = "open-rubric"
 authors = [
+    {name = "Jacob Phillips", email = "jacob.phillips8905@gmail.com"},
     {name = "William Brown", email = "williambrown97@gmail.com"},
 ]
 version = "0.1.1"
-description = "Verifiers for reinforcement learning with LLMs"
+description = "Advanced Multi-Step Rubric Evaluation Framework for LLMs"
 readme = "README.md"
 license = {text = "MIT"}
 requires-python = ">=3.11,<3.13"
-keywords = ["reinforcement-learning", "llm", "rl", "grpo", "verifiable-environments", "multi-turn"]
+keywords = ["reinforcement-learning", "llm", "rl", "grpo", "verifiable-environments", "multi-turn", "multistep", "rubric-evaluation", "open-rubric"]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -122,10 +123,10 @@ dev = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/willccbb/verifiers"
-Documentation = "https://github.com/willccbb/verifiers"
-Repository = "https://github.com/willccbb/verifiers.git"
-Issues = "https://github.com/willccbb/verifiers/issues"
+Homepage = "https://github.com/jacobphillips99/open-rubric"
+Documentation = "https://github.com/jacobphillips99/open-rubric"
+Repository = "https://github.com/jacobphillips99/open-rubric.git"
+Issues = "https://github.com/jacobphillips99/open-rubric/issues"
 
 [tool.pytest.ini_options]
 minversion = "7.0"

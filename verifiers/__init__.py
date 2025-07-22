@@ -6,21 +6,28 @@ from typing import Optional
 from .types import *
 
 try:
-    import torch._dynamo # type: ignore
-    torch._dynamo.config.suppress_errors = True # type: ignore
+    import torch._dynamo  # type: ignore
+
+    torch._dynamo.config.suppress_errors = True  # type: ignore
 except ImportError:
     pass
 
 try:
     from .utils.logging_utils import setup_logging
     from .utils.logging_utils import print_prompt_completions_sample
+
     _HAS_RICH = True
 except ImportError:
     _HAS_RICH = False
 
-from .utils.data_utils import extract_boxed_answer, extract_hash_answer, load_example_dataset
+from .utils.data_utils import (
+    extract_boxed_answer,
+    extract_hash_answer,
+    load_example_dataset,
+)
 
 from .rewards.reward import Reward
+
 RewardFunc = Union[Callable[..., float], Reward]
 
 from .parsers.parser import Parser
@@ -40,14 +47,16 @@ from .envs.env_group import EnvGroup
 
 # Conditional import based on trl availability
 try:
-    import trl # type: ignore
+    import trl  # type: ignore
     from .utils.model_utils import get_model, get_tokenizer, get_model_and_tokenizer
     from .trainers import GRPOTrainer, GRPOConfig, grpo_defaults, lora_defaults
+
     _HAS_TRL = True
 except ImportError:
     _HAS_TRL = False
 
 __version__ = "0.1.0"
+
 
 # Setup default logging configuration
 def setup_logging(
@@ -57,7 +66,7 @@ def setup_logging(
 ) -> None:
     """
     Setup basic logging configuration for the verifiers package.
-    
+
     Args:
         level: The logging level to use. Defaults to "INFO".
         log_format: Custom log format string. If None, uses default format.
@@ -78,7 +87,8 @@ def setup_logging(
     logger.addHandler(handler)
 
     # Prevent the logger from propagating messages to the root logger
-    logger.propagate = False 
+    logger.propagate = False
+
 
 setup_logging()
 
@@ -103,17 +113,21 @@ __all__ = [
 
 # Add trainer exports only if trl is available
 if _HAS_TRL:
-    __all__.extend([
-        "get_model",
-        "get_tokenizer",
-        "get_model_and_tokenizer",
-        "GRPOTrainer",
-        "GRPOConfig",
-        "grpo_defaults",
-        "lora_defaults",
-    ])
+    __all__.extend(
+        [
+            "get_model",
+            "get_tokenizer",
+            "get_model_and_tokenizer",
+            "GRPOTrainer",
+            "GRPOConfig",
+            "grpo_defaults",
+            "lora_defaults",
+        ]
+    )
 
 if _HAS_RICH:
-    __all__.extend([
-        "print_prompt_completions_sample",
-    ])
+    __all__.extend(
+        [
+            "print_prompt_completions_sample",
+        ]
+    )
