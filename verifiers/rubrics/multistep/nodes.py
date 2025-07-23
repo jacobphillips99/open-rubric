@@ -132,22 +132,54 @@ class NodeFactory:
 
         Args:
             requirement: The requirement to evaluate
-            judge_rewarder: The judge rewarder to use for evaluation
+            judge_options: List of judge rewarders available for matching
 
         Returns:
             The appropriate RequirementRewardNode subclass instance
         """
-        # maintain order of precedence in REQUIREMENT_TO_JUDGE_MAPPING
-        for requirement_type, judge_type in REQUIREMENT_TO_JUDGE_MAPPING.items():
-            if isinstance(requirement, requirement_type):
-                judge_options = [
-                    jr for jr in judge_options if isinstance(jr, judge_type)
-                ]
-                if not judge_options:
-                    raise ValueError(
-                        f"No judge rewarder found for requirement type {requirement_type} from judge options {judge_options}"
-                    )
-                return RequirementJudgeRewardNode(requirement, judge_options[0])
-        raise ValueError(
-            f"Requirement type {type(requirement)} not found in mapping {REQUIREMENT_TO_JUDGE_MAPPING}"
-        )
+        selected_judge = None
+        
+        # First, try name-based matching if judge_name is specified
+        if hasattr(requirement, 'judge_name') and requirement.judge_name is not None:
+            named_judges = [
+                jr for jr in judge_options 
+                if hasattr(jr, 'name') and jr.name == requirement.judge_name
+            ]
+            if named_judges:
+                selected_judge = named_judges[0]
+                # Validate that the named judge's response format is compatible
+                if hasattr(selected_judge, 'judge_response_format'):
+                    judge_format = selected_judge.judge_response_format
+                    req_format = requirement.judge_response_format
+                    if judge_format.__class__ != req_format.__class__:
+                        raise ValueError(
+                            f"Judge '{requirement.judge_name}' has response format {judge_format.__class__.__name__} "
+                            f"but requirement '{requirement.name}' expects {req_format.__class__.__name__}"
+                        )
+            else:
+                raise ValueError(
+                    f"No judge found with name '{requirement.judge_name}' for requirement '{requirement.name}'. "
+                    f"Available judge names: {[getattr(jr, 'name', 'unnamed') for jr in judge_options]}"
+                )
+        
+        # If no judge selected by name, fall back to type-based matching
+        if selected_judge is None:
+            # maintain order of precedence in REQUIREMENT_TO_JUDGE_MAPPING
+            for requirement_type, judge_type in REQUIREMENT_TO_JUDGE_MAPPING.items():
+                if isinstance(requirement, requirement_type):
+                    compatible_judges = [
+                        jr for jr in judge_options if isinstance(jr, judge_type)
+                    ]
+                    if not compatible_judges:
+                        raise ValueError(
+                            f"No judge rewarder found for requirement type {requirement_type} from judge options {judge_options}"
+                        )
+                    selected_judge = compatible_judges[0]
+                    break
+            
+            if selected_judge is None:
+                raise ValueError(
+                    f"Requirement type {type(requirement)} not found in mapping {REQUIREMENT_TO_JUDGE_MAPPING}"
+                )
+        
+        return RequirementJudgeRewardNode(requirement, selected_judge)

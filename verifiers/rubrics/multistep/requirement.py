@@ -27,6 +27,7 @@ class Requirement:
         question: str,
         judge_response_format: JudgeResponseFormat,
         dependencies: Optional[dict[float, list[str]]] = None,
+        judge_name: Optional[str] = None,
     ):
         """
         Initialize a requirement with name, question, judge format, and dependencies.
@@ -36,11 +37,13 @@ class Requirement:
             question: The question to be evaluated
             judge_response_format: Format for judge responses
             dependencies: Optional dict mapping answers to dependent requirements
+            judge_name: Optional name of specific judge to use for this requirement
         """
         self.name = name
         self.question = question
         self.dependencies = dependencies
         self.judge_response_format = judge_response_format
+        self.judge_name = judge_name
 
     def validate_dependencies(self) -> None:
         """Validate the dependencies for this requirement."""
@@ -66,6 +69,7 @@ class Requirement:
             "type": self.__class__.__name__.replace("Requirement", "").lower(),
             "dependencies": self.dependencies,
             "judge_response_format": self.judge_response_format.to_dict(),
+            "judge_name": self.judge_name,
         }
 
     def save(self, file_path: Union[str, Path]) -> None:
@@ -126,10 +130,27 @@ class DiscreteRequirement(Requirement):
     def validate_dependencies(self) -> None:
         """Validate the dependencies for this requirement."""
         if self.dependencies is not None:
-            assert all(
-                d in self.judge_response_format.options
-                for d in self.dependencies.keys()
-            )
+            # Check that all dependency keys are valid options for this judge format
+            invalid_keys = [
+                d for d in self.dependencies.keys() 
+                if d not in self.judge_response_format.options
+            ]
+            if invalid_keys:
+                raise ValueError(
+                    f"Invalid dependency keys {invalid_keys} for requirement '{self.name}'. "
+                    f"Valid options for {self.judge_response_format.__class__.__name__} are: {self.judge_response_format.options}"
+                )
+            
+            # Check that dependency values are lists of strings (requirement names)
+            for key, deps in self.dependencies.items():
+                if not isinstance(deps, list):
+                    raise ValueError(
+                        f"Dependencies for key {key} in requirement '{self.name}' must be a list, got {type(deps)}"
+                    )
+                if not all(isinstance(dep, str) for dep in deps):
+                    raise ValueError(
+                        f"All dependency names for key {key} in requirement '{self.name}' must be strings"
+                    )
 
     def get_dependencies_from_answer(self, answer: Any) -> list[str]:
         """Get the dependencies for this requirement based on the answer."""
@@ -151,12 +172,29 @@ class ContinuousRequirement(Requirement):
     def validate_dependencies(self) -> None:
         """Validate the dependencies for this requirement."""
         if self.dependencies is not None:
-            assert all(
-                self.judge_response_format.options[0]
-                <= d
-                <= self.judge_response_format.options[1]
-                for d in self.dependencies.keys()
-            )
+            min_val, max_val = self.judge_response_format.options
+            
+            # Check that all dependency keys are within the valid range
+            invalid_keys = [
+                d for d in self.dependencies.keys()
+                if not (min_val <= d <= max_val)
+            ]
+            if invalid_keys:
+                raise ValueError(
+                    f"Invalid dependency keys {invalid_keys} for requirement '{self.name}'. "
+                    f"Valid range for {self.judge_response_format.__class__.__name__} is: [{min_val}, {max_val}]"
+                )
+            
+            # Check that dependency values are lists of strings (requirement names)
+            for key, deps in self.dependencies.items():
+                if not isinstance(deps, list):
+                    raise ValueError(
+                        f"Dependencies for key {key} in requirement '{self.name}' must be a list, got {type(deps)}"
+                    )
+                if not all(isinstance(dep, str) for dep in deps):
+                    raise ValueError(
+                        f"All dependency names for key {key} in requirement '{self.name}' must be strings"
+                    )
 
     def get_dependencies_from_answer(self, answer: Any) -> list[str]:
         """Get the dependencies for this requirement based on the answer."""
@@ -182,6 +220,7 @@ class BinaryRequirement(DiscreteRequirement):
         name: str,
         question: str,
         dependencies: Optional[dict[float, list[str]]] = None,
+        judge_name: Optional[str] = None,
     ) -> None:
         """
         Initialize a binary requirement.
@@ -190,8 +229,9 @@ class BinaryRequirement(DiscreteRequirement):
             name: Unique identifier for this requirement
             question: The question to be evaluated
             dependencies: Optional dict mapping binary answers to dependent requirements
+            judge_name: Optional name of specific judge to use for this requirement
         """
-        super().__init__(name, question, binary_judge_response_format, dependencies)
+        super().__init__(name, question, binary_judge_response_format, dependencies, judge_name)
 
 
 class UnitVectorRequirement(ContinuousRequirement):
@@ -205,6 +245,7 @@ class UnitVectorRequirement(ContinuousRequirement):
         name: str,
         question: str,
         dependencies: Optional[dict[float, list[str]]] = None,
+        judge_name: Optional[str] = None,
         **kwargs,
     ):
         """
@@ -214,9 +255,10 @@ class UnitVectorRequirement(ContinuousRequirement):
             name: Unique identifier for this requirement
             question: The question to be evaluated
             dependencies: Optional dict mapping unit vector answers to dependent requirements
+            judge_name: Optional name of specific judge to use for this requirement
         """
         super().__init__(
-            name, question, unit_vector_judge_response_format, dependencies, **kwargs
+            name, question, unit_vector_judge_response_format, dependencies, judge_name, **kwargs
         )
 
 
@@ -234,7 +276,10 @@ def make_requirement(type: str, **kwargs) -> Requirement:
     base_types = ["discrete", "continuous"]
     if type not in base_types:
         kwargs.pop("judge_response_format", None)
-    return NAME_TO_REQUIREMENT_CLASS[type](**kwargs)
+    
+    requirement = NAME_TO_REQUIREMENT_CLASS[type](**kwargs)
+    requirement.validate_dependencies()  # Validate after creation
+    return requirement
 
 
 def make_requirements(requirements: list[dict]) -> list[Requirement]:

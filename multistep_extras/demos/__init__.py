@@ -20,7 +20,7 @@ __all__ = [
     "demo_scenario_builder",
     "run_builder_demo",
     # Inspector demos (new naming)
-    "run_inspector_demo", 
+    "run_inspector_demo",
     # Legacy alias for backward compatibility
     "run_visualizer_demo",
     # Tutorial

@@ -163,7 +163,11 @@ if __name__ == "__main__":
     from multistep_extras.example_rubrics import get_workflow
 
     reqs, scenarios = get_workflow("first_responder")
-    hidden_descriptions = [scenario._hidden_description for scenario in scenarios if scenario._hidden_description]
+    hidden_descriptions = [
+        scenario._hidden_description
+        for scenario in scenarios
+        if scenario._hidden_description
+    ]
     if not hidden_descriptions:
         raise ValueError("No hidden descriptions found")
     hidden_description = hidden_descriptions[0]

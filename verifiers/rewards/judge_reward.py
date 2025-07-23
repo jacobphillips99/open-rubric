@@ -67,9 +67,10 @@ def detect_client_type(client: OpenAI) -> tuple[str, dict[str, Any]]:
 
 
 class JudgeRewarder(Reward):
-    def __init__(self, judge_prompt: str, judge_response_format: JudgeResponseFormat, judge_client: OpenAI | None = None, judge_model: str = "gpt-4.1-nano", parser: Parser = Parser(), **kwargs):
+    def __init__(self, judge_prompt: str, judge_response_format: JudgeResponseFormat, judge_client: OpenAI | None = None, judge_model: str = "gpt-4.1-nano", parser: Parser = Parser(), name: Optional[str] = None, **kwargs):
         self.judge_response_format = judge_response_format
         self.judge_prompt = judge_prompt
+        self.name = name
 
         # Assert that judge_prompt template contains exactly the expected fields
         formatter = string.Formatter()
@@ -114,26 +115,26 @@ class JudgeRewarder(Reward):
 
 
 class DiscreteJudgeRewarder(JudgeRewarder):
-    def __init__(self, judge_prompt: str, judge_response_format: JudgeResponseFormat = None, judge_client: OpenAI | None = None, judge_model: str = "gpt-4.1-nano", parser: Parser = Parser(), **kwargs):
+    def __init__(self, judge_prompt: str, judge_response_format: JudgeResponseFormat = None, judge_client: OpenAI | None = None, judge_model: str = "gpt-4.1-nano", parser: Parser = Parser(), name: Optional[str] = None, **kwargs):
         # If no response format provided, use binary as default for discrete
         if judge_response_format is None:
             judge_response_format = binary_judge_response_format
-        super().__init__(judge_prompt, judge_response_format, judge_client, judge_model, parser, **kwargs)
+        super().__init__(judge_prompt, judge_response_format, judge_client, judge_model, parser, name, **kwargs)
 
 class ContinuousJudgeRewarder(JudgeRewarder):
-    def __init__(self, judge_prompt: str, judge_response_format: JudgeResponseFormat = None, judge_client: OpenAI | None = None, judge_model: str = "gpt-4.1-nano", parser: Parser = Parser(), **kwargs):
+    def __init__(self, judge_prompt: str, judge_response_format: JudgeResponseFormat = None, judge_client: OpenAI | None = None, judge_model: str = "gpt-4.1-nano", parser: Parser = Parser(), name: Optional[str] = None, **kwargs):
         # If no response format provided, use unit vector as default for continuous
         if judge_response_format is None:
             judge_response_format = unit_vector_judge_response_format
-        super().__init__(judge_prompt, judge_response_format, judge_client, judge_model, parser, **kwargs)
+        super().__init__(judge_prompt, judge_response_format, judge_client, judge_model, parser, name, **kwargs)
 
 class BinaryJudgeRewarder(DiscreteJudgeRewarder):
-    def __init__(self, judge_prompt: str, judge_client: OpenAI | None = None, judge_model: str = "gpt-4.1-nano", parser: Parser = Parser(), **kwargs):
-        super().__init__(judge_prompt, binary_judge_response_format, judge_client, judge_model, parser, **kwargs)
+    def __init__(self, judge_prompt: str, judge_client: OpenAI | None = None, judge_model: str = "gpt-4.1-nano", parser: Parser = Parser(), name: Optional[str] = None, **kwargs):
+        super().__init__(judge_prompt, binary_judge_response_format, judge_client, judge_model, parser, name, **kwargs)
 
 class UnitVectorJudgeRewarder(JudgeRewarder):
-    def __init__(self, judge_prompt: str, judge_client: OpenAI | None = None, judge_model: str = "gpt-4.1-nano", parser: Parser = Parser(), **kwargs):
-        super().__init__(judge_prompt, unit_vector_judge_response_format, judge_client, judge_model, parser, **kwargs)
+    def __init__(self, judge_prompt: str, judge_client: OpenAI | None = None, judge_model: str = "gpt-4.1-nano", parser: Parser = Parser(), name: Optional[str] = None, **kwargs):
+        super().__init__(judge_prompt, unit_vector_judge_response_format, judge_client, judge_model, parser, name, **kwargs)
 
 NAME_TO_JUDGE_REWARDER_CLASS = {
     "binary": BinaryJudgeRewarder,
@@ -154,20 +155,25 @@ def make_judge_rewarder(judge_rewarder_type: str, **kwargs) -> JudgeRewarder:
     if "response_format" in kwargs:
         response_format_config = kwargs.pop("response_format")
         format_type = response_format_config.get("type")
-        
+
         if format_type == "discrete":
             judge_response_format = DiscreteJudgeResponseFormat(
                 options=response_format_config.get("options", [0.0, 1.0]),
                 meanings=response_format_config.get("meanings")
             )
             kwargs["judge_response_format"] = judge_response_format
-            
+
         elif format_type == "continuous":
             judge_response_format = ContinuousJudgeResponseFormat(
                 options=response_format_config.get("options", [0.0, 1.0]),
                 meanings=response_format_config.get("meanings")
             )
             kwargs["judge_response_format"] = judge_response_format
+
+    # Extract name if provided
+    name = kwargs.get("name")
+    if name is not None:
+        kwargs["name"] = name
 
     return NAME_TO_JUDGE_REWARDER_CLASS[judge_rewarder_type](**kwargs)
 

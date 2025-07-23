@@ -29,7 +29,7 @@ This repository is a specialized fork of [verifiers](https://github.com/willccbb
 
 ## 🛠️ Installation
 
-### From Source 
+### From Source
 
 
 ```bash
@@ -55,7 +55,7 @@ uv pip install flash-attn --no-build-isolation
 **Rubrics**
 Rubrics hold groups of reward functions. In OpenRubric, the rubric is a directed acyclic graph (DAG) of requirements, where each requirement is a reward function. This enables complex, multi-step evaluation workflows as a judge determines if the model's response properly addresses each requirement according to a set of ground truth answers. Rubrics hold `Requirements` which determine the question for the judge to evaluate and the dependencies for the next requirement(s).
 
-The `MultiStepRubric` conducts a topological sort of the requirements to determine the order in which to evaluate them. 
+The `MultiStepRubric` conducts a topological sort of the requirements to determine the order in which to evaluate them.
 
 **Scenarios**
 Scenarios are the input to the rubric to be evaluated. They contain the prompt, the policy model's response, and the ground truth answers for the rubric. Scenarios can be seeded by a `_hidden_description` field from which an LLM generates a prompt, completion, and ground truth answers.
@@ -90,7 +90,7 @@ Requirements are the building blocks of the rubric. They contain the question fo
 OpenRubric provides[flexible scoring approaches](https://github.com/jacobphillips99/open-rubric/blob/main/verifiers/rubrics/multistep/reward_strategies.py) in order to attend to different evaluation objectives. For example, you can weight correct answers more heavily for earlier requirements, treat everything as the same topological level, or even just use a simple sum of the requirements:
 
 - **LevelWeightedRewardStrategy**: Earlier requirements worth more
-- **CompletionRatioRewardStrategy**: Based on percentage completed  
+- **CompletionRatioRewardStrategy**: Based on percentage completed
 - **ProgressiveRewardStrategy**: Exponential scaling
 - **SumRewardStrategy**: Simple addition
 - **MeanRewardStrategy**: Average of completed requirements
@@ -116,7 +116,7 @@ requirements = [
         }
     ),
     BinaryRequirement(
-        name="make_decision", 
+        name="make_decision",
         question="Does the response make a clear decision?",
         dependencies={
             1.0: ["take_action"],
@@ -154,7 +154,7 @@ print(f"Evaluation complete. Reward: {result}")
 ```python
 import verifiers as vf
 
-# Standard verifiers workflow  
+# Standard verifiers workflow
 parser = vf.XMLParser(['think', 'answer'])
 rubric = vf.Rubric(
     your_reward_function,
@@ -190,7 +190,7 @@ response, reward, done, info = await env.step(messages)
 while not done:
     # Model responds
     messages.append({"role": "assistant", "content": model_response})
-    
+
     # Environment evaluates and potentially reveals new information
     response, reward, done, info = await env.step(messages)
     if response:  # New information revealed
@@ -281,7 +281,7 @@ Run the comprehensive test suite:
 # Run all tests
 pytest
 
-# Run multistep-specific tests  
+# Run multistep-specific tests
 pytest multistep_extras/tests/
 
 # Run with coverage

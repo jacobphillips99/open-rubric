@@ -269,18 +269,26 @@ def _load_rubric_from_directory(rubric_name: str, directory: Path) -> None:
                 "judge_prompt": judge.judge_prompt,
                 "judge_model": judge.judge_model,
             }
-            
+
+            # Add judge name if available
+            if hasattr(judge, 'name') and judge.name:
+                judge_data["name"] = judge.name
+
             # Extract response format information if available
-            if hasattr(judge, 'judge_response_format') and judge.judge_response_format:
+            if hasattr(judge, "judge_response_format") and judge.judge_response_format:
                 response_format = judge.judge_response_format
                 format_data = {
-                    "type": "discrete" if "Discrete" in response_format.__class__.__name__ else "continuous",
+                    "type": (
+                        "discrete"
+                        if "Discrete" in response_format.__class__.__name__
+                        else "continuous"
+                    ),
                     "options": response_format.options,
                 }
                 if response_format.meanings:
                     format_data["meanings"] = response_format.meanings
                 judge_data["response_format"] = format_data
-                
+
             st.session_state.judge_rewarders.append(judge_data)
 
         # Populate requirements
@@ -291,6 +299,11 @@ def _load_rubric_from_directory(rubric_name: str, directory: Path) -> None:
                 "question": req.question,
                 "dependencies": req.dependencies,
             }
+            
+            # Add judge name if available
+            if hasattr(req, 'judge_name') and req.judge_name:
+                req_data["judge_name"] = req.judge_name
+                
             st.session_state.requirements.append(req_data)
 
         # Populate reward strategy
@@ -439,7 +452,12 @@ def _render_judge_rewarders_overview() -> None:
     if st.session_state.judge_rewarders:
         for i, judge in enumerate(st.session_state.judge_rewarders):
             with st.container():
-                st.markdown(f"**{i + 1}.** `{judge['type']}`")
+                judge_name = judge.get('name', '')
+                type_info = f"`{judge['type']}`"
+                if judge_name:
+                    st.markdown(f"**{i + 1}.** `{judge_name}` ({type_info})")
+                else:
+                    st.markdown(f"**{i + 1}.** {type_info}")
                 st.caption(f"Model: {judge['judge_model']}")
                 prompt_preview = (
                     f"{judge['judge_prompt'][:47]}..."
@@ -447,7 +465,7 @@ def _render_judge_rewarders_overview() -> None:
                     else judge["judge_prompt"]
                 )
                 st.caption(f"Prompt: {prompt_preview}")
-                
+
                 # Show response format if configured
                 if "response_format" in judge:
                     rf = judge["response_format"]
@@ -455,14 +473,19 @@ def _render_judge_rewarders_overview() -> None:
                         options_str = ", ".join(map(str, rf.get("options", [])))
                         st.caption(f"Format: Discrete [{options_str}]")
                         if rf.get("meanings"):
-                            meanings_preview = ", ".join([f"{k}={v}" for k, v in list(rf["meanings"].items())[:2]])
+                            meanings_preview = ", ".join(
+                                [
+                                    f"{k}={v}"
+                                    for k, v in list(rf["meanings"].items())[:2]
+                                ]
+                            )
                             if len(rf["meanings"]) > 2:
                                 meanings_preview += "..."
                             st.caption(f"Meanings: {meanings_preview}")
                     elif rf.get("type") == "continuous":
                         bounds = rf.get("options", [0.0, 1.0])
                         st.caption(f"Format: Continuous [{bounds[0]} to {bounds[1]}]")
-                        
+
         st.markdown(f"*Total: {len(st.session_state.judge_rewarders)} judges*")
     else:
         st.info("No judges configured yet")
@@ -476,6 +499,15 @@ def _render_requirements_overview() -> None:
             with st.container():
                 st.markdown(f"**{i + 1}.** `{req['name']}`")
                 st.caption(f"Type: {req['type']}")
+                
+                # Show judge assignment
+                judge_name = req.get('judge_name', '')
+                if judge_name:
+                    st.caption(f"Judge: {judge_name}")
+                else:
+                    st.caption(f"Judge: auto-select by type")
+                
+                # Show dependency info
                 deps_count = (
                     len(req.get("dependencies", {})) if req.get("dependencies") else 0
                 )
@@ -535,6 +567,12 @@ def _render_judge_rewarder_form() -> None:
         judge_model = st.text_input(
             "Judge Model", value="gpt-4.1-nano", key="new_judge_model"
         )
+        judge_name = st.text_input(
+            "Judge Name (optional)", 
+            placeholder="e.g., accuracy_judge, style_judge",
+            key="new_judge_name",
+            help="Optional name to identify this judge for specific requirements"
+        )
 
     with col2:
         judge_prompt = st.text_area(
@@ -550,68 +588,66 @@ def _render_judge_rewarder_form() -> None:
         response_format_config = _render_response_format_config(judge_type)
 
     if st.button("Add Judge Rewarder"):
-        _add_judge_rewarder(judge_type, judge_model, judge_prompt, response_format_config)
+        _add_judge_rewarder(
+            judge_type, judge_model, judge_prompt, response_format_config, judge_name
+        )
 
 
 def _render_response_format_config(judge_type: str) -> dict:
     """Render the response format configuration for discrete/continuous judges."""
     st.markdown("**Response Format Configuration:**")
-    
+
     if judge_type == "discrete":
-        st.markdown("*Configure the discrete options and their meanings (e.g., Likert scale)*")
-        
+        st.markdown(
+            "*Configure the discrete options and their meanings (e.g., Likert scale)*"
+        )
+
         col1, col2 = st.columns([1, 1])
-        
+
         with col1:
             # Options input
             options_input = st.text_input(
                 "Options (comma-separated)",
                 placeholder="1, 2, 3, 4, 5",
                 key="discrete_options",
-                help="Enter the discrete values separated by commas. Numbers will be converted to float."
+                help="Enter the discrete values separated by commas. Numbers will be converted to float.",
             )
-            
+
         with col2:
-            # Meanings input  
+            # Meanings input
             meanings_input = st.text_area(
                 "Meanings (JSON format)",
                 placeholder='{"1": "terrible", "2": "bad", "3": "fine", "4": "good", "5": "great"}',
                 key="discrete_meanings",
                 height=80,
-                help="Optional: Map each option to its meaning using JSON format."
+                help="Optional: Map each option to its meaning using JSON format.",
             )
-            
+
     elif judge_type == "continuous":
         st.markdown("*Configure the continuous range bounds and their meanings*")
-        
+
         col1, col2 = st.columns([1, 1])
-        
+
         with col1:
             lower_bound = st.number_input(
-                "Lower Bound", 
-                value=0.0, 
-                step=0.1,
-                key="continuous_lower"
+                "Lower Bound", value=0.0, step=0.1, key="continuous_lower"
             )
             upper_bound = st.number_input(
-                "Upper Bound", 
-                value=1.0, 
-                step=0.1,
-                key="continuous_upper"
+                "Upper Bound", value=1.0, step=0.1, key="continuous_upper"
             )
-            
+
         with col2:
             meanings_input = st.text_area(
                 "Meanings (JSON format)",
                 placeholder='{"0.0": "poor", "1.0": "excellent"}',
                 key="continuous_meanings",
                 height=80,
-                help="Optional: Map the bounds to their meanings using JSON format."
+                help="Optional: Map the bounds to their meanings using JSON format.",
             )
-    
+
     # Parse and return the config
     config = {"type": judge_type}
-    
+
     if judge_type == "discrete":
         if options_input.strip():
             try:
@@ -619,21 +655,21 @@ def _render_response_format_config(judge_type: str) -> dict:
                 options_str = options_input.strip().split(",")
                 options = [float(opt.strip()) for opt in options_str]
                 config["options"] = options
-                
+
                 # Parse meanings if provided
                 if meanings_input.strip():
                     meanings_dict = json.loads(meanings_input.strip())
                     # Convert keys to float to match options
                     meanings = {float(k): v for k, v in meanings_dict.items()}
                     config["meanings"] = meanings
-                    
+
             except (ValueError, json.JSONDecodeError) as e:
                 st.error(f"Error parsing discrete format: {str(e)}")
                 return None
-                
+
     elif judge_type == "continuous":
         config["options"] = [lower_bound, upper_bound]
-        
+
         if meanings_input.strip():
             try:
                 meanings_dict = json.loads(meanings_input.strip())
@@ -643,11 +679,17 @@ def _render_response_format_config(judge_type: str) -> dict:
             except json.JSONDecodeError as e:
                 st.error(f"Error parsing continuous meanings: {str(e)}")
                 return None
-    
+
     return config
 
 
-def _add_judge_rewarder(judge_type: str, judge_model: str, judge_prompt: str, response_format_config: dict = None) -> None:
+def _add_judge_rewarder(
+    judge_type: str,
+    judge_model: str,
+    judge_prompt: str,
+    response_format_config: dict = None,
+    judge_name: str = None,
+) -> None:
     """Add a new judge rewarder to the session state."""
     if not all(var in judge_prompt for var in JUDGE_PROMPT_VARIABLES):
         st.error(
@@ -660,13 +702,17 @@ def _add_judge_rewarder(judge_type: str, judge_model: str, judge_prompt: str, re
         "judge_prompt": judge_prompt,
         "judge_model": judge_model,
     }
-    
+
     # Add response format config if provided
     if response_format_config:
         if response_format_config is None:  # Error during parsing
             return
         new_judge["response_format"] = response_format_config
-    
+
+    # Add judge name if provided
+    if judge_name:
+        new_judge["name"] = judge_name
+
     st.session_state.judge_rewarders.append(new_judge)
     st.success("Judge rewarder added successfully!")
     st.rerun()
@@ -675,7 +721,8 @@ def _add_judge_rewarder(judge_type: str, judge_model: str, judge_prompt: str, re
 def _render_existing_judge_rewarders() -> None:
     """Render the list of existing judge rewarders."""
     for i, judge in enumerate(st.session_state.judge_rewarders):
-        with st.expander(f"Judge {i + 1}: {judge['type']}", expanded=False):
+        judge_display_name = judge.get('name', f'Unnamed {judge["type"]}')
+        with st.expander(f"Judge {i + 1}: {judge_display_name}", expanded=False):
             col1, col2, col3 = st.columns([2, 2, 1])
 
             with col1:
@@ -687,6 +734,13 @@ def _render_existing_judge_rewarders() -> None:
                     value=judge["judge_model"],
                     disabled=True,
                     key=f"judge_model_{i}",
+                )
+                st.text_input(
+                    "Name",
+                    value=judge.get("name", ""),
+                    disabled=True,
+                    key=f"judge_name_{i}",
+                    help="Optional judge name for specific matching"
                 )
 
             with col2:
@@ -702,28 +756,28 @@ def _render_existing_judge_rewarders() -> None:
                 if st.button("🗑️ Remove", key=f"remove_judge_{i}"):
                     st.session_state.judge_rewarders.pop(i)
                     st.rerun()
-                    
+
             # Show response format details if configured
             if "response_format" in judge:
                 st.markdown("**Response Format:**")
                 rf = judge["response_format"]
-                
+
                 col_rf1, col_rf2 = st.columns(2)
                 with col_rf1:
                     st.text_input(
-                        "Format Type", 
-                        value=rf.get("type", "N/A"), 
-                        disabled=True, 
-                        key=f"judge_format_type_{i}"
+                        "Format Type",
+                        value=rf.get("type", "N/A"),
+                        disabled=True,
+                        key=f"judge_format_type_{i}",
                     )
                     options_str = ", ".join(map(str, rf.get("options", [])))
                     st.text_input(
-                        "Options", 
-                        value=options_str, 
-                        disabled=True, 
-                        key=f"judge_options_{i}"
+                        "Options",
+                        value=options_str,
+                        disabled=True,
+                        key=f"judge_options_{i}",
                     )
-                    
+
                 with col_rf2:
                     if rf.get("meanings"):
                         st.text_area(
@@ -731,14 +785,14 @@ def _render_existing_judge_rewarders() -> None:
                             value=json.dumps(rf["meanings"], indent=2),
                             height=100,
                             disabled=True,
-                            key=f"judge_meanings_{i}"
+                            key=f"judge_meanings_{i}",
                         )
                     else:
                         st.text_input(
-                            "Meanings", 
-                            value="None", 
-                            disabled=True, 
-                            key=f"judge_no_meanings_{i}"
+                            "Meanings",
+                            value="None",
+                            disabled=True,
+                            key=f"judge_no_meanings_{i}",
                         )
 
 
@@ -766,6 +820,20 @@ def _render_requirement_form() -> None:
             placeholder="e.g., check_scene_safety",
             key="new_req_name",
         )
+        
+        # Judge name selector
+        judge_options = ["(auto-select by type)"] + [
+            judge.get("name", f"Unnamed {judge['type']}") 
+            for judge in st.session_state.judge_rewarders 
+            if judge.get("name")  # Only show named judges
+        ]
+        judge_name_selection = st.selectbox(
+            "Judge Name (optional)",
+            options=judge_options,
+            key="new_req_judge_name",
+            help="Select a specific judge by name, or leave as auto-select to use type-based matching"
+        )
+        req_judge_name = None if judge_name_selection == "(auto-select by type)" else judge_name_selection
 
     with col2:
         req_question = st.text_area(
@@ -788,11 +856,11 @@ def _render_requirement_form() -> None:
     )
 
     if st.button("Add Requirement"):
-        _add_requirement(req_type, req_name, req_question, req_dependencies)
+        _add_requirement(req_type, req_name, req_question, req_dependencies, req_judge_name)
 
 
 def _add_requirement(
-    req_type: str, req_name: str, req_question: str, req_dependencies: str
+    req_type: str, req_name: str, req_question: str, req_dependencies: str, req_judge_name: str = None
 ) -> None:
     """Add a new requirement to the session state."""
     if not req_name or not req_question:
@@ -814,6 +882,11 @@ def _add_requirement(
         "question": req_question,
         "dependencies": dependencies,
     }
+
+    # Add judge name if provided
+    if req_judge_name:
+        new_req["judge_name"] = req_judge_name
+
     st.session_state.requirements.append(new_req)
     st.rerun()
 
@@ -821,7 +894,9 @@ def _add_requirement(
 def _render_existing_requirements() -> None:
     """Render the list of existing requirements."""
     for i, req in enumerate(st.session_state.requirements):
-        with st.expander(f"Requirement {i + 1}: {req['name']}", expanded=False):
+        req_display_name = req['name']
+        judge_info = f" → {req.get('judge_name', 'auto-select')}"
+        with st.expander(f"Requirement {i + 1}: {req_display_name}{judge_info}", expanded=False):
             col1, col2, col3 = st.columns([2, 3, 1])
 
             with col1:
@@ -830,6 +905,13 @@ def _render_existing_requirements() -> None:
                 )
                 st.text_input(
                     "Name", value=req["name"], disabled=True, key=f"req_name_{i}"
+                )
+                st.text_input(
+                    "Judge Name",
+                    value=req.get("judge_name", ""),
+                    disabled=True,
+                    key=f"req_judge_name_{i}",
+                    help="Specific judge to use, or empty for auto-select"
                 )
 
             with col2:
@@ -959,7 +1041,12 @@ def _render_preview_judges() -> None:
     st.subheader("Judge Rewarders")
     if st.session_state.judge_rewarders:
         for i, judge in enumerate(st.session_state.judge_rewarders):
-            st.markdown(f"**{i + 1}.** {judge['type']} ({judge['judge_model']})")
+            judge_name = judge.get('name', '')
+            judge_info = f"{judge['type']} ({judge['judge_model']})"
+            if judge_name:
+                st.markdown(f"**{i + 1}.** `{judge_name}` - {judge_info}")
+            else:
+                st.markdown(f"**{i + 1}.** {judge_info}")
     else:
         st.warning("No judge rewarders configured")
 
@@ -974,7 +1061,8 @@ def _render_preview_requirements() -> None:
                 if req.get("dependencies")
                 else " → terminal"
             )
-            st.markdown(f"**{i + 1}.** {req['name']} ({req['type']}){deps_info}")
+            judge_info = f" [{req.get('judge_name', 'auto-select')}]"
+            st.markdown(f"**{i + 1}.** {req['name']} ({req['type']}){judge_info}{deps_info}")
     else:
         st.warning("No requirements configured")
 

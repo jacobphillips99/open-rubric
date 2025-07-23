@@ -13,13 +13,14 @@ import traceback
 from openai import OpenAI
 
 from multistep_extras.example_rubrics import get_workflow
+from multistep_extras.inspection.inspector import (EvaluationInspector,
+                                                   RequirementsInspector,
+                                                   RubricInspector,
+                                                   inspect_requirements)
 from multistep_extras.utils.print_utils import (print_debug, print_error,
                                                 print_header, print_info,
                                                 print_process, print_score,
                                                 print_success)
-from multistep_extras.inspection.inspector import (
-    EvaluationInspector, RequirementsInspector, RubricInspector,
-    inspect_requirements)
 from verifiers.rewards.judge_reward import (JUDGE_PROMPT, BinaryJudgeRewarder,
                                             JudgeRewarder,
                                             UnitVectorJudgeRewarder)
@@ -384,4 +385,4 @@ def run_full_demo():
 
 
 if __name__ == "__main__":
-    run_full_demo() 
+    run_full_demo()

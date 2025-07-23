@@ -5,37 +5,27 @@ This test demonstrates the new architecture and provides detailed diagnostics
 for workflow progression, state management, and rubric evaluation.
 """
 
-from datasets import Dataset
-from typing import List, Dict, Any
 import os
+from typing import Any, Dict, List
 
+from datasets import Dataset
 from openai import OpenAI
 
-from verifiers.rubrics.multistep.requirement import Requirement
-from verifiers.rubrics.multistep.scenario import Scenario
-from verifiers.rubrics.multistep.reward_strategies import LevelWeightedRewardStrategy
-from verifiers.rubrics.multistep.multistep_rubric import (
-    MultiStepRubric,
-)
-from verifiers.rewards.judge_reward import JUDGE_PROMPT, BinaryJudgeRewarder
-from verifiers.envs.multistep_env import MultiStepMultiTurnEnv
-
-from multistep_extras.utils.print_utils import (
-    Colors,
-    print_header,
-    print_section,
-    print_success,
-    print_error,
-    print_state,
-    print_assistant,
-    print_environment,
-    print_info,
-    print_process,
-    print_rubric,
-    print_score,
-    print_debug,
-)
 from multistep_extras.example_rubrics import get_workflow
+from multistep_extras.utils.print_utils import (Colors, print_assistant,
+                                                print_debug, print_environment,
+                                                print_error, print_header,
+                                                print_info, print_process,
+                                                print_rubric, print_score,
+                                                print_section, print_state,
+                                                print_success)
+from verifiers.envs.multistep_env import MultiStepMultiTurnEnv
+from verifiers.rewards.judge_reward import JUDGE_PROMPT, BinaryJudgeRewarder
+from verifiers.rubrics.multistep.multistep_rubric import MultiStepRubric
+from verifiers.rubrics.multistep.requirement import Requirement
+from verifiers.rubrics.multistep.reward_strategies import \
+    LevelWeightedRewardStrategy
+from verifiers.rubrics.multistep.scenario import Scenario
 
 
 def _truncate_content(content: str, max_length: int) -> str:

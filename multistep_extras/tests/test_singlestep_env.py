@@ -1,16 +1,17 @@
-from copy import deepcopy
-import os
 import asyncio
-from openai import OpenAI, AsyncOpenAI
-from multistep_extras.example_rubrics import (
-    first_responder_requirements as REQUIREMENTS,
-    first_responder_scenarios as ALL_SCENARIOS,
-)
-from datasets import Dataset
+import os
+from copy import deepcopy
 
+from datasets import Dataset
+from openai import AsyncOpenAI, OpenAI
+
+from multistep_extras.example_rubrics import \
+    first_responder_requirements as REQUIREMENTS
+from multistep_extras.example_rubrics import \
+    first_responder_scenarios as ALL_SCENARIOS
 from verifiers.envs.singleturn_env import SingleTurnEnv
-from verifiers.rubrics.multistep.multistep_rubric import MultiStepRubric
 from verifiers.rewards.judge_reward import JUDGE_PROMPT, BinaryJudgeRewarder
+from verifiers.rubrics.multistep.multistep_rubric import MultiStepRubric
 
 
 def setup_inputs(ds: Dataset | dict) -> dict:

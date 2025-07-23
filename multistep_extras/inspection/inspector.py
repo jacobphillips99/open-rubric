@@ -625,7 +625,7 @@ def compare_requirements(
 def visualize_requirements(requirements: List[Requirement]) -> None:
     """
     Legacy alias for inspect_requirements. Use inspect_requirements instead.
-    
+
     Args:
         requirements: List of requirement objects
     """
@@ -634,5 +634,5 @@ def visualize_requirements(requirements: List[Requirement]) -> None:
 
 # Legacy class aliases for backward compatibility
 RequirementsVisualizer = RequirementsInspector
-RubricVisualizer = RubricInspector  
-CompletedRubricVisualizer = EvaluationInspector 
+RubricVisualizer = RubricInspector
+CompletedRubricVisualizer = EvaluationInspector
