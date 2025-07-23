@@ -31,7 +31,7 @@ def setup_inputs(ds: Dataset | dict) -> dict:
 
 
 async def run_test():
-    """ Setup objects for environment -- client, model, requirements, judges, rubric, dataset, and env. """
+    """Setup objects for environment -- client, model, requirements, judges, rubric, dataset, and env."""
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
     async_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
     model = "gpt-4.1-nano"

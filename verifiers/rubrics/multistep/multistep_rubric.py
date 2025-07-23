@@ -9,15 +9,20 @@ from typing import Any, Dict, List, Mapping, Optional, Tuple, Union
 
 import yaml
 
-from verifiers.rewards.judge_reward import (JudgeResponse, JudgeRewarder,
-                                            detect_client_type,
-                                            make_judge_rewarders)
+from verifiers.rewards.judge_reward import (
+    JudgeResponse,
+    JudgeRewarder,
+    detect_client_type,
+    make_judge_rewarders,
+)
 from verifiers.rubrics.multistep.enums import EvaluationMode, TerminalCondition
-from verifiers.rubrics.multistep.nodes import (NodeFactory,
-                                               RequirementRewardNode)
+from verifiers.rubrics.multistep.nodes import NodeFactory, RequirementRewardNode
 from verifiers.rubrics.multistep.requirement import Requirement
 from verifiers.rubrics.multistep.reward_strategies import (
-    LevelWeightedRewardStrategy, RewardStrategy, make_reward_strategy)
+    LevelWeightedRewardStrategy,
+    RewardStrategy,
+    make_reward_strategy,
+)
 from verifiers.rubrics.multistep.scenario import Scenario
 from verifiers.rubrics.multistep.utils import topological_levels
 from verifiers.rubrics.rubric import Rubric
@@ -124,7 +129,7 @@ class MultiStepRubric(Rubric):
         ground_truth_answers = {}
         for req_name, answer_data in scenario.answers.items():
             # Skip None answers and metadata keys (starting with underscore)
-            if answer_data is None or req_name.startswith('_'):
+            if answer_data is None or req_name.startswith("_"):
                 continue
             maybe_answer = answer_data.get("answer", answer_data)
             if isinstance(maybe_answer, (int, float)):
@@ -278,7 +283,9 @@ class MultiStepRubric(Rubric):
             # Fallback to direct evaluation for single-turn scenarios
             # Convert prompt and completion to string format for Scenario constructor
             prompt_str = prompt if isinstance(prompt, str) else str(prompt)
-            completion_str = completion if isinstance(completion, str) else str(completion)
+            completion_str = (
+                completion if isinstance(completion, str) else str(completion)
+            )
 
             # Create a Scenario object from the individual parameters
             scenario = Scenario(

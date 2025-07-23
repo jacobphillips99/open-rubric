@@ -5,8 +5,11 @@ This module provides interactive demos and tutorials to help users
 understand and work with multistep workflows.
 """
 
-from .demo_visualizer import run_full_demo as run_visualizer_demo
+from .demo_inspector import run_full_demo as run_inspector_demo
 from .tutorial import MultiStepTutorial
+
+# Legacy alias for backward compatibility
+run_visualizer_demo = run_inspector_demo
 
 __all__ = [
     # Builder demos
@@ -16,7 +19,9 @@ __all__ = [
     "demo_quick_helpers",
     "demo_scenario_builder",
     "run_builder_demo",
-    # Visualizer demos
+    # Inspector demos (new naming)
+    "run_inspector_demo", 
+    # Legacy alias for backward compatibility
     "run_visualizer_demo",
     # Tutorial
     "MultiStepTutorial",

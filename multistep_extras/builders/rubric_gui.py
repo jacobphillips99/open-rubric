@@ -269,6 +269,18 @@ def _load_rubric_from_directory(rubric_name: str, directory: Path) -> None:
                 "judge_prompt": judge.judge_prompt,
                 "judge_model": judge.judge_model,
             }
+            
+            # Extract response format information if available
+            if hasattr(judge, 'judge_response_format') and judge.judge_response_format:
+                response_format = judge.judge_response_format
+                format_data = {
+                    "type": "discrete" if "Discrete" in response_format.__class__.__name__ else "continuous",
+                    "options": response_format.options,
+                }
+                if response_format.meanings:
+                    format_data["meanings"] = response_format.meanings
+                judge_data["response_format"] = format_data
+                
             st.session_state.judge_rewarders.append(judge_data)
 
         # Populate requirements
@@ -435,6 +447,22 @@ def _render_judge_rewarders_overview() -> None:
                     else judge["judge_prompt"]
                 )
                 st.caption(f"Prompt: {prompt_preview}")
+                
+                # Show response format if configured
+                if "response_format" in judge:
+                    rf = judge["response_format"]
+                    if rf.get("type") == "discrete":
+                        options_str = ", ".join(map(str, rf.get("options", [])))
+                        st.caption(f"Format: Discrete [{options_str}]")
+                        if rf.get("meanings"):
+                            meanings_preview = ", ".join([f"{k}={v}" for k, v in list(rf["meanings"].items())[:2]])
+                            if len(rf["meanings"]) > 2:
+                                meanings_preview += "..."
+                            st.caption(f"Meanings: {meanings_preview}")
+                    elif rf.get("type") == "continuous":
+                        bounds = rf.get("options", [0.0, 1.0])
+                        st.caption(f"Format: Continuous [{bounds[0]} to {bounds[1]}]")
+                        
         st.markdown(f"*Total: {len(st.session_state.judge_rewarders)} judges*")
     else:
         st.info("No judges configured yet")
@@ -516,11 +544,110 @@ def _render_judge_rewarder_form() -> None:
             key="new_judge_prompt",
         )
 
+    # Response format configuration for discrete/continuous judges
+    response_format_config = None
+    if judge_type in ["discrete", "continuous"]:
+        response_format_config = _render_response_format_config(judge_type)
+
     if st.button("Add Judge Rewarder"):
-        _add_judge_rewarder(judge_type, judge_model, judge_prompt)
+        _add_judge_rewarder(judge_type, judge_model, judge_prompt, response_format_config)
 
 
-def _add_judge_rewarder(judge_type: str, judge_model: str, judge_prompt: str) -> None:
+def _render_response_format_config(judge_type: str) -> dict:
+    """Render the response format configuration for discrete/continuous judges."""
+    st.markdown("**Response Format Configuration:**")
+    
+    if judge_type == "discrete":
+        st.markdown("*Configure the discrete options and their meanings (e.g., Likert scale)*")
+        
+        col1, col2 = st.columns([1, 1])
+        
+        with col1:
+            # Options input
+            options_input = st.text_input(
+                "Options (comma-separated)",
+                placeholder="1, 2, 3, 4, 5",
+                key="discrete_options",
+                help="Enter the discrete values separated by commas. Numbers will be converted to float."
+            )
+            
+        with col2:
+            # Meanings input  
+            meanings_input = st.text_area(
+                "Meanings (JSON format)",
+                placeholder='{"1": "terrible", "2": "bad", "3": "fine", "4": "good", "5": "great"}',
+                key="discrete_meanings",
+                height=80,
+                help="Optional: Map each option to its meaning using JSON format."
+            )
+            
+    elif judge_type == "continuous":
+        st.markdown("*Configure the continuous range bounds and their meanings*")
+        
+        col1, col2 = st.columns([1, 1])
+        
+        with col1:
+            lower_bound = st.number_input(
+                "Lower Bound", 
+                value=0.0, 
+                step=0.1,
+                key="continuous_lower"
+            )
+            upper_bound = st.number_input(
+                "Upper Bound", 
+                value=1.0, 
+                step=0.1,
+                key="continuous_upper"
+            )
+            
+        with col2:
+            meanings_input = st.text_area(
+                "Meanings (JSON format)",
+                placeholder='{"0.0": "poor", "1.0": "excellent"}',
+                key="continuous_meanings",
+                height=80,
+                help="Optional: Map the bounds to their meanings using JSON format."
+            )
+    
+    # Parse and return the config
+    config = {"type": judge_type}
+    
+    if judge_type == "discrete":
+        if options_input.strip():
+            try:
+                # Parse options
+                options_str = options_input.strip().split(",")
+                options = [float(opt.strip()) for opt in options_str]
+                config["options"] = options
+                
+                # Parse meanings if provided
+                if meanings_input.strip():
+                    meanings_dict = json.loads(meanings_input.strip())
+                    # Convert keys to float to match options
+                    meanings = {float(k): v for k, v in meanings_dict.items()}
+                    config["meanings"] = meanings
+                    
+            except (ValueError, json.JSONDecodeError) as e:
+                st.error(f"Error parsing discrete format: {str(e)}")
+                return None
+                
+    elif judge_type == "continuous":
+        config["options"] = [lower_bound, upper_bound]
+        
+        if meanings_input.strip():
+            try:
+                meanings_dict = json.loads(meanings_input.strip())
+                # Convert keys to float to match bounds
+                meanings = {float(k): v for k, v in meanings_dict.items()}
+                config["meanings"] = meanings
+            except json.JSONDecodeError as e:
+                st.error(f"Error parsing continuous meanings: {str(e)}")
+                return None
+    
+    return config
+
+
+def _add_judge_rewarder(judge_type: str, judge_model: str, judge_prompt: str, response_format_config: dict = None) -> None:
     """Add a new judge rewarder to the session state."""
     if not all(var in judge_prompt for var in JUDGE_PROMPT_VARIABLES):
         st.error(
@@ -533,6 +660,13 @@ def _add_judge_rewarder(judge_type: str, judge_model: str, judge_prompt: str) ->
         "judge_prompt": judge_prompt,
         "judge_model": judge_model,
     }
+    
+    # Add response format config if provided
+    if response_format_config:
+        if response_format_config is None:  # Error during parsing
+            return
+        new_judge["response_format"] = response_format_config
+    
     st.session_state.judge_rewarders.append(new_judge)
     st.success("Judge rewarder added successfully!")
     st.rerun()
@@ -568,6 +702,44 @@ def _render_existing_judge_rewarders() -> None:
                 if st.button("🗑️ Remove", key=f"remove_judge_{i}"):
                     st.session_state.judge_rewarders.pop(i)
                     st.rerun()
+                    
+            # Show response format details if configured
+            if "response_format" in judge:
+                st.markdown("**Response Format:**")
+                rf = judge["response_format"]
+                
+                col_rf1, col_rf2 = st.columns(2)
+                with col_rf1:
+                    st.text_input(
+                        "Format Type", 
+                        value=rf.get("type", "N/A"), 
+                        disabled=True, 
+                        key=f"judge_format_type_{i}"
+                    )
+                    options_str = ", ".join(map(str, rf.get("options", [])))
+                    st.text_input(
+                        "Options", 
+                        value=options_str, 
+                        disabled=True, 
+                        key=f"judge_options_{i}"
+                    )
+                    
+                with col_rf2:
+                    if rf.get("meanings"):
+                        st.text_area(
+                            "Meanings",
+                            value=json.dumps(rf["meanings"], indent=2),
+                            height=100,
+                            disabled=True,
+                            key=f"judge_meanings_{i}"
+                        )
+                    else:
+                        st.text_input(
+                            "Meanings", 
+                            value="None", 
+                            disabled=True, 
+                            key=f"judge_no_meanings_{i}"
+                        )
 
 
 def render_requirements_tab() -> None:

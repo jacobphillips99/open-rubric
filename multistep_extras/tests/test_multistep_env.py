@@ -155,7 +155,7 @@ def print_workflow_progression_from_state(
     if not progression:
         print_error("No progression data found in state!")
         print_debug(f"Available state keys: {list(final_state.keys())}")
-        
+
         # Debug: let's see what's actually in the state
         print_debug("Full state contents:")
         for key, value in final_state.items():
@@ -166,14 +166,14 @@ def print_workflow_progression_from_state(
                         print_debug(f"    {sub_key}: {type(sub_value)}")
             else:
                 print_debug(f"  {key}: {type(value)} = {value}")
-        
+
         # Try to reconstruct basic progression from available data
         print_info("Attempting to show available state information instead:")
         level_idx = final_state.get("level_idx", "unknown")
         active_reqs = final_state.get("active_reqs", [])
         finished = final_state.get("finished", False)
         revealed_info = final_state.get("revealed_info", set())
-        
+
         print_info(f"Final level: {level_idx}")
         print_info(f"Final active requirements: {active_reqs}")
         print_info(f"Workflow finished: {finished}")
@@ -233,7 +233,7 @@ def print_evaluation_results(state: dict) -> None:
             if key.isdigit() and isinstance(value, dict):
                 print_info(f"Found level {key} results in state keys")
                 evaluation_data[key] = value
-        
+
         if not evaluation_data:
             print_error("No evaluation results found in any format!")
             return
@@ -426,6 +426,7 @@ def test_state_tracking(
     print_info(
         f"  Progression steps captured: {len(final_state.get('progression', []))}"
     )
+
 
 def main():
     """Run all enhanced tests."""

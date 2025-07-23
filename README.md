@@ -15,7 +15,7 @@ This repository is a specialized fork of [verifiers](https://github.com/willccbb
 ## **Advanced Tooling**
 - **Visual workflow builder**: [Streamlit GUI](https://github.com/jacobphillips99/open-rubric/blob/main/multistep_extras/builders/rubric_gui.py) for creating and editing rubrics
 - **Visualization tools**: [Interactive diagrams](https://github.com/jacobphillips99/open-rubric/blob/main/multistep_extras/visualization/visualizer.py) for understanding evaluation flows
-- **Synthetic data generation**: Use LLMs to [generate scenarios and ground truth answers](https://github.com/jacobphillips99/open-rubric/blob/main/verifiers/rubrics/multistep/scenario_generator.py) for training.
+- **Synthetic data generation**: Use LLMs to [generate scenarios and ground truth answers](https://github.com/jacobphillips99/open-rubric/blob/main/verifiers/multistep_extras/builders/scenario_generator.py) for training.
 
 ## 📋 Table of Contents
 
@@ -238,6 +238,25 @@ The GUI provides:
 - **Reward strategy selection**: Choose scoring approaches
 - **Export/import**: Save workflows as YAML files
 - **Live preview**: Test workflows in real-time
+
+## 📊 Inspection
+
+```python
+from multistep_extras.inspection import RubricInspector
+
+# Inspect workflow structure
+inspector = RubricInspector(rubric)
+inspector.print_complete_structure()
+
+# Inspect evaluation results
+from multistep_extras.inspection import EvaluationInspector
+result_inspector = EvaluationInspector(rubric)
+result_inspector.print_complete_evaluation(scenario, evaluation_results)
+
+# Quick requirement analysis
+from multistep_extras.inspection import inspect_requirements
+inspect_requirements(requirements)
+```
 
 ## 📊 Visualization
 
