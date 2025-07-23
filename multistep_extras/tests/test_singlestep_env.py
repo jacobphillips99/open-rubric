@@ -1,6 +1,7 @@
 from copy import deepcopy
 import os
-from openai import OpenAI
+import asyncio
+from openai import OpenAI, AsyncOpenAI
 from multistep_extras.example_rubrics import (
     first_responder_requirements as REQUIREMENTS,
     first_responder_scenarios as ALL_SCENARIOS,
@@ -29,9 +30,10 @@ def setup_inputs(ds: Dataset | dict) -> dict:
     return results
 
 
-if __name__ == "__main__":
+async def run_test():
     """ Setup objects for environment -- client, model, requirements, judges, rubric, dataset, and env. """
     client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+    async_client = AsyncOpenAI(api_key=os.getenv("OPENAI_API_KEY"))
     model = "gpt-4.1-nano"
     scenario = ALL_SCENARIOS[0]
 
@@ -56,14 +58,14 @@ if __name__ == "__main__":
     )
 
     results = setup_inputs(ds)
-    # TODO: fixme
     results["answer"] = scenario.answers
     if isinstance(results["prompt"][0], str):
         results["prompt"] = [{"role": "user", "content": results["prompt"][0]}]
 
     """ Run policy model rollouts (done with API model for testing)"""
-    rollout = env.rollout(
-        client=client,
+    # Use async client and await the result
+    rollout = await env.rollout(
+        client=async_client,
         model=model,
         prompt=results["prompt"],
         answer=results["answer"],
@@ -74,18 +76,20 @@ if __name__ == "__main__":
     results["state"] = rollout[1]
     if "task" not in results:
         results["task"] = "default"
-    breakpoint()
 
     """ Score rollouts with multistep rubric """
-    results_rewards = env.rubric.score_rollouts(
+    results_rewards = await env.rubric.score_rollouts(
         prompts=[results["prompt"]],
         completions=[results["completion"]],
         answers=[results["answer"]],
         states=[results["state"]],
-        tasks=results["task"],
-        infos=results["info"],
+        tasks=[results["task"]],
+        infos=[results["info"]],
         max_concurrent=max_concurrent,
         apply_weights=True,
     )
     results.update(results_rewards)
-    breakpoint()
+
+
+if __name__ == "__main__":
+    asyncio.run(run_test())

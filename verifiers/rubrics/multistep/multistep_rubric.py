@@ -123,8 +123,8 @@ class MultiStepRubric(Rubric):
         # Convert scenario.answers to ground_truth_answers format
         ground_truth_answers = {}
         for req_name, answer_data in scenario.answers.items():
-            # Skip None answers
-            if answer_data is None:
+            # Skip None answers and metadata keys (starting with underscore)
+            if answer_data is None or req_name.startswith('_'):
                 continue
             maybe_answer = answer_data.get("answer", answer_data)
             if isinstance(maybe_answer, (int, float)):
@@ -270,24 +270,31 @@ class MultiStepRubric(Rubric):
         if info is None:
             info = {}
 
-        # Convert prompt and completion to string format for Scenario constructor
-        prompt_str = prompt if isinstance(prompt, str) else str(prompt)
-        completion_str = completion if isinstance(completion, str) else str(completion)
+        # Check if we have evaluation results from conversation flow
+        if "evaluation_results" in state and state["evaluation_results"]:
+            # Use the evaluation results that were built during the conversation
+            evaluation_results = state["evaluation_results"]
+        else:
+            # Fallback to direct evaluation for single-turn scenarios
+            # Convert prompt and completion to string format for Scenario constructor
+            prompt_str = prompt if isinstance(prompt, str) else str(prompt)
+            completion_str = completion if isinstance(completion, str) else str(completion)
 
-        # Create a Scenario object from the individual parameters
-        scenario = Scenario(
-            prompt=prompt_str, completion=completion_str, answers=answer
-        )
-        result = await self.evaluate(scenario, **kwargs)
+            # Create a Scenario object from the individual parameters
+            scenario = Scenario(
+                prompt=prompt_str, completion=completion_str, answers=answer
+            )
+            evaluation_results = await self.evaluate(scenario, **kwargs)
 
         # Calculate reward using the configured strategy
         reward_kwargs = {"total_requirements": len(self.requirements), **kwargs}
         reward = self.reward_strategy.calculate_reward(
-            result, EvaluationMode.MODEL_GUIDED, **reward_kwargs
+            evaluation_results, EvaluationMode.MODEL_GUIDED, **reward_kwargs
         )
 
+        # Return reward info with the full original state preserved
         return {
-            "state": result,
+            "state": state,  # Return the full original state, don't modify it
             "reward": reward,
             "reward_strategy": self.reward_strategy.name,
             "mode": EvaluationMode.MODEL_GUIDED.value,
@@ -396,17 +403,7 @@ class MultiStepRubric(Rubric):
         new_info_found = False
 
         if revealed_info_data and current_level_results:
-            print(f"DEBUG: current_level_results = {current_level_results}")
-            print(f"DEBUG: answers_gt = {answers_gt}")
-            print(f"DEBUG: revealed_info_data = {revealed_info_data}")
-
             for req_name, judge_result in current_level_results.items():
-                print(
-                    f"DEBUG: Processing {req_name} with judge_answer {judge_result.answer} (type: {type(judge_result.answer)})"
-                )
-                if judge_result.reasoning:
-                    print(f"DEBUG: Judge reasoning: {judge_result.reasoning}")
-
                 # Only proceed if judge determined the response was correct
                 if judge_result.answer == 1.0 and req_name in revealed_info_data:
                     info_key = req_name
@@ -415,17 +412,6 @@ class MultiStepRubric(Rubric):
                         revealed_info_content.append(revealed_info_data[req_name])
                         revealed_info_set.add(info_key)
                         new_info_found = True
-                        print(
-                            f"DEBUG: Added revealed info for {req_name}: {revealed_info_data[req_name]}"
-                        )
-                    else:
-                        print(f"DEBUG: Info already revealed for {info_key}")
-                elif judge_result.answer != 1.0:
-                    print(
-                        f"DEBUG: Judge determined incorrect response for {req_name} (answer: {judge_result.answer}), no info revealed"
-                    )
-                else:
-                    print(f"DEBUG: {req_name} not in revealed_info_data")
 
         # Determine next requirements based on current level results
         # Only follow dependencies where judge determined correctness (answer == 1.0)

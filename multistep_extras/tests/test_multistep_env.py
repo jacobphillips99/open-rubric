@@ -154,6 +154,30 @@ def print_workflow_progression_from_state(
     progression = final_state.get("progression", [])
     if not progression:
         print_error("No progression data found in state!")
+        print_debug(f"Available state keys: {list(final_state.keys())}")
+        
+        # Debug: let's see what's actually in the state
+        print_debug("Full state contents:")
+        for key, value in final_state.items():
+            if isinstance(value, (dict, list)):
+                print_debug(f"  {key}: {type(value)} with {len(value)} items")
+                if isinstance(value, dict) and len(value) < 10:
+                    for sub_key, sub_value in value.items():
+                        print_debug(f"    {sub_key}: {type(sub_value)}")
+            else:
+                print_debug(f"  {key}: {type(value)} = {value}")
+        
+        # Try to reconstruct basic progression from available data
+        print_info("Attempting to show available state information instead:")
+        level_idx = final_state.get("level_idx", "unknown")
+        active_reqs = final_state.get("active_reqs", [])
+        finished = final_state.get("finished", False)
+        revealed_info = final_state.get("revealed_info", set())
+        
+        print_info(f"Final level: {level_idx}")
+        print_info(f"Final active requirements: {active_reqs}")
+        print_info(f"Workflow finished: {finished}")
+        print_info(f"Information revealed: {len(revealed_info)} items")
         return
 
     print_header("CHRONOLOGICAL WORKFLOW PROGRESSION")
@@ -201,10 +225,18 @@ def print_evaluation_results(state: dict) -> None:
     """Print detailed evaluation results from the final state."""
     print_header("DETAILED EVALUATION RESULTS")
 
-    evaluation_data = state["evaluation_results"]
+    evaluation_data = state.get("evaluation_results", {})
     if not evaluation_data:
         print_error("No evaluation data found in state!")
-        return
+        # Try to find evaluation data in other formats
+        for key, value in state.items():
+            if key.isdigit() and isinstance(value, dict):
+                print_info(f"Found level {key} results in state keys")
+                evaluation_data[key] = value
+        
+        if not evaluation_data:
+            print_error("No evaluation results found in any format!")
+            return
 
     for level_str, level_results in evaluation_data.items():
         print_rubric(f"LEVEL {level_str} RESULTS:")
@@ -277,15 +309,16 @@ def test_multistep_rollout(
     print_process("Starting Complete Rollout with Real-Time Progression Tracking...")
 
     try:
-        completion, final_state = env.rollout(
+        result = env.generate(
+            inputs=ds,
             client=client,
             model=model,
-            prompt=scenario.prompt,
-            answer=answer_with_revealed_info,
-            task="first_responder_test",
-            info={"test_run": True},
             sampling_args={"temperature": 0.7, "max_tokens": 10000},
+            score_rollouts=True,
         )
+
+        completion = result["completion"][0]
+        final_state = result["state"][0]
 
         print_success("Rollout Completed Successfully!")
 
@@ -293,7 +326,11 @@ def test_multistep_rollout(
         print_workflow_progression_from_state(final_state, rubric)
 
         # Show detailed evaluation results
-        print_evaluation_results(final_state)
+        try:
+            print_evaluation_results(final_state)
+        except Exception as e:
+            print_error(f"Could not print evaluation results: {e}")
+            print_debug(f"Available final state keys: {list(final_state.keys())}")
 
         # Show final summary
         print_header("FINAL SUMMARY")
@@ -389,17 +426,6 @@ def test_state_tracking(
     print_info(
         f"  Progression steps captured: {len(final_state.get('progression', []))}"
     )
-
-
-# def test_level_progression():
-#     """Test level progression specifically."""
-#     pass
-
-
-# def test_conversation_flow():
-#     """Test a full conversation flow with better error handling."""
-#     pass
-
 
 def main():
     """Run all enhanced tests."""

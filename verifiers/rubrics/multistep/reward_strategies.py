@@ -75,7 +75,11 @@ class LevelWeightedRewardStrategy(RewardStrategy):
         reward = 0.0
         for level_idx, level_scores in state.items():
             if isinstance(level_scores, dict):
-                level_sum = sum(level_scores.values())
+                # Extract answer values from JudgeResponse dictionaries
+                level_sum = sum(
+                    score_data["answer"]
+                    for score_data in level_scores.values()
+                )
                 # Convert level_idx to float for numeric operations
                 level_num = (
                     float(level_idx)
@@ -115,7 +119,11 @@ class SumRewardStrategy(RewardStrategy):
         total = 0.0
         for level_scores in state.values():
             if isinstance(level_scores, dict):
-                total += sum(level_scores.values())
+                # Extract answer values from JudgeResponse dictionaries
+                total += sum(
+                    score_data["answer"] if isinstance(score_data, dict) and "answer" in score_data else score_data
+                    for score_data in level_scores.values()
+                )
         return total
 
 
@@ -148,7 +156,11 @@ class MeanRewardStrategy(RewardStrategy):
         count = 0
         for level_scores in state.values():
             if isinstance(level_scores, dict):
-                total += sum(level_scores.values())
+                # Extract answer values from JudgeResponse dictionaries
+                total += sum(
+                    score_data["answer"] if isinstance(score_data, dict) and "answer" in score_data else score_data
+                    for score_data in level_scores.values()
+                )
                 count += len(level_scores)
 
         return total / count if count > 0 else 0.0
@@ -267,7 +279,11 @@ class CompletionRatioRewardStrategy(RewardStrategy):
         count = 0
         for level_scores in state.values():
             if isinstance(level_scores, dict):
-                total_score += sum(level_scores.values())
+                # Extract answer values from JudgeResponse dictionaries
+                total_score += sum(
+                    score_data["answer"] if isinstance(score_data, dict) and "answer" in score_data else score_data
+                    for score_data in level_scores.values()
+                )
                 count += len(level_scores)
 
         quality_reward = (
@@ -323,7 +339,11 @@ class ProgressiveRewardStrategy(RewardStrategy):
                     else 0.0
                 )
                 level_multiplier = self.base_reward * (self.growth_factor**level_num)
-                level_sum = sum(level_scores.values())
+                # Extract answer values from JudgeResponse dictionaries
+                level_sum = sum(
+                    score_data["answer"] if isinstance(score_data, dict) and "answer" in score_data else score_data
+                    for score_data in level_scores.values()
+                )
                 total_reward += level_multiplier * level_sum
 
         return total_reward

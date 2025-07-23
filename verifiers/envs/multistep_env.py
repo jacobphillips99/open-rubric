@@ -1,7 +1,7 @@
 from copy import deepcopy
 from typing import Any, Dict, List, Tuple, Union
 
-from openai import OpenAI
+from openai import AsyncOpenAI
 
 from verifiers.envs.multiturn_env import MultiTurnEnv
 from verifiers.envs.singleturn_env import SingleTurnEnv
@@ -92,15 +92,15 @@ class MultiStepMultiTurnEnv(MultiTurnEnv):
         )
         return {"role": "user", "content": content}, updated_state
 
-    def rollout(self,
-                client: OpenAI,
-                model: str,
-                prompt: Union[str, List[Dict[str, Any]]],
-                answer: Any,
-                task: str = "default",
-                info: Dict[str, Any] | None = None,
-                sampling_args: Dict[str, Any] | None = None,
-                **kwargs) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
+    async def rollout(self,
+                      client: AsyncOpenAI,
+                      model: str,
+                      prompt: Union[str, List[Dict[str, Any]]],
+                      answer: Any,
+                      task: str = "default",
+                      info: Dict[str, Any] | None = None,
+                      sampling_args: Dict[str, Any] | None = None,
+                      **kwargs) -> Tuple[List[Dict[str, Any]], Dict[str, Any]]:
         if sampling_args is None:
             sampling_args = {}
         if info is None:
@@ -129,20 +129,26 @@ class MultiStepMultiTurnEnv(MultiTurnEnv):
         completion: List[Dict[str, Any]] = []
 
         while not self.is_completed(messages, state) and turn < self.max_turns:
-            # Get model response
-            model_reply = self.get_model_response(
+            # Get model response (now properly awaited)
+            model_response = await self.get_model_response(
                 prompt=messages,
                 client=client,
                 model=model,
                 sampling_args=sampling_args,
                 message_type="chat",
             )
+            
+            # Extract content from response
+            if hasattr(model_response, 'choices') and model_response.choices:
+                model_reply = model_response.choices[0].message.content or ""
+            else:
+                model_reply = str(model_response)
+                
             messages.append({"role": "assistant", "content": model_reply})
             completion.append({"role": "assistant", "content": model_reply})
             turn += 1
 
             self.progression_tracker.add_step(turn, "assistant_response", content=model_reply)
-
 
             # Get environment response with state tracking for test compatibility
             state_before = {k: v for k, v in state.items() if k != "progression"}
@@ -163,7 +169,13 @@ class MultiStepMultiTurnEnv(MultiTurnEnv):
                 self.progression_tracker.add_step(turn, "env_response", content=env_msg["content"])
 
         final_state = state.copy()
-        final_state["progression"] = self.progression_tracker.get_progression()
+        progression_data = self.progression_tracker.get_progression()
+        
+        final_state["progression"] = progression_data
+
+        # Ensure evaluation_results is preserved in final state
+        if "evaluation_results" not in final_state:
+            final_state["evaluation_results"] = {}
 
         evaluation_results = state.get("evaluation_results", {})
         for level_key, level_data in evaluation_results.items():
