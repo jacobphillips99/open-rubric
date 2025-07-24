@@ -7,558 +7,588 @@ This module provides three specialized visualizers for different use cases:
 3. CompletedRubricVisualizer - For visualizing evaluated rubrics with results
 """
 
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, Optional, Set
+import plotly.graph_objects as go
+import plotly.express as px
+import numpy as np
 
-from verifiers.rewards.judge_reward import JUDGE_PROMPT
-from verifiers.rewards.judge_utils import (ContinuousJudgeResponseFormat,
-                                           DiscreteJudgeResponseFormat)
 from verifiers.rubrics.multistep.multistep_rubric import MultiStepRubric
-from verifiers.rubrics.multistep.requirement import (ContinuousRequirement,
-                                                     DiscreteRequirement,
-                                                     Requirement)
+from verifiers.rubrics.multistep.requirement import Requirement
 from verifiers.rubrics.multistep.scenario import Scenario
-from verifiers.rubrics.multistep.utils import topological_levels
+
+from multistep_extras.inspection.base_inspector import (BaseRequirementsInspector, BaseRubricInspector,
+                                         BaseEvaluationInspector)
 
 
-class RequirementsVisualizer:
+class RequirementsVisualizer(BaseRequirementsInspector):
     """Visualizer focused on requirement dependencies and workflow structure."""
 
-    def __init__(self, requirements: List[Requirement]):
+    def create_dependency_graph(
+        self, 
+        width: int = 1200, 
+        height: int = 800,
+        show_answer_labels: bool = True,
+        highlight_path: Optional[Dict[str, float]] = None,
+        show_terminal_states: bool = True,
+        show_requirement_types: bool = True
+    ) -> go.Figure:
         """
-        Initialize visualizer with a list of requirements.
+        Create an interactive Plotly graph showing requirement dependencies.
 
         Args:
-            requirements: List of requirement objects
+            width: Graph width in pixels
+            height: Graph height in pixels
+            show_answer_labels: Whether to show answer values on edges
+            highlight_path: Optional dict of requirement answers to highlight a specific path
+            show_terminal_states: Whether to emphasize terminal states with special styling
+            show_requirement_types: Whether to differentiate requirement types visually
+
+        Returns:
+            Plotly Figure object
         """
-        self.requirements = requirements
-        self.name_to_req = {req.name: req for req in requirements}
+        # Build graph data
+        nodes, edges = self._build_graph_data()
+        
+        # Calculate hierarchical positions
+        positions = self._calculate_hierarchical_positions(nodes)
 
-        # Build dependency structure for topological sorting
-        self.dependencies = {
-            name: sum(req.dependencies.values(), []) if req.dependencies else None
-            for name, req in self.name_to_req.items()
-        }
+        # Create figure
+        fig = go.Figure()
 
-        # Get topological levels
-        self.levels = topological_levels(self.dependencies)
-        self.levels.reverse()  # Start from root nodes
+        # Add edges first (so they appear behind nodes)
+        self._add_edges_to_figure(fig, edges, positions, show_answer_labels, highlight_path)
+        
+        # Add nodes with enhanced styling
+        self._add_nodes_to_figure(fig, nodes, positions, highlight_path, show_terminal_states, show_requirement_types)
 
-    def print_dependency_graph(self) -> None:
-        """Print the dependency relationships between requirements."""
-        print("REQUIREMENT DEPENDENCIES")
-        print("=" * 60)
+        # Configure layout with improved usability
+        fig.update_layout(
+            title={
+                'text': "MultiStep Rubric Dependency Graph",
+                'x': 0.5,
+                'xanchor': 'center',
+                'font': {'size': 18, 'color': '#2c3e50'}
+            },
+            width=width,
+            height=height,
+            showlegend=True,
+            hovermode="closest",
+            xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+            yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
+            plot_bgcolor="white",
+            margin=dict(l=20, r=20, t=60, b=20),
+            legend=dict(
+                orientation="h",
+                yanchor="bottom",
+                y=1.02,
+                xanchor="right",
+                x=1,
+                bgcolor="rgba(255,255,255,0.8)",
+                bordercolor="lightgray",
+                borderwidth=1
+            )
+        )
 
-        for req_name, req in self.name_to_req.items():
-            print(f"\n{req_name}:")
-            print(f"  Question: {req.question}")
+        return fig
 
-            # Enhanced format display
-            if isinstance(req.judge_response_format, DiscreteJudgeResponseFormat):
-                format_info = f"Discrete: {req.judge_response_format.options}"
-                if req.judge_response_format.meanings:
-                    meanings = ", ".join(
-                        [
-                            f"{opt}={meaning}"
-                            for opt, meaning in req.judge_response_format.meanings.items()
-                        ]
-                    )
-                    format_info += f" ({meanings})"
-            elif isinstance(req.judge_response_format, ContinuousJudgeResponseFormat):
-                bounds = req.judge_response_format.options
-                format_info = f"Continuous: {bounds[0]} to {bounds[1]}"
-                if req.judge_response_format.meanings:
-                    meanings_dict = req.judge_response_format.meanings
-                    format_info += f" ({bounds[0]}={meanings_dict.get(bounds[0], 'low')}, {bounds[1]}={meanings_dict.get(bounds[1], 'high')})"
-            else:
-                format_info = f"{req.judge_response_format.options}"
+    def _build_graph_data(self) -> Tuple[List[Dict], List[Dict]]:
+        """Build node and edge data structures for the graph."""
+        nodes = []
+        edges = []
 
-            print(f"  Response Format: {format_info}")
-
-            if req.terminal():
-                print("  Dependencies: Terminal node (no dependencies)")
-            else:
-                print("  Dependencies:")
-                if req.dependencies:
-                    for answer, deps in req.dependencies.items():
-                        if deps:
-                            if isinstance(req, ContinuousRequirement):
-                                print(f"    └─ If score ≥ {answer}: {', '.join(deps)}")
-                            else:
-                                print(f"    └─ If answer = {answer}: {', '.join(deps)}")
-                        else:
-                            print(f"    └─ If answer = {answer}: STOP (terminal)")
-        print()
-
-    def print_workflow_structure(self) -> None:
-        """Print a level-based view of the workflow structure."""
-        print("WORKFLOW LEVELS")
-        print("=" * 60)
-        print(f"Total Requirements: {len(self.requirements)}")
-        print(f"Levels: {len(self.levels)}")
-        print()
-
-        for level_idx, level in enumerate(self.levels):
-            print(f"Level {level_idx}:")
-            for req_name in level:
-                req = self.name_to_req[req_name]
-                status = "Terminal" if req.terminal() else "Branches"
-                print(f"  • {req_name} ({status})")
-
-                if not req.terminal() and req.dependencies:
-                    for answer, deps in req.dependencies.items():
-                        deps_str = ", ".join(deps) if deps else "STOP"
-                        print(f"    └─ {answer} → {deps_str}")
-            print()
-
-    def analyze_metrics(self) -> Dict[str, Any]:
-        """Analyze and return metrics about the requirement structure."""
-        terminal_nodes = [
-            name for name, req in self.name_to_req.items() if req.terminal()
-        ]
-
-        branching_nodes = []
-        multi_branch_nodes = []
-        for name, req in self.name_to_req.items():
+        # Build nodes with enhanced metadata
+        for req in self.requirements:
+            req_type = req.__class__.__name__.replace("Requirement", "").lower()
+            
+            # Determine node properties
+            is_terminal = req.terminal()
+            judge_name = getattr(req, 'judge_name', None)
+            
+            # Calculate branching factor
+            branching_factor = 0
             if req.dependencies:
-                branching_nodes.append(name)
-                if len(req.dependencies) > 2:
-                    multi_branch_nodes.append(name)
+                for answer, deps in req.dependencies.items():
+                    branching_factor += len(deps)
+            
+            node = {
+                "id": req.name,
+                "label": req.name,
+                "question": req.question,
+                "type": req_type,
+                "is_terminal": is_terminal,
+                "judge_name": judge_name or "auto-select",
+                "dependencies_count": len(req.dependencies) if req.dependencies else 0,
+                "branching_factor": branching_factor,
+                "has_multiple_paths": branching_factor > 1
+            }
+            nodes.append(node)
 
-        # Calculate branching factor
-        total_branches = sum(
-            len(req.dependencies) if req.dependencies else 0
-            for req in self.requirements
-        )
-        avg_branching_factor = (
-            total_branches / len(branching_nodes) if branching_nodes else 0.0
-        )
+        # Build edges with enhanced metadata
+        for req in self.requirements:
+            if req.dependencies:
+                for answer, deps in req.dependencies.items():
+                    for dep in deps:
+                        edge = {
+                            "source": req.name,
+                            "target": dep,
+                            "answer": answer,
+                            "label": str(answer),
+                            "source_type": req.__class__.__name__.replace("Requirement", "").lower(),
+                            "target_type": next((r.__class__.__name__.replace("Requirement", "").lower() 
+                                               for r in self.requirements if r.name == dep), "unknown")
+                        }
+                        edges.append(edge)
 
-        # Count total edges
-        total_edges = sum(
-            len(deps) if deps is not None else 0 for deps in self.dependencies.values()
-        )
+        return nodes, edges
 
-        return {
-            "total_requirements": len(self.requirements),
-            "terminal_nodes": len(terminal_nodes),
-            "branching_nodes": len(branching_nodes),
-            "multi_branch_nodes": len(multi_branch_nodes),
-            "max_depth": len(self.levels),
-            "avg_branching_factor": avg_branching_factor,
-            "total_edges": total_edges,
-            "root_nodes": list(self.levels[0]) if self.levels else [],
-            "terminal_node_names": terminal_nodes,
+    def _calculate_hierarchical_positions(self, nodes: List[Dict]) -> Dict[str, Tuple[float, float]]:
+        """Calculate positions using hierarchical layout based on topological levels."""
+        positions = {}
+        
+        # Group nodes by level
+        level_to_nodes = {}
+        for level_idx, level in enumerate(self.levels):
+            level_to_nodes[level_idx] = level
+
+        # Calculate positions with better spacing
+        max_level = len(self.levels) - 1
+        for level_idx, node_names in level_to_nodes.items():
+            y = max_level - level_idx  # Top to bottom
+            
+            # Spread nodes horizontally within the level with better spacing
+            if len(node_names) == 1:
+                x_positions = [0]
+            else:
+                # Use wider spacing for better visual separation
+                x_positions = np.linspace(-1.5, 1.5, len(node_names))
+            
+            for i, node_name in enumerate(node_names):
+                positions[node_name] = (x_positions[i], y)
+
+        return positions
+
+    def _add_nodes_to_figure(
+        self, 
+        fig: go.Figure, 
+        nodes: List[Dict], 
+        positions: Dict[str, Tuple[float, float]],
+        highlight_path: Optional[Dict[str, float]] = None,
+        show_terminal_states: bool = True,
+        show_requirement_types: bool = True
+    ) -> None:
+        """Add nodes to the figure with enhanced styling."""
+        
+        # Enhanced color scheme for different node types and states
+        type_colors = {
+            "binary": "#3498db",      # Blue
+            "discrete": "#e67e22",    # Orange  
+            "continuous": "#27ae60",   # Green
+            "unit_vector": "#e74c3c"  # Red
+        }
+        
+        # Terminal state styling
+        terminal_colors = {
+            "binary": "#2980b9",      # Darker blue
+            "discrete": "#d35400",    # Darker orange
+            "continuous": "#229954",   # Darker green
+            "unit_vector": "#c0392b"  # Darker red
         }
 
-    def print_metrics(self) -> None:
-        """Print analyzed workflow metrics."""
-        metrics = self.analyze_metrics()
-
-        print("WORKFLOW METRICS")
-        print("=" * 60)
-        print(f"Total Requirements: {metrics['total_requirements']}")
-        print(
-            f"Root Nodes: {len(metrics['root_nodes'])} ({', '.join(metrics['root_nodes'])})"
-        )
-        print(
-            f"Terminal Nodes: {metrics['terminal_nodes']} ({', '.join(metrics['terminal_node_names'])})"
-        )
-        print(f"Branching Nodes: {metrics['branching_nodes']}")
-        print(f"Multi-Branch Nodes: {metrics['multi_branch_nodes']}")
-        print(f"Maximum Depth: {metrics['max_depth']} levels")
-        print(f"Average Branching Factor: {metrics['avg_branching_factor']:.2f}")
-        print(f"Total Dependency Edges: {metrics['total_edges']}")
-        print()
-
-    def trace_evaluation_paths(
-        self, answers: Dict[str, float]
-    ) -> List[Tuple[int, List[str]]]:
-        """Trace the evaluation path given a set of answers."""
-        path = []
-        current_level = 0
-        current_requirements = self.levels[0] if self.levels else []
-
-        while current_requirements and current_level < len(self.levels):
-            path.append((current_level, current_requirements.copy()))
-
-            # Determine next level based on answers
-            next_requirements: set[str] = set()
-            for req_name in current_requirements:
-                if req_name in answers:
-                    req = self.name_to_req[req_name]
-                    answer = answers[req_name]
-                    if (
-                        not req.terminal()
-                        and req.dependencies
-                        and answer in req.dependencies
-                    ):
-                        next_requirements.update(
-                            req.get_dependencies_from_answer(answer)
-                        )
-
-            current_requirements = list(next_requirements)
-            current_level += 1
-
-        return path
-
-    def print_evaluation_path(self, answers: Dict[str, float]) -> None:
-        """Print the evaluation path for given answers."""
-        path = self.trace_evaluation_paths(answers)
-
-        print("EVALUATION PATH")
-        print("=" * 60)
-        print("Given answers:", answers)
-        print()
-
-        for level, requirements in path:
-            print(f"Level {level}: {', '.join(requirements)}")
-
-            # Show which answers lead to next level
-            if level < len(path) - 1:
-                next_level_reqs = path[level + 1][1] if level + 1 < len(path) else []
-                for req_name in requirements:
-                    if req_name in answers:
-                        req = self.name_to_req[req_name]
-                        answer = answers[req_name]
-                        if (
-                            not req.terminal()
-                            and req.dependencies
-                            and answer in req.dependencies
-                        ):
-                            deps = req.get_dependencies_from_answer(answer)
-                            active_deps = [d for d in deps if d in next_level_reqs]
-                            if active_deps:
-                                print(
-                                    f"  {req_name} ({answer}) → {', '.join(active_deps)}"
-                                )
-        print()
-
-
-class RubricVisualizer:
-    """Visualizer for complete MultiStepRubric with nodes and judge rewarders."""
-
-    def __init__(self, rubric: MultiStepRubric):
-        """
-        Initialize visualizer with a MultiStepRubric.
-
-        Args:
-            rubric: MultiStepRubric object to visualize
-        """
-        self.rubric = rubric
-        self.requirements_viz = RequirementsVisualizer(list(rubric.requirements))
-
-    def print_rubric_overview(self) -> None:
-        """Print an overview of the rubric configuration."""
-        print("RUBRIC OVERVIEW")
-        print("=" * 60)
-        print(f"Rubric Type: {type(self.rubric).__name__}")
-        print(
-            f"Judge Rewarders: {[type(jr).__name__ for jr in self.rubric.judge_options]}"
-        )
-        print(f"Reward Strategy: {self.rubric.reward_strategy.name}")
-        print(f"Total Requirements: {len(self.rubric.requirements)}")
-        print(f"Total Nodes: {len(self.rubric.name_to_node)}")
-        print(f"Topological Levels: {len(self.rubric.levels)}")
-        print()
-
-    def print_node_structure(self) -> None:
-        """Print the node structure with their types and capabilities."""
-        print("RUBRIC NODES")
-        print("=" * 60)
-
-        for level_idx, level in enumerate(self.rubric.levels):
-            print(f"\nLevel {level_idx}:")
-            for req_name in level:
-                if req_name not in self.rubric.name_to_node:
-                    breakpoint()
-                node = self.rubric.name_to_node[req_name]
-                req = self.rubric.name_to_req[req_name]
-
-                print(f"  • {req_name}:")
-                print(f"    Node Type: {type(node).__name__}")
-                print(f"    Question: {req.question}")
-                print(f"    Response Format: {req.judge_response_format.options}")
-                print(f"    Terminal: {node.terminal()}")
-
-                if not node.terminal() and req.dependencies:
-                    print("    Dependencies:")
-                    for answer, deps in req.dependencies.items():
-                        deps_str = ", ".join(deps) if deps else "STOP"
-                        print(f"      └─ {answer} → {deps_str}")
-        print()
-
-    def print_judge_configuration(self) -> None:
-        """Print details about the judge rewarder configuration."""
-        print("JUDGE CONFIGURATION")
-        print("=" * 60)
-        for judge in self.rubric.judge_options:
-            print(f"Judge type: {type(judge).__name__}")
-            print(f"Judge model: {judge.judge_model}")
-            print(f"Judge client: {type(judge.judge_client).__name__}")
-            print(f"Judge response format: {judge.judge_response_format}")
-            if judge.judge_prompt != JUDGE_PROMPT:
-                print(f"Special Judge prompt: {judge.judge_prompt}")
-
-        print()
-
-    def print_reward_strategy_info(self) -> None:
-        """Print information about the reward calculation strategy."""
-        print("REWARD STRATEGY")
-        print("=" * 60)
-        strategy = self.rubric.reward_strategy
-        print(f"Strategy: {strategy.name}")
-        print(f"Type: {type(strategy).__name__}")
-
-        # Print strategy-specific parameters if available
-        if hasattr(strategy, "base_weight"):
-            print(f"Base Weight: {strategy.base_weight}")
-        if hasattr(strategy, "level_multiplier"):
-            print(f"Level Multiplier: {strategy.level_multiplier}")
-        if hasattr(strategy, "max_level_bonus"):
-            print(f"Max Level Bonus: {strategy.max_level_bonus}")
-
-        print()
-
-    def print_complete_structure(self) -> None:
-        """Print a complete view of the rubric."""
-        self.print_rubric_overview()
-        self.print_judge_configuration()
-        self.print_reward_strategy_info()
-        self.print_node_structure()
-        self.requirements_viz.print_metrics()
-
-
-class CompletedRubricVisualizer:
-    """Visualizer for rubrics that have been evaluated with results."""
-
-    def __init__(self, rubric: MultiStepRubric):
-        """
-        Initialize visualizer with a rubric.
-
-        Args:
-            rubric: The MultiStepRubric to visualize
-        """
-        self.rubric = rubric
-        self.rubric_viz = RubricVisualizer(rubric)
-
-    def print_scenario_info(self, scenario: Scenario) -> None:
-        """Print information about the evaluated scenario."""
-        print("EVALUATED SCENARIO")
-        print("=" * 60)
-        print(f"Name: {scenario.name or 'Unnamed'}")
-        print(f"Description: {scenario.description or 'No description'}")
-        print(
-            f"Prompt: {scenario.prompt[:200]}{'...' if len(scenario.prompt) > 200 else ''}"
-        )
-        print(
-            f"Completion: {scenario.completion[:200] if scenario.completion else 'None'}{'...' if scenario.completion and len(scenario.completion) > 200 else ''}"
-        )
-
-        if scenario.answers:
-            print(f"Ground Truth Answers: {len(scenario.answers)} requirements")
-            for req_name, answer_data in scenario.answers.items():
-                if isinstance(answer_data, dict):
-                    answer: float = answer_data["answer"]
-                    reasoning: str = answer_data.get(
-                        "reasoning", "No reasoning provided"
-                    )
-                    print(
-                        f"  • {req_name}: {answer} ({reasoning[:100]}{'...' if len(reasoning) > 100 else ''})"
-                    )
-                else:
-                    print(f"  • {req_name}: {answer_data}")
-        print()
-
-    def print_evaluation_results(
-        self, scenario: Scenario, results: Dict[str, Any]
-    ) -> None:
-        """Print the detailed evaluation results."""
-        print("EVALUATION RESULTS")
-        print("=" * 60)
-
-        total_evaluated = 0
-        total_correct = 0
-        for level_key, level_results in results.items():
-            if level_key.isdigit():  # Only process numeric level keys
-                level_num = int(level_key)
-                print(f"\nLevel {level_num}:")
-
-                for req_name, result_data in level_results.items():
-                    total_evaluated += 1
-                    req = self.rubric.name_to_req[req_name]
-
-                    # Handle both dict and direct value formats
-                    if isinstance(result_data, dict):
-                        judge_answer = result_data.get("answer", "N/A")
-                        judge_reasoning = result_data.get(
-                            "reasoning", "No reasoning provided"
-                        )
-                    else:
-                        judge_answer = result_data
-                        judge_reasoning = "Direct value result"
-
-                    # Determine correctness based on requirement type
-                    if isinstance(req, DiscreteRequirement):
-                        is_correct = judge_answer == 1.0
-                        score_display = f"{judge_answer}"
-                        if (
-                            req.judge_response_format.meanings
-                            and judge_answer in req.judge_response_format.meanings
-                        ):
-                            meaning = req.judge_response_format.meanings[judge_answer]
-                            score_display += f" ({meaning})"
-                    elif isinstance(req, ContinuousRequirement):
-                        # For continuous, consider >0.5 as "correct" for summary stats
-                        is_correct = judge_answer > 0.5
-                        bounds = req.judge_response_format.options
-                        percentage = (
-                            (judge_answer - bounds[0]) / (bounds[1] - bounds[0]) * 100
-                        )
-                        score_display = (
-                            f"{judge_answer}/{bounds[1]} ({percentage:.0f}%)"
-                        )
-                    else:
-                        # Fallback for base Requirement class
-                        is_correct = judge_answer == 1.0
-                        score_display = f"{judge_answer}"
-
-                    if is_correct:
-                        total_correct += 1
-
-                    status = "✓ CORRECT" if is_correct else "✗ INCORRECT"
-                    print(f"  • {req_name}: {score_display} {status}")
-                    print(
-                        f"    Reasoning: {judge_reasoning[:150]}{'...' if len(judge_reasoning) > 150 else ''}"
-                    )
-
-        # Summary statistics
-        print("\nSUMMARY:")
-        print(f"Total Evaluated: {total_evaluated}")
-        print(f"Correct: {total_correct}")
-        print(
-            f"Accuracy: {total_correct / total_evaluated * 100:.1f}%"
-            if total_evaluated > 0
-            else "No evaluations"
-        )
-        print()
-
-    def print_evaluation_path_taken(
-        self, scenario: Scenario, results: Dict[str, Any]
-    ) -> None:
-        """Print the actual path taken during evaluation."""
-        print("EVALUATION PATH TAKEN")
-        print("=" * 60)
-
-        if not scenario.answers:
-            print("No ground truth answers available to trace path.")
-            return
-
-        # Extract ground truth answers for path tracing
-        gt_answers = {}
-        for req_name, answer_data in scenario.answers.items():
-            if isinstance(answer_data, dict):
-                gt_answers[req_name] = answer_data.get("answer")
+        # Group nodes by type and terminal status for better organization
+        node_groups = {}
+        for node in nodes:
+            node_type = node["type"]
+            is_terminal = node["is_terminal"]
+            
+            # Create composite key for grouping
+            if show_terminal_states and is_terminal:
+                group_key = f"{node_type}_terminal"
             else:
-                gt_answers[req_name] = answer_data
+                group_key = f"{node_type}_non_terminal"
+            
+            if group_key not in node_groups:
+                node_groups[group_key] = []
+            node_groups[group_key].append(node)
 
-        # Trace the path based on ground truth and judge results
-        for level_key in sorted(results.keys()):
-            if level_key.isdigit():
-                level_num = int(level_key)
-                level_results = results[level_key]
-                evaluated_reqs = list(level_results.keys())
+        for group_key, group_nodes in node_groups.items():
+            x_coords = []
+            y_coords = []
+            texts = []
+            hover_texts = []
+            colors = []
+            sizes = []
+            shapes = []
 
-                print(f"Level {level_num}: {', '.join(evaluated_reqs)}")
-
-                # Show what happened for each requirement
-                for req_name in evaluated_reqs:
-                    result_data = level_results[req_name]
-                    judge_answer = (
-                        result_data.get("answer", "N/A")
-                        if isinstance(result_data, dict)
-                        else result_data
-                    )
-                    gt_answer = gt_answers.get(req_name, "N/A")
-                    req = self.rubric.name_to_req[req_name]
-
-                    # Determine if this leads to next steps
-                    if isinstance(req, DiscreteRequirement):
-                        is_correct = judge_answer == 1.0
-                    elif isinstance(req, ContinuousRequirement):
-                        is_correct = (
-                            judge_answer > 0.5
-                        )  # Or whatever threshold makes sense
-                    else:
-                        is_correct = judge_answer == 1.0
-
-                    if (
-                        is_correct
-                        and not req.terminal()
-                        and req.dependencies
-                        and gt_answer in req.dependencies
-                    ):
-                        next_deps = req.get_dependencies_from_answer(gt_answer)
-                        if next_deps:
-                            print(
-                                f"  {req_name}: ✓ Correct → leads to {', '.join(next_deps)}"
-                            )
-                        else:
-                            print(f"  {req_name}: ✓ Correct → TERMINAL")
-                    elif is_correct:
-                        print(f"  {req_name}: ✓ Correct → TERMINAL")
-                    else:
-                        print(f"  {req_name}: ✗ Incorrect → path stops here")
-                print()
-
-    def print_revealed_information(
-        self, scenario: Scenario, results: Dict[str, Any]
-    ) -> None:
-        """Print any information that was revealed during evaluation."""
-        if not scenario.revealed_info:
-            return
-
-        print("REVEALED INFORMATION")
-        print("=" * 60)
-
-        for req_name, info in scenario.revealed_info.items():
-            # Check if this requirement was evaluated and correct
-            req_evaluated = False
-            req_correct = False
-
-            for level_results in results.values():
-                if isinstance(level_results, dict) and req_name in level_results:
-                    req_evaluated = True
-                    result = level_results[req_name]
-                    judge_answer = (
-                        result.get("answer", 0.0)
-                        if isinstance(result, dict)
-                        else result
-                    )
-                    req_correct = judge_answer == 1.0
-                    break
-
-            status = ""
-            if req_evaluated:
-                status = (
-                    " [REVEALED]"
-                    if req_correct
-                    else " [NOT REVEALED - incorrect answer]"
+            for node in group_nodes:
+                x, y = positions[node["id"]]
+                x_coords.append(x)
+                y_coords.append(y)
+                texts.append(node["label"])
+                
+                # Enhanced hover text with more details
+                hover_text = (
+                    f"<b>{node['label']}</b><br>"
+                    f"Type: {node['type'].title()}<br>"
+                    f"Status: {'Terminal' if node['is_terminal'] else 'Non-Terminal'}<br>"
+                    f"Question: {node['question'][:80]}{'...' if len(node['question']) > 80 else ''}<br>"
+                    f"Judge: {node['judge_name']}<br>"
+                    f"Outgoing Paths: {node['branching_factor']}<br>"
+                    f"Multiple Paths: {'Yes' if node['has_multiple_paths'] else 'No'}"
                 )
+                hover_texts.append(hover_text)
+
+                # Determine styling based on type and terminal status
+                node_type = node["type"]
+                is_terminal = node["is_terminal"]
+                
+                # Color selection
+                if is_terminal and show_terminal_states:
+                    base_color = terminal_colors.get(node_type, "#34495e")
+                    # Use diamond shape for terminal nodes
+                    shapes.append("diamond")
+                    sizes.append(25)  # Larger for terminal nodes
+                else:
+                    base_color = type_colors.get(node_type, "#95a5a6")
+                    # Use circle for non-terminal nodes
+                    shapes.append("circle")
+                    sizes.append(18)
+                
+                # Highlight if in path
+                if highlight_path and node["id"] in highlight_path:
+                    colors.append("#e74c3c")  # Red for highlighted
+                    sizes.append(30)  # Even larger for highlighted
+                else:
+                    colors.append(base_color)
+
+            # Create legend name
+            if "terminal" in group_key:
+                legend_name = f"{node_type.title()} (Terminal)"
             else:
-                status = " [NOT EVALUATED]"
+                legend_name = f"{node_type.title()} (Non-Terminal)"
 
-            print(f"• {req_name}{status}:")
-            print(f"  {info}")
-            print()
+            # Add scatter trace for this node group
+            fig.add_trace(go.Scatter(
+                x=x_coords,
+                y=y_coords,
+                mode="markers+text",
+                marker=dict(
+                    size=sizes,
+                    color=colors,
+                    line=dict(width=2, color="white"),
+                    opacity=0.9,
+                    symbol=shapes
+                ),
+                text=texts,
+                textposition="middle center",
+                textfont=dict(size=9, color="white", family="Arial Bold"),
+                hovertext=hover_texts,
+                hoverinfo="text",
+                name=legend_name,
+                showlegend=True
+            ))
 
-    def print_complete_evaluation(
-        self, scenario: Scenario, results: Dict[str, Any]
+    def _add_edges_to_figure(
+        self, 
+        fig: go.Figure, 
+        edges: List[Dict], 
+        positions: Dict[str, Tuple[float, float]],
+        show_answer_labels: bool,
+        highlight_path: Optional[Dict[str, float]] = None
     ) -> None:
-        """Print a complete view of the evaluation."""
-        self.print_scenario_info(scenario)
-        self.print_evaluation_results(scenario, results)
-        self.print_evaluation_path_taken(scenario, results)
-        self.print_revealed_information(scenario, results)
+        """Add edges to the figure with enhanced styling."""
+        
+        # Add each edge as a separate trace for better color control
+        for edge in edges:
+            x0, y0 = positions[edge["source"]]
+            x1, y1 = positions[edge["target"]]
+            
+            # Determine edge styling
+            source_req = edge["source"]
+            answer = edge["answer"]
+            
+            # Check if this edge is part of highlighted path
+            is_highlighted = (
+                highlight_path and 
+                source_req in highlight_path and 
+                float(highlight_path[source_req]) == float(answer)
+            )
+            
+            if is_highlighted:
+                color = "#e74c3c"  # Red for highlighted
+                width = 4
+            else:
+                # Color based on answer value
+                if answer == 1.0:
+                    color = "#27ae60"  # Green for positive
+                elif answer == 0.0:
+                    color = "#e74c3c"  # Red for negative
+                else:
+                    color = "#f39c12"  # Orange for other values
+                width = 2
+
+            # Add edge as separate trace
+            fig.add_trace(go.Scatter(
+                x=[x0, x1],
+                y=[y0, y1],
+                mode="lines",
+                line=dict(color=color, width=width),
+                hoverinfo="none",
+                showlegend=False,
+                name="Dependencies"
+            ))
+
+        # Add answer labels on edges if requested
+        if show_answer_labels:
+            label_x = []
+            label_y = []
+            label_text = []
+            label_colors = []
+            
+            for edge in edges:
+                x0, y0 = positions[edge["source"]]
+                x1, y1 = positions[edge["target"]]
+                
+                # Position label at midpoint of edge
+                mid_x = (x0 + x1) / 2
+                mid_y = (y0 + y1) / 2
+                
+                label_x.append(mid_x)
+                label_y.append(mid_y)
+                label_text.append(str(edge["answer"]))
+                
+                # Color label based on answer
+                answer = edge["answer"]
+                if answer == 1.0:
+                    label_colors.append("#27ae60")
+                elif answer == 0.0:
+                    label_colors.append("#e74c3c")
+                else:
+                    label_colors.append("#f39c12")
+
+            fig.add_trace(go.Scatter(
+                x=label_x,
+                y=label_y,
+                mode="text",
+                text=label_text,
+                textfont=dict(size=10, color=label_colors),
+                hoverinfo="none",
+                showlegend=False,
+                name="Answer Labels"
+            ))
+
+    def create_path_visualization(
+        self, 
+        answers: Dict[str, float],
+        width: int = 1200,
+        height: int = 800,
+        show_answer_labels: bool = True,
+        show_terminal_states: bool = True
+    ) -> go.Figure:
+        """
+        Create a visualization showing a specific evaluation path through the requirements.
+
+        Args:
+            answers: Dictionary mapping requirement names to answers
+            width: Graph width in pixels  
+            height: Graph height in pixels
+            show_answer_labels: Whether to show answer labels on edges
+            show_terminal_states: Whether to emphasize terminal states
+
+        Returns:
+            Plotly Figure with highlighted path
+        """
+        return self.create_dependency_graph(
+            width=width,
+            height=height,
+            show_answer_labels=show_answer_labels,
+            highlight_path=answers,
+            show_terminal_states=show_terminal_states
+        )
+
+    def create_metrics_dashboard(self) -> go.Figure:
+        """
+        Create a dashboard showing various metrics about the requirement structure.
+
+        Returns:
+            Plotly Figure with metrics visualization
+        """
+        metrics = self.analyze_metrics()
+        
+        # Create subplots for different metrics
+        from plotly.subplots import make_subplots
+        
+        fig = make_subplots(
+            rows=2, cols=2,
+            subplot_titles=(
+                "Requirement Types & Terminal States", 
+                "Workflow Structure",
+                "Dependency Distribution",
+                "Terminal State Analysis"
+            ),
+            specs=[[{"type": "pie"}, {"type": "bar"}],
+                   [{"type": "histogram"}, {"type": "bar"}]]
+        )
+
+        # 1. Requirement types and terminal states pie chart
+        type_terminal_counts = {}
+        for req in self.requirements:
+            req_type = req.__class__.__name__.replace("Requirement", "")
+            is_terminal = req.terminal()
+            key = f"{req_type} ({'Terminal' if is_terminal else 'Non-Terminal'})"
+            type_terminal_counts[key] = type_terminal_counts.get(key, 0) + 1
+        
+        fig.add_trace(
+            go.Pie(
+                labels=list(type_terminal_counts.keys()),
+                values=list(type_terminal_counts.values()),
+                name="Types & States",
+                textinfo="label+percent"
+            ),
+            row=1, col=1
+        )
+
+        # 2. Workflow structure bar chart
+        structure_stats = [
+            ("Total Requirements", metrics["total_requirements"]),
+            ("Terminal Nodes", metrics["terminal_nodes"]),
+            ("Branching Nodes", metrics["branching_nodes"]),
+            ("Multi-branch Nodes", metrics["multi_branch_nodes"]),
+            ("Root Nodes", len(metrics["root_nodes"]))
+        ]
+        
+        fig.add_trace(
+            go.Bar(
+                x=[s[0] for s in structure_stats],
+                y=[s[1] for s in structure_stats],
+                name="Structure Stats",
+                marker_color=["#3498db", "#e74c3c", "#f39c12", "#27ae60", "#9b59b6"]
+            ),
+            row=1, col=2
+        )
+
+        # 3. Dependency distribution
+        dep_counts = []
+        for req in self.requirements:
+            if req.dependencies:
+                dep_counts.append(len(req.dependencies))
+            else:
+                dep_counts.append(0)
+        
+        fig.add_trace(
+            go.Histogram(
+                x=dep_counts,
+                nbinsx=10,
+                name="Dependencies",
+                marker_color="#3498db"
+            ),
+            row=2, col=1
+        )
+
+        # 4. Terminal state analysis
+        terminal_analysis = [
+            ("Terminal by Type", len([r for r in self.requirements if r.terminal()])),
+            ("Non-Terminal by Type", len([r for r in self.requirements if not r.terminal()])),
+            ("Max Depth", metrics["max_depth"]),
+            ("Avg Branching", f"{metrics['avg_branching_factor']:.1f}")
+        ]
+        
+        fig.add_trace(
+            go.Bar(
+                x=[s[0] for s in terminal_analysis],
+                y=[s[1] if isinstance(s[1], (int, float)) else 0 for s in terminal_analysis],
+                name="Terminal Analysis",
+                marker_color=["#e74c3c", "#3498db", "#f39c12", "#27ae60"]
+            ),
+            row=2, col=2
+        )
+
+        fig.update_layout(
+            title={
+                'text': "MultiStep Rubric Metrics Dashboard",
+                'x': 0.5,
+                'xanchor': 'center',
+                'font': {'size': 18, 'color': '#2c3e50'}
+            },
+            height=800,
+            showlegend=False
+        )
+
+        return fig
+
+    def create_terminal_analysis(self) -> Dict[str, Any]:
+        """
+        Create detailed analysis of terminal states and workflow structure.
+        
+        Returns:
+            Dictionary with terminal state analysis
+        """
+        terminal_nodes = [req for req in self.requirements if req.terminal()]
+        non_terminal_nodes = [req for req in self.requirements if not req.terminal()]
+        
+        # Analyze terminal nodes by type
+        terminal_by_type = {}
+        for req in terminal_nodes:
+            req_type = req.__class__.__name__.replace("Requirement", "")
+            terminal_by_type[req_type] = terminal_by_type.get(req_type, 0) + 1
+        
+        # Analyze paths to terminal nodes
+        paths_to_terminal = {}
+        for terminal_req in terminal_nodes:
+            # Find all paths that lead to this terminal node
+            paths = self._find_paths_to_node(terminal_req.name)
+            paths_to_terminal[terminal_req.name] = paths
+        
+        return {
+            "terminal_nodes": len(terminal_nodes),
+            "non_terminal_nodes": len(non_terminal_nodes),
+            "terminal_by_type": terminal_by_type,
+            "paths_to_terminal": paths_to_terminal,
+            "terminal_percentage": len(terminal_nodes) / len(self.requirements) * 100
+        }
+    
+    def _find_paths_to_node(self, target_node: str) -> List[List[str]]:
+        """Find all possible paths that lead to a specific node."""
+        paths = []
+        
+        def dfs(current_node: str, path: List[str], visited: Set[str]):
+            if current_node in visited:
+                return
+            
+            visited.add(current_node)
+            path.append(current_node)
+            
+            if current_node == target_node:
+                paths.append(path[:])
+            else:
+                # Find all requirements that have this node as a dependency
+                for req in self.requirements:
+                    if req.dependencies:
+                        for answer, deps in req.dependencies.items():
+                            if current_node in deps:
+                                for dep in deps:
+                                    if dep not in visited:
+                                        dfs(dep, path, visited)
+            
+            visited.remove(current_node)
+            path.pop()
+        
+        # Start from root nodes
+        metrics = self.analyze_metrics()
+        root_nodes = metrics['root_nodes']
+        for root in root_nodes:
+            dfs(root, [], set())
+        
+        return paths
+
+
+class RubricVisualizer(BaseRubricInspector):
+    """Visualizer for complete MultiStepRubric with nodes and judge rewarders."""
+    pass
+
+
+class CompletedRubricVisualizer(BaseEvaluationInspector):
+    """Visualizer for rubrics that have been evaluated with results."""
+    pass
 
 
 # Convenience functions for backward compatibility and easy usage
@@ -573,6 +603,76 @@ def visualize_requirements(requirements: List[Requirement]) -> None:
     viz.print_dependency_graph()
     viz.print_workflow_structure()
     viz.print_metrics()
+
+
+def create_dependency_graph(
+    requirements: List[Requirement], 
+    **kwargs
+) -> go.Figure:
+    """
+    Create a dependency graph visualization for requirements.
+    
+    Args:
+        requirements: List of requirement objects
+        **kwargs: Additional arguments passed to create_dependency_graph
+        
+    Returns:
+        Plotly Figure object
+    """
+    viz = RequirementsVisualizer(requirements)
+    return viz.create_dependency_graph(**kwargs)
+
+
+def create_rubric_dependency_graph(
+    rubric: MultiStepRubric,
+    **kwargs
+) -> go.Figure:
+    """
+    Create a dependency graph visualization for a MultiStepRubric.
+    
+    Args:
+        rubric: MultiStepRubric object
+        **kwargs: Additional arguments passed to create_dependency_graph
+        
+    Returns:
+        Plotly Figure object
+    """
+    viz = RequirementsVisualizer(list(rubric.requirements))
+    return viz.create_dependency_graph(**kwargs)
+
+
+def create_path_visualization(
+    requirements: List[Requirement],
+    answers: Dict[str, float],
+    **kwargs
+) -> go.Figure:
+    """
+    Create a path visualization showing evaluation flow through requirements.
+    
+    Args:
+        requirements: List of requirement objects
+        answers: Dictionary mapping requirement names to answers
+        **kwargs: Additional arguments passed to create_path_visualization
+        
+    Returns:
+        Plotly Figure with highlighted path
+    """
+    viz = RequirementsVisualizer(requirements)
+    return viz.create_path_visualization(answers, **kwargs)
+
+
+def create_metrics_dashboard(requirements: List[Requirement]) -> go.Figure:
+    """
+    Create a metrics dashboard for requirements analysis.
+    
+    Args:
+        requirements: List of requirement objects
+        
+    Returns:
+        Plotly Figure with metrics dashboard
+    """
+    viz = RequirementsVisualizer(requirements)
+    return viz.create_metrics_dashboard()
 
 
 def compare_requirements(

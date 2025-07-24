@@ -7,10 +7,12 @@ from .example_rubrics import (AVAILABLE_WORKFLOWS, all_scenarios,
                               first_responder_reqs, get_workflow,
                               get_workflow_summary, list_workflows, scenarios)
 # Legacy aliases for backward compatibility
-from .inspection import (CompletedRubricVisualizer, EvaluationInspector,
-                         RequirementsInspector, RequirementsVisualizer,
-                         RubricInspector, RubricVisualizer,
-                         inspect_requirements, visualize_requirements)
+from .inspection import (EvaluationInspector,
+                         RequirementsInspector,
+                         RubricInspector,
+                         inspect_requirements)
+from .visualization import (CompletedRubricVisualizer, RequirementsVisualizer,
+                           RubricVisualizer, visualize_requirements)
 
 __all__ = [
     # Builders

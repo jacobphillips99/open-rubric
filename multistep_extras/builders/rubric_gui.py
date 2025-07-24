@@ -9,6 +9,7 @@ This GUI allows you to build a MultiStepRubric by adding judge rewarders, requir
 
 import json
 from pathlib import Path
+import traceback
 from typing import Any
 
 import streamlit as st
@@ -271,7 +272,8 @@ def _load_rubric_from_directory(rubric_name: str, directory: Path) -> None:
         st.rerun()
 
     except Exception as e:
-        st.error(f"Error loading rubric: {str(e)}")
+        breakpoint()
+        st.error(f"Error loading rubric: {str(e)}\n{traceback.format_exc()}")
 
 
 def _delete_rubric_from_directory(rubric_name: str, directory: Path) -> None:
@@ -393,15 +395,20 @@ def _delete_saved_rubric(rubric_name: str) -> None:
 def _render_judge_rewarders_overview() -> None:
     """Render the judge rewarders overview section."""
     if st.session_state.judge_rewarders:
-        with st.expander(f"🔨 Judge Rewarders ({len(st.session_state.judge_rewarders)})", expanded=False):
+        with st.expander(
+            f"🔨 Judge Rewarders ({len(st.session_state.judge_rewarders)})",
+            expanded=False,
+        ):
             for i, judge in enumerate(st.session_state.judge_rewarders):
-                judge_name = getattr(judge, 'name', '') or ""
-                type_info = f"`{judge.__class__.__name__.replace('JudgeRewarder', '').lower()}`"
+                judge_name = getattr(judge, "name", "") or ""
+                type_info = (
+                    f"`{judge.__class__.__name__.replace('JudgeRewarder', '').lower()}`"
+                )
                 if judge_name:
                     st.markdown(f"**{i + 1}.** `{judge_name}` ({type_info})")
                 else:
                     st.markdown(f"**{i + 1}.** {type_info}")
-                
+
                 # Combine all info into a single text block to avoid blank lines
                 info_lines = []
                 info_lines.append(f"Model: {judge.judge_model}")
@@ -415,14 +422,18 @@ def _render_judge_rewarders_overview() -> None:
                         if rf.meanings:
                             # Show first 2 meanings with better formatting
                             meanings_items = list(rf.meanings.items())[:2]
-                            meanings_preview = ", ".join([f"{k}: {v}" for k, v in meanings_items])
+                            meanings_preview = ", ".join(
+                                [f"{k}: {v}" for k, v in meanings_items]
+                            )
                             if len(rf.meanings) > 2:
                                 meanings_preview += f", +{len(rf.meanings) - 2} more"
                             info_lines.append(f"Meanings: {meanings_preview}")
                     elif "Continuous" in rf.__class__.__name__:
                         bounds = rf.options
-                        info_lines.append(f"Format: Continuous [{bounds[0]} to {bounds[1]}]")
-                
+                        info_lines.append(
+                            f"Format: Continuous [{bounds[0]} to {bounds[1]}]"
+                        )
+
                 st.text("\n".join(info_lines))
     else:
         st.subheader("🔨 Judge Rewarders")
@@ -432,16 +443,20 @@ def _render_judge_rewarders_overview() -> None:
 def _render_requirements_overview() -> None:
     """Render the requirements overview section."""
     if st.session_state.requirements:
-        with st.expander(f"📋 Requirements ({len(st.session_state.requirements)})", expanded=False):
+        with st.expander(
+            f"📋 Requirements ({len(st.session_state.requirements)})", expanded=False
+        ):
             for i, req in enumerate(st.session_state.requirements):
                 st.markdown(f"**{i + 1}.** `{req.name}`")
-                
+
                 # Combine all info into a single caption to avoid blank lines
                 info_lines = []
-                info_lines.append(f"Type: {req.__class__.__name__.replace('Requirement', '').lower()}")
+                info_lines.append(
+                    f"Type: {req.__class__.__name__.replace('Requirement', '').lower()}"
+                )
 
                 # Show judge assignment
-                judge_name = getattr(req, 'judge_name', '') or ""
+                judge_name = getattr(req, "judge_name", "") or ""
                 if judge_name:
                     info_lines.append(f"Judge: {judge_name}")
 
@@ -453,23 +468,27 @@ def _render_requirements_overview() -> None:
                         if deps:
                             # Truncate long dependency lists
                             if len(deps) > 2:
-                                deps_preview = f"{', '.join(deps[:2])}, +{len(deps) - 2} more"
+                                deps_preview = (
+                                    f"{', '.join(deps[:2])}, +{len(deps) - 2} more"
+                                )
                             else:
-                                deps_preview = ', '.join(deps)
+                                deps_preview = ", ".join(deps)
                             dep_info.append(f"{answer} → {deps_preview}")
                         else:
                             dep_info.append(f"{answer} → terminal")
-                    
+
                     # Show up to 2 dependency mappings to keep it readable
                     if len(dep_info) > 2:
-                        displayed_deps = dep_info[:2] + [f"+{len(dep_info) - 2} more answers"]
+                        displayed_deps = dep_info[:2] + [
+                            f"+{len(dep_info) - 2} more answers"
+                        ]
                     else:
                         displayed_deps = dep_info
-                        
+
                     info_lines.append(f"Dependencies: {', '.join(displayed_deps)}")
                 else:
                     info_lines.append("Terminal requirement")
-                
+
                 st.text("\n".join(info_lines))
     else:
         st.subheader("📋 Requirements")
@@ -482,7 +501,7 @@ def _render_reward_strategy_overview() -> None:
         strategy = st.session_state.reward_strategy
         with st.expander("🎯 Reward Strategy (1)", expanded=False):
             st.markdown(f"**Type:** `{strategy.name}`")
-            
+
             # Show strategy parameters
             params = {}
             for attr_name in dir(strategy):
@@ -492,7 +511,7 @@ def _render_reward_strategy_overview() -> None:
                     and attr_name not in ["name", "calculate_reward"]
                 ):
                     params[attr_name] = getattr(strategy, attr_name)
-            
+
             if params:
                 info_lines = []
                 for param, value in params.items():
@@ -672,18 +691,18 @@ def _add_judge_rewarder(
             "judge_model": judge_model,
             "judge_prompt": judge_prompt,
         }
-        
+
         # Add response format config if provided
         if response_format_config:
             judge_kwargs["response_format"] = response_format_config
-        
+
         # Add judge name if provided
         if judge_name:
             judge_kwargs["name"] = judge_name
-        
+
         # Instantiate the judge rewarder - this will validate the configuration
         new_judge = make_judge_rewarder(judge_type, **judge_kwargs)
-        
+
     except Exception as e:
         st.error(f"Error creating judge rewarder: {str(e)}")
         return
@@ -713,38 +732,40 @@ def _update_judge_rewarder(
     try:
         # Get the current judge to preserve its type and response format
         current_judge = st.session_state.judge_rewarders[index]
-        judge_type = current_judge.__class__.__name__.replace('JudgeRewarder', '').lower()
-        
+        judge_type = current_judge.__class__.__name__.replace(
+            "JudgeRewarder", ""
+        ).lower()
+
         # Prepare kwargs for make_judge_rewarder
         judge_kwargs = {
             "judge_model": new_model,
             "judge_prompt": new_prompt,
         }
-        
+
         # Preserve existing response format if it exists
         if hasattr(current_judge, "judge_response_format"):
             rf = current_judge.judge_response_format
-            
+
             # Reconstruct response format config
             response_format_config = {"type": judge_type}
             response_format_config["options"] = rf.options
             if rf.meanings:
                 response_format_config["meanings"] = rf.meanings
-            
+
             judge_kwargs["response_format"] = response_format_config
-        
+
         # Add judge name if provided
         if new_name:
             judge_kwargs["name"] = new_name
-        
+
         # Create the updated judge rewarder
         updated_judge = make_judge_rewarder(judge_type, **judge_kwargs)
-        
+
         # Replace the judge rewarder
         st.session_state.judge_rewarders[index] = updated_judge
         st.success("Judge rewarder updated successfully!")
         st.rerun()
-        
+
     except Exception as e:
         st.error(f"Error updating judge rewarder: {str(e)}")
         return
@@ -760,10 +781,10 @@ def _update_judge_response_format(
     try:
         # Get the current judge
         current_judge = st.session_state.judge_rewarders[index]
-        
+
         # Parse the new response format configuration
         config = {"type": judge_type}
-        
+
         if judge_type == "discrete":
             if options_input.strip():
                 options_str = options_input.strip().split(",")
@@ -794,26 +815,28 @@ def _update_judge_response_format(
                 config["meanings"] = meanings
 
         # Reconstruct the judge with new response format
-        judge_type_name = current_judge.__class__.__name__.replace('JudgeRewarder', '').lower()
-        
+        judge_type_name = current_judge.__class__.__name__.replace(
+            "JudgeRewarder", ""
+        ).lower()
+
         judge_kwargs = {
             "judge_model": current_judge.judge_model,
             "judge_prompt": current_judge.judge_prompt,
             "response_format": config,
         }
-        
+
         # Preserve judge name if it exists
-        if hasattr(current_judge, 'name') and current_judge.name:
+        if hasattr(current_judge, "name") and current_judge.name:
             judge_kwargs["name"] = current_judge.name
-        
+
         # Create the updated judge rewarder
         updated_judge = make_judge_rewarder(judge_type_name, **judge_kwargs)
-        
+
         # Replace the judge rewarder
         st.session_state.judge_rewarders[index] = updated_judge
         st.success("Judge response format updated successfully!")
         st.rerun()
-        
+
     except (ValueError, json.JSONDecodeError) as e:
         st.error(f"Error parsing response format: {str(e)}")
         return
@@ -825,13 +848,18 @@ def _update_judge_response_format(
 def _render_existing_judge_rewarders() -> None:
     """Render the list of existing judge rewarders."""
     for i, judge in enumerate(st.session_state.judge_rewarders):
-        judge_display_name = getattr(judge, 'name', None) or f'Unnamed {judge.__class__.__name__}'
+        judge_display_name = (
+            getattr(judge, "name", None) or judge.__class__.__name__
+        )
         with st.expander(f"Judge {i + 1}: {judge_display_name}", expanded=False):
             col1, col2, col3 = st.columns([2, 2, 1])
 
             with col1:
                 st.text_input(
-                    "Type", value=judge.__class__.__name__, disabled=True, key=f"judge_type_{i}"
+                    "Type",
+                    value=judge.__class__.__name__,
+                    disabled=True,
+                    key=f"judge_type_{i}",
                 )
                 updated_model = st.text_input(
                     "Model",
@@ -840,7 +868,7 @@ def _render_existing_judge_rewarders() -> None:
                 )
                 updated_name = st.text_input(
                     "Name",
-                    value=getattr(judge, 'name', '') or "",
+                    value=getattr(judge, "name", "") or "",
                     key=f"judge_name_{i}",
                     help="Optional judge name for specific matching",
                 )
@@ -855,10 +883,12 @@ def _render_existing_judge_rewarders() -> None:
 
             with col3:
                 st.markdown("<br>", unsafe_allow_html=True)  # Add some spacing
-                
+
                 if st.button("💾 Update", key=f"update_judge_{i}"):
-                    _update_judge_rewarder(i, updated_model, updated_prompt, updated_name)
-                
+                    _update_judge_rewarder(
+                        i, updated_model, updated_prompt, updated_name
+                    )
+
                 if st.button("🗑️ Remove", key=f"remove_judge_{i}"):
                     st.session_state.judge_rewarders.pop(i)
                     st.rerun()
@@ -867,7 +897,9 @@ def _render_existing_judge_rewarders() -> None:
             if hasattr(judge, "judge_response_format"):
                 st.markdown("**Response Format:**")
                 rf = judge.judge_response_format
-                judge_type = rf.__class__.__name__.replace("JudgeResponseFormat", "").lower()
+                judge_type = rf.__class__.__name__.replace(
+                    "JudgeResponseFormat", ""
+                ).lower()
 
                 col_rf1, col_rf2 = st.columns(2)
                 with col_rf1:
@@ -877,7 +909,7 @@ def _render_existing_judge_rewarders() -> None:
                         disabled=True,
                         key=f"judge_format_type_{i}",
                     )
-                    
+
                     if judge_type == "discrete":
                         options_str = ", ".join(map(str, rf.options))
                         updated_options = st.text_input(
@@ -897,7 +929,7 @@ def _render_existing_judge_rewarders() -> None:
                             )
                         with col_upper:
                             updated_upper = st.number_input(
-                                "Upper Bound", 
+                                "Upper Bound",
                                 value=float(rf.options[1]),
                                 step=0.1,
                                 key=f"judge_upper_{i}",
@@ -908,7 +940,7 @@ def _render_existing_judge_rewarders() -> None:
                         meanings_json = json.dumps(rf.meanings, indent=2)
                     else:
                         meanings_json = ""
-                    
+
                     updated_meanings = st.text_area(
                         "Meanings (JSON format)",
                         value=meanings_json,
@@ -916,13 +948,20 @@ def _render_existing_judge_rewarders() -> None:
                         key=f"judge_meanings_{i}",
                         help="Optional: Map options to meanings using JSON format",
                     )
-                
+
                 # Update button for response format
                 if st.button("💾 Update Format", key=f"update_format_{i}"):
                     if judge_type == "discrete":
-                        _update_judge_response_format(i, judge_type, updated_options, updated_meanings)
+                        _update_judge_response_format(
+                            i, judge_type, updated_options, updated_meanings
+                        )
                     elif judge_type == "continuous":
-                        _update_judge_response_format(i, judge_type, f"{updated_lower}, {updated_upper}", updated_meanings)
+                        _update_judge_response_format(
+                            i,
+                            judge_type,
+                            f"{updated_lower}, {updated_upper}",
+                            updated_meanings,
+                        )
 
 
 def render_requirements_tab() -> None:
@@ -952,9 +991,9 @@ def _render_requirement_form() -> None:
 
         # Judge name selector
         judge_options = ["(auto-select by type)"] + [
-            getattr(judge, 'name', None) or f"Unnamed {judge.__class__.__name__}"
+            getattr(judge, "name", None) or f"Unnamed {judge.__class__.__name__}"
             for judge in st.session_state.judge_rewarders
-            if getattr(judge, 'name', None)  # Only show named judges
+            if getattr(judge, "name", None)  # Only show named judges
         ]
         judge_name_selection = st.selectbox(
             "Judge Name (optional)",
@@ -1022,14 +1061,14 @@ def _add_requirement(
             "question": req_question,
             "dependencies": dependencies,
         }
-        
+
         # Add judge name if provided
         if req_judge_name:
             req_kwargs["judge_name"] = req_judge_name
-        
+
         # Instantiate the requirement - this will validate the configuration
         new_req = make_requirement(req_type, **req_kwargs)
-        
+
     except Exception as e:
         st.error(f"Error creating requirement: {str(e)}")
         return
@@ -1043,33 +1082,37 @@ def _render_existing_requirements() -> None:
     for i, req in enumerate(st.session_state.requirements):
         req_display_name = req.name
         # Remove the judge_info from the title to clean it up
-        with st.expander(
-            f"Requirement {i + 1}: {req_display_name}", expanded=False
-        ):
+        with st.expander(f"Requirement {i + 1}: {req_display_name}", expanded=False):
             col1, col2, col3 = st.columns([2, 3, 1])
 
             with col1:
                 st.text_input(
-                    "Type", value=req.__class__.__name__, disabled=True, key=f"req_type_{i}"
+                    "Type",
+                    value=req.__class__.__name__,
+                    disabled=True,
+                    key=f"req_type_{i}",
                 )
                 updated_name = st.text_input(
                     "Name", value=req.name, key=f"req_name_{i}"
                 )
-                
+
                 # Judge name selector for editing
                 judge_options = ["(auto-select by type)"] + [
-                    getattr(judge, 'name', None) or f"Unnamed {judge.__class__.__name__}"
+                    getattr(judge, "name", None)
+                    or f"Unnamed {judge.__class__.__name__}"
                     for judge in st.session_state.judge_rewarders
-                    if getattr(judge, 'name', None)  # Only show named judges
+                    if getattr(judge, "name", None)  # Only show named judges
                 ]
-                current_judge = getattr(req, 'judge_name', '') or ""
-                current_judge_display = current_judge if current_judge else "(auto-select by type)"
-                
+                current_judge = getattr(req, "judge_name", "") or ""
+                current_judge_display = (
+                    current_judge if current_judge else "(auto-select by type)"
+                )
+
                 try:
                     judge_index = judge_options.index(current_judge_display)
                 except ValueError:
                     judge_index = 0
-                
+
                 updated_judge_selection = st.selectbox(
                     "Judge Name",
                     options=judge_options,
@@ -1090,14 +1133,14 @@ def _render_existing_requirements() -> None:
                     height=80,
                     key=f"req_question_{i}",
                 )
-                
+
                 # Add a proper title for the dependencies section
                 st.markdown("**Dependencies:**")
                 if req.dependencies:
                     deps_json = json.dumps(req.dependencies, indent=2)
                 else:
                     deps_json = ""
-                
+
                 updated_dependencies = st.text_area(
                     "Dependencies (JSON)",
                     value=deps_json,
@@ -1108,10 +1151,16 @@ def _render_existing_requirements() -> None:
 
             with col3:
                 st.markdown("<br>", unsafe_allow_html=True)  # Add some spacing
-                
+
                 if st.button("💾 Update", key=f"update_req_{i}"):
-                    _update_requirement(i, updated_name, updated_question, updated_dependencies, updated_judge_name)
-                
+                    _update_requirement(
+                        i,
+                        updated_name,
+                        updated_question,
+                        updated_dependencies,
+                        updated_judge_name,
+                    )
+
                 if st.button("🗑️ Remove", key=f"remove_req_{i}"):
                     st.session_state.requirements.pop(i)
                     st.rerun()
@@ -1142,27 +1191,27 @@ def _update_requirement(
     try:
         # Get the current requirement to preserve its type
         current_req = st.session_state.requirements[index]
-        req_type = current_req.__class__.__name__.replace('Requirement', '').lower()
-        
+        req_type = current_req.__class__.__name__.replace("Requirement", "").lower()
+
         # Prepare kwargs for make_requirement
         req_kwargs = {
             "name": new_name,
             "question": new_question,
             "dependencies": dependencies,
         }
-        
+
         # Add judge name if provided
         if new_judge_name:
             req_kwargs["judge_name"] = new_judge_name
-        
+
         # Create the updated requirement
         updated_req = make_requirement(req_type, **req_kwargs)
-        
+
         # Replace the requirement
         st.session_state.requirements[index] = updated_req
         st.success("Requirement updated successfully!")
         st.rerun()
-        
+
     except Exception as e:
         st.error(f"Error updating requirement: {str(e)}")
         return
@@ -1254,7 +1303,7 @@ def _render_strategy_parameters(strategy_type: str) -> dict[str, Any]:
 def render_configuration_preview() -> None:
     """Render the configuration preview and build button."""
     st.divider()
-    
+
     # Header with build button
     col_header, col_button = st.columns([3, 1])
     with col_header:
@@ -1267,7 +1316,7 @@ def render_configuration_preview() -> None:
         or st.session_state.requirements
         or st.session_state.reward_strategy
     ):
-        
+
         # Enhanced preview layout
         _render_enhanced_preview()
     else:
@@ -1286,15 +1335,17 @@ def _render_build_button() -> None:
         label_visibility="collapsed",
         help="Enter name for the rubric",
     )
-    
+
     # Check if we can build
     can_build = (
         st.session_state.judge_rewarders
         and st.session_state.requirements
         and rubric_name.strip()
     )
-    
-    if st.button("🏗️ Build & Save", type="primary", key="build_main", disabled=not can_build):
+
+    if st.button(
+        "🏗️ Build & Save", type="primary", key="build_main", disabled=not can_build
+    ):
         try:
             rubric = _build_rubric()
 
@@ -1322,21 +1373,23 @@ def _render_enhanced_preview() -> None:
     """Render an enhanced preview of the current rubric configuration."""
     # Configuration summary cards
     col1, col2, col3 = st.columns(3)
-    
+
     with col1:
         with st.container():
             st.markdown("### 🔨 Judge Rewarders")
             if st.session_state.judge_rewarders:
                 st.metric("Count", len(st.session_state.judge_rewarders))
-                
+
                 with st.expander("View Details", expanded=False):
                     for i, judge in enumerate(st.session_state.judge_rewarders):
-                        judge_name = getattr(judge, 'name', None) or f"Judge {i+1}"
-                        judge_type = judge.__class__.__name__.replace('JudgeRewarder', '').lower()
-                        
+                        judge_name = getattr(judge, "name", None) or f"Judge {i+1}"
+                        judge_type = judge.__class__.__name__.replace(
+                            "JudgeRewarder", ""
+                        ).lower()
+
                         st.markdown(f"**{judge_name}**")
                         st.caption(f"Type: {judge_type} • Model: {judge.judge_model}")
-                        
+
                         # Show response format if configured
                         if hasattr(judge, "judge_response_format"):
                             rf = judge.judge_response_format
@@ -1346,52 +1399,56 @@ def _render_enhanced_preview() -> None:
                             elif "Continuous" in rf.__class__.__name__:
                                 bounds = rf.options
                                 st.caption(f"Range: [{bounds[0]} to {bounds[1]}]")
-                        
+
                         if i < len(st.session_state.judge_rewarders) - 1:
                             st.divider()
             else:
                 st.warning("No judges configured")
-    
+
     with col2:
         with st.container():
             st.markdown("### 📋 Requirements")
             if st.session_state.requirements:
                 st.metric("Count", len(st.session_state.requirements))
-                
+
                 with st.expander("View Details", expanded=False):
                     for i, req in enumerate(st.session_state.requirements):
                         st.markdown(f"**{req.name}**")
-                        st.caption(f"Type: {req.__class__.__name__.replace('Requirement', '').lower()}")
-                        
+                        st.caption(
+                            f"Type: {req.__class__.__name__.replace('Requirement', '').lower()}"
+                        )
+
                         # Show judge assignment
-                        judge_name = getattr(req, 'judge_name', None)
+                        judge_name = getattr(req, "judge_name", None)
                         if judge_name:
                             st.caption(f"Judge: {judge_name}")
                         else:
                             st.caption("Judge: auto-select")
-                        
+
                         # Show dependency info
                         if req.dependencies:
-                            dep_count = sum(len(deps) for deps in req.dependencies.values())
+                            dep_count = sum(
+                                len(deps) for deps in req.dependencies.values()
+                            )
                             st.caption(f"Dependencies: {dep_count} total")
                         else:
                             st.caption("Terminal requirement")
-                        
+
                         if i < len(st.session_state.requirements) - 1:
                             st.divider()
             else:
                 st.warning("No requirements configured")
-    
+
     with col3:
         with st.container():
             st.markdown("### 🎯 Reward Strategy")
             if st.session_state.reward_strategy:
                 strategy = st.session_state.reward_strategy
                 st.metric("Type", strategy.name)
-                
+
                 with st.expander("View Details", expanded=False):
                     st.markdown(f"**Strategy:** `{strategy.name}`")
-                    
+
                     # Show strategy parameters
                     params = {}
                     for attr_name in dir(strategy):
@@ -1401,7 +1458,7 @@ def _render_enhanced_preview() -> None:
                             and attr_name not in ["name", "calculate_reward"]
                         ):
                             params[attr_name] = getattr(strategy, attr_name)
-                    
+
                     if params:
                         st.markdown("**Parameters:**")
                         for param, value in params.items():
@@ -1410,28 +1467,28 @@ def _render_enhanced_preview() -> None:
                         st.caption("No additional parameters")
             else:
                 st.warning("No strategy configured")
-    
+
     # Requirement dependencies visualization
     if st.session_state.requirements:
         st.markdown("---")
         st.markdown("### 🔗 Dependency Structure")
-        
+
         with st.expander("View Dependency Flow", expanded=False):
             # Create a simple dependency visualization
             terminal_reqs = []
             dependent_reqs = []
-            
+
             for req in st.session_state.requirements:
                 if req.dependencies:
                     dependent_reqs.append(req)
                 else:
                     terminal_reqs.append(req)
-            
+
             if terminal_reqs:
                 st.markdown("**Terminal Requirements:**")
                 for req in terminal_reqs:
                     st.markdown(f"• `{req.name}`")
-            
+
             if dependent_reqs:
                 st.markdown("**Requirements with Dependencies:**")
                 for req in dependent_reqs:
@@ -1470,7 +1527,7 @@ def main() -> None:
 
     st.title("🏗️ MultiStep Rubric Builder")
     st.markdown(
-        "Build complex multi-step rubrics forRL environments with dependencies, judges, and reward strategies."
+        "Build complex multi-step rubrics for RL environments with dependencies, judges, and reward strategies."
     )
 
     render_sidebar_overview()
@@ -1493,6 +1550,10 @@ def main() -> None:
         render_scenarios_tab()
 
     render_configuration_preview()
+
+    # Visualization section at the bottom
+    st.divider()
+    render_visualization()
 
     # Footer
     st.divider()
@@ -1737,6 +1798,342 @@ def _load_example_scenarios(example_name: str) -> None:
 
     except Exception as e:
         st.error(f"Error loading example scenarios: {str(e)}")
+
+
+def render_visualization() -> None:
+    """Render the visualization tab with dependency graphs and metrics."""
+    st.header("Dependency Visualization")
+    st.markdown("Visualize the structure and flow of your rubric requirements.")
+
+    if not st.session_state.requirements:
+        st.info("Configure some requirements first to see visualizations.")
+        return
+
+    # Enhanced visualization options
+    col1, col2, col3, col4 = st.columns(4)
+    
+    with col1:
+        layout_algorithm = st.selectbox(
+            "Layout Algorithm",
+            options=["hierarchical", "force", "circular"],
+            index=0,
+            help="Choose how to arrange the nodes in the graph"
+        )
+    
+    with col2:
+        show_answer_labels = st.checkbox(
+            "Show Answer Labels",
+            value=True,
+            help="Display answer values on the edges"
+        )
+    
+    with col3:
+        show_terminal_states = st.checkbox(
+            "Highlight Terminal States",
+            value=True,
+            help="Emphasize terminal states with diamond shapes"
+        )
+    
+    with col4:
+        graph_height = st.slider(
+            "Graph Height",
+            min_value=400,
+            max_value=1000,
+            value=600,
+            step=50,
+            help="Adjust the height of the graph"
+        )
+
+    # Create the main dependency graph with enhanced features
+    try:
+        from multistep_extras.visualization.visualizer import create_dependency_graph
+        
+        st.subheader("🔗 Dependency Graph")
+        
+        fig = create_dependency_graph(
+            st.session_state.requirements,
+            width=1000,
+            height=graph_height,
+            show_answer_labels=show_answer_labels,
+            show_terminal_states=show_terminal_states,
+            show_requirement_types=True
+        )
+        
+        # Add enhanced annotations like in the demo
+        fig.add_annotation(
+            text="💎 Diamond shapes = Terminal states<br>🔵 Circles = Non-terminal states<br>🟢 Green edges = Positive answers<br>🔴 Red edges = Negative answers",
+            xref="paper", yref="paper",
+            x=0.02, y=0.98,
+            showarrow=False,
+            font=dict(size=12, color="#2c3e50"),
+            align="left",
+            bgcolor="rgba(255,255,255,0.8)",
+            bordercolor="lightgray",
+            borderwidth=1
+        )
+        
+        st.plotly_chart(fig, use_container_width=True)
+        
+        # Add explanation
+        with st.expander("📚 How to Read This Graph", expanded=False):
+            st.markdown("""
+            **Understanding the Dependency Graph:**
+            
+            - **Nodes (shapes)** represent requirements:
+              - 💎 **Diamond shapes** = Terminal states (no dependencies)
+              - 🔵 **Circle shapes** = Non-terminal states (have dependencies)
+            - **Colors** indicate requirement types:
+              - 🔵 Blue: Binary requirements
+              - 🟠 Orange: Discrete requirements  
+              - 🟢 Green: Continuous requirements
+              - 🔴 Red: Unit vector requirements
+            - **Edges (arrows)** show dependencies between requirements
+            - **Numbers on edges** show which answer triggers that dependency
+            - **Size** indicates if a requirement is terminal (larger) or has dependencies
+            - **Hover** over nodes to see detailed information
+            
+            **Layout Algorithms:**
+            - **Hierarchical**: Organizes by dependency levels (top-down flow)
+            - **Force**: Uses physics simulation for natural clustering
+            - **Circular**: Arranges nodes in a circle for overview
+            """)
+
+    except ImportError as e:
+        st.error("Required dependencies not available. Please install: `pip install plotly networkx`")
+        return
+    except Exception as e:
+        st.error(f"Error creating dependency graph: {str(e)}")
+        return
+
+    # Enhanced path visualization section
+    st.divider()
+    st.subheader("🛤️ Path Visualization")
+    
+    if st.session_state.requirements:
+        st.markdown("**Simulate an evaluation path:**")
+        
+        # Create input fields for answers with enhanced UI
+        answers = {}
+        req_names = [req.name for req in st.session_state.requirements]
+        
+        # Use columns to organize the input
+        cols = st.columns(min(3, len(req_names)))
+        
+        for i, req in enumerate(st.session_state.requirements):
+            col = cols[i % len(cols)]
+            
+            with col:
+                # Enhanced input based on requirement type
+                if hasattr(req, 'judge_response_format'):
+                    options = req.judge_response_format.options
+                    if len(options) == 2 and set(options) == {0.0, 1.0}:
+                        # Binary choice with better labels
+                        answer = st.selectbox(
+                            f"{req.name}:",
+                            options=[0.0, 1.0],
+                            format_func=lambda x: "❌ No" if x == 0.0 else "✅ Yes",
+                            key=f"path_answer_{req.name}",
+                            help=f"Question: {req.question[:50]}..."
+                        )
+                    elif isinstance(options, list) and len(options) > 2:
+                        # Discrete choices
+                        answer = st.selectbox(
+                            f"{req.name}:",
+                            options=options,
+                            key=f"path_answer_{req.name}",
+                            help=f"Question: {req.question[:50]}..."
+                        )
+                    else:
+                        # Continuous or other
+                        if isinstance(options, list) and len(options) == 2:
+                            # Continuous range
+                            answer = st.slider(
+                                f"{req.name}:",
+                                min_value=float(options[0]),
+                                max_value=float(options[1]),
+                                value=float(options[0]),
+                                step=0.1,
+                                key=f"path_answer_{req.name}",
+                                help=f"Question: {req.question[:50]}..."
+                            )
+                        else:
+                            # Fallback to number input
+                            answer = st.number_input(
+                                f"{req.name}:",
+                                value=1.0,
+                                step=0.1,
+                                key=f"path_answer_{req.name}",
+                                help=f"Question: {req.question[:50]}..."
+                            )
+                else:
+                    # Fallback for requirements without response format
+                    answer = st.number_input(
+                        f"{req.name}:",
+                        value=1.0,
+                        step=0.1,
+                        key=f"path_answer_{req.name}",
+                        help=f"Question: {req.question[:50]}..."
+                    )
+                
+                answers[req.name] = float(answer)
+        
+        if st.button("🎯 Visualize Path", type="primary"):
+            try:
+                from multistep_extras.visualization.visualizer import create_path_visualization
+                
+                path_fig = create_path_visualization(
+                    st.session_state.requirements,
+                    answers,
+                    width=1000,
+                    height=graph_height,
+                    show_answer_labels=show_answer_labels,
+                    show_terminal_states=show_terminal_states
+                )
+                
+                st.plotly_chart(path_fig, use_container_width=True)
+                
+                # Show path explanation
+                st.success("🎯 **Path highlighted in red!** This shows which requirements would be evaluated given your answers.")
+                
+            except Exception as e:
+                st.error(f"Error creating path visualization: {str(e)}")
+
+    # Enhanced metrics dashboard section  
+    st.divider()
+    st.subheader("📊 Enhanced Metrics Dashboard")
+    
+    try:
+        from multistep_extras.visualization.visualizer import create_metrics_dashboard, RequirementsVisualizer
+        
+        metrics_fig = create_metrics_dashboard(st.session_state.requirements)
+        
+        # Add terminal state analysis like in the demo
+        viz = RequirementsVisualizer(st.session_state.requirements)
+        terminal_analysis = viz.create_terminal_analysis()
+        
+        # Add terminal state summary as annotation
+        non_terminal_count = len(st.session_state.requirements) - terminal_analysis['terminal_nodes']
+        terminal_summary = (
+            f"💎 Terminal Analysis:<br>"
+            f"• {terminal_analysis['terminal_nodes']} terminal nodes<br>"
+            f"• {non_terminal_count} non-terminal nodes<br>"
+            f"• {terminal_analysis['terminal_percentage']:.1f}% terminal rate"
+        )
+        
+        metrics_fig.add_annotation(
+            text=terminal_summary,
+            xref="paper", yref="paper",
+            x=0.02, y=0.98,
+            showarrow=False,
+            font=dict(size=12, color="#2c3e50"),
+            align="left",
+            bgcolor="rgba(255,255,255,0.9)",
+            bordercolor="lightgray",
+            borderwidth=1
+        )
+        
+        st.plotly_chart(metrics_fig, use_container_width=True)
+        
+        # Show text metrics alongside
+        metrics = viz.analyze_metrics()
+        
+        col1, col2, col3, col4 = st.columns(4)
+        
+        with col1:
+            st.metric("Total Requirements", metrics["total_requirements"])
+            
+        with col2:
+            st.metric("Terminal Nodes", metrics["terminal_nodes"], 
+                     delta=f"{terminal_analysis['terminal_percentage']:.1f}%")
+            
+        with col3:
+            st.metric("Max Depth", metrics["max_depth"])
+            
+        with col4:
+            st.metric("Avg Branching", f"{metrics['avg_branching_factor']:.1f}")
+            
+        # Enhanced metrics details
+        with st.expander("📊 Detailed Metrics", expanded=False):
+            col1, col2 = st.columns(2)
+            
+            with col1:
+                st.markdown("**Structure Analysis:**")
+                st.markdown(f"• Branching Nodes: {metrics['branching_nodes']}")
+                st.markdown(f"• Multi-branch Nodes: {metrics['multi_branch_nodes']}")
+                st.markdown(f"• Root Nodes: {', '.join(metrics['root_nodes'])}")
+                st.markdown(f"• Total Edges: {metrics['total_edges']}")
+            
+            with col2:
+                st.markdown("**Terminal Analysis:**")
+                for req_type, count in terminal_analysis['terminal_by_type'].items():
+                    st.markdown(f"• {req_type}: {count} terminal")
+                st.markdown(f"• Terminal Rate: {terminal_analysis['terminal_percentage']:.1f}%")
+                st.markdown(f"• Non-Terminal: {non_terminal_count}")
+            
+    except Exception as e:
+        st.error(f"Error creating metrics dashboard: {str(e)}")
+
+    # Save visualization section
+    st.divider()
+    st.subheader("💾 Save Visualizations")
+    
+    col1, col2 = st.columns(2)
+    
+    with col1:
+        if st.button("📁 Save Dependency Graph"):
+            try:
+                from pathlib import Path
+                outputs_dir = Path("outputs") / "visualizations"
+                outputs_dir.mkdir(parents=True, exist_ok=True)
+                
+                output_file = outputs_dir / "dependency_graph.html"
+                fig.write_html(str(output_file))
+                st.success(f"✅ Saved dependency graph to: {output_file}")
+                
+            except Exception as e:
+                st.error(f"Error saving dependency graph: {str(e)}")
+    
+    with col2:
+        if st.button("📊 Save Metrics Dashboard"):
+            try:
+                from pathlib import Path
+                outputs_dir = Path("outputs") / "visualizations"
+                outputs_dir.mkdir(parents=True, exist_ok=True)
+                
+                output_file = outputs_dir / "metrics_dashboard.html"
+                metrics_fig.write_html(str(output_file))
+                st.success(f"✅ Saved metrics dashboard to: {output_file}")
+                
+            except Exception as e:
+                st.error(f"Error saving metrics dashboard: {str(e)}")
+
+    # Comparison section if multiple rubrics are loaded
+    if "loaded_scenarios" in st.session_state and st.session_state.loaded_scenarios:
+        st.divider()
+        st.subheader("🔄 Scenario Compatibility")
+        
+        try:
+            rubric = _build_rubric()
+            scenarios = st.session_state.loaded_scenarios
+            
+            compatible_count = 0
+            total_count = len(scenarios)
+            
+            for scenario in scenarios:
+                if scenario.answers:
+                    rubric_req_names = {req.name for req in rubric.requirements}
+                    scenario_req_names = set(scenario.answers.keys())
+                    if rubric_req_names.intersection(scenario_req_names):
+                        compatible_count += 1
+            
+            st.metric(
+                "Compatible Scenarios", 
+                f"{compatible_count}/{total_count}",
+                delta=f"{compatible_count/total_count*100:.0f}%" if total_count > 0 else "0%"
+            )
+            
+        except Exception as e:
+            st.warning(f"Could not analyze scenario compatibility: {str(e)}")
 
 
 if __name__ == "__main__":

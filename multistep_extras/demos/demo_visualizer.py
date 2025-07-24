@@ -1,387 +1,165 @@
 """
-Demo script for the new MultiStep Visualizers.
+Demo script showcasing the enhanced dependency graph visualization capabilities.
 
-This demonstrates the visualization capabilities of the three specialized visualizers:
-1. RequirementsVisualizer - For analyzing requirement dependencies
-2. RubricVisualizer - For visualizing complete rubrics with nodes
-3. CompletedRubricVisualizer - For visualizing evaluated rubrics with results
+This demo creates a sample rubric with dependencies and shows improved visualization options
+with better terminal state handling and usability improvements.
+Run with: python -m multistep_extras.demos.demo_visualizer
 """
 
 import os
-import traceback
+from pathlib import Path
 
-from openai import OpenAI
+from typing import List
+import plotly.graph_objects as go
+
+from verifiers.rubrics.multistep.requirement import BinaryRequirement, DiscreteRequirement, ContinuousRequirement, Requirement
+from multistep_extras.visualization.visualizer import (
+    RequirementsVisualizer,
+    create_dependency_graph,
+    create_path_visualization,
+    create_metrics_dashboard
+)
 
 from multistep_extras.example_rubrics import get_workflow
-from multistep_extras.utils.print_utils import (print_debug, print_error,
-                                                print_header, print_info,
-                                                print_process, print_score,
-                                                print_success)
-from multistep_extras.visualization.visualizer import (
-    CompletedRubricVisualizer, RequirementsVisualizer, RubricVisualizer,
-    visualize_requirements)
-from verifiers.rewards.judge_reward import (JUDGE_PROMPT, BinaryJudgeRewarder,
-                                            JudgeRewarder,
-                                            UnitVectorJudgeRewarder)
-# For creating mock rubrics and evaluations
-from verifiers.rubrics.multistep.multistep_rubric import MultiStepRubric
-# Create examples of both types
-from verifiers.rubrics.multistep.requirement import (BinaryRequirement,
-                                                     Requirement,
-                                                     UnitVectorRequirement)
-from verifiers.rubrics.multistep.scenario import Scenario
 
-
-def create_simple_demo_requirements() -> list[Requirement]:
-    """Create simple self-contained requirements for demo purposes."""
-    return [
-        BinaryRequirement(
-            name="safety_check",
-            question="Does the response consider safety first?",
-            dependencies={1.0: ["initial_assessment"], 0.0: ["emergency_protocol"]},
-        ),
-        BinaryRequirement(
-            name="initial_assessment",
-            question="Does the response include initial assessment?",
-            dependencies={1.0: ["terminal_action"], 0.0: ["emergency_protocol"]},
-        ),
-        BinaryRequirement(
-            name="emergency_protocol",
-            question="Does the response follow emergency protocols?",
-        ),
-        BinaryRequirement(
-            name="terminal_action",
-            question="Does the response include appropriate terminal actions?",
-        ),
-    ]
-
-
-def demo_requirements_visualizer(name: str, reqs: list[Requirement]):
-    """Demonstrate the RequirementsVisualizer for pure requirement analysis."""
-    print_header("📋 REQUIREMENTS VISUALIZER DEMO")
-    print_info("Analyzing requirement dependencies and workflow structure.")
-    print()
-
-    # Start with simple, clear hierarchical requirements to show the concept
-    print_process("🔍 Understanding Requirement Dependencies:")
-    print_info(
-        "Let's start with a simple example to understand how requirements connect..."
+def demo_enhanced_visualization(requirements: list[Requirement]) -> go.Figure:
+    """Demonstrate enhanced dependency graph visualization with terminal state emphasis."""
+    print("=== Enhanced Dependency Graph Demo ===")
+    
+    # Create enhanced dependency graph with terminal state emphasis
+    fig = create_dependency_graph(
+        requirements,
+        show_answer_labels=True,
+        show_terminal_states=True,
+        show_requirement_types=True,
+        width=1400,
+        height=900
     )
-    print()
-
-    simple_reqs = create_simple_demo_requirements()
-    simple_viz = RequirementsVisualizer(simple_reqs)
-    simple_viz.print_workflow_structure()
-
-    # Trace a path through the simple requirements
-    print_process("📍 Evaluation Path Tracing:")
-    print_info("When we provide answers, the visualizer shows which path gets taken:")
-    sample_answers = {"safety_check": 1.0, "initial_assessment": 1.0}
-    simple_viz.print_evaluation_path(sample_answers)
-    print()
-
-    # Now show the real workflow - use full requirements list to avoid dependency issues
-    print_process(f"🚑 Real-World Example: {name.title()} Workflow:")
-    print_info("Now let's see the complete real-world requirement structure...")
-    print()
-
-    # Show the full requirements list to avoid breaking dependency references
-    visualize_requirements(reqs)
-
-
-def demo_rubric_visualizer(judge_options: list[JudgeRewarder]):
-    """Demonstrate the RubricVisualizer for complete rubrics with nodes."""
-    print_header("🏗️ RUBRIC VISUALIZER DEMO")
-    print_info("Visualizing complete rubrics with nodes, judges, and strategies.")
-    print()
-
-    simple_reqs = create_simple_demo_requirements()
-    rubric = MultiStepRubric(simple_reqs, judge_options)
-
-    print_process("🔧 Simple Demo Rubric Configuration:")
-    viz = RubricVisualizer(rubric)
-    viz.print_complete_structure()
-
-
-def demo_completed_rubric_visualizer(judge_options: list[JudgeRewarder]):
-    """Demonstrate the CompletedRubricVisualizer for evaluated rubrics."""
-    print_header("✅ COMPLETED RUBRIC VISUALIZER DEMO")
-    print_info("Visualizing rubrics with actual evaluation results and judge feedback.")
-    print()
-
-    demo_scenario = Scenario(
-        name="Emergency Response Demo",
-        description="A demonstration scenario showing proper emergency response evaluation",
-        prompt="You encounter an emergency situation. What do you do?",
-        completion="First, I ensure the scene is safe before proceeding. Then I conduct an initial assessment of the situation and take appropriate action following emergency protocols.",
-        answers={
-            "safety_check": {"answer": 1.0, "reasoning": "Safety is addressed first"},
-            "initial_assessment": {
-                "answer": 1.0,
-                "reasoning": "Assessment is mentioned",
-            },
-            "terminal_action": {
-                "answer": 1.0,
-                "reasoning": "Appropriate action is taken",
-            },
-            "emergency_protocol": {
-                "answer": 1.0,
-                "reasoning": "Emergency protocols mentioned",
-            },
-        },
+    
+    # Add custom annotations for better usability
+    fig.add_annotation(
+        text="💎 Diamond shapes = Terminal states<br>🔵 Circles = Non-terminal states<br>🟢 Green edges = Positive answers<br>🔴 Red edges = Negative answers",
+        xref="paper", yref="paper",
+        x=0.02, y=0.98,
+        showarrow=False,
+        font=dict(size=12, color="#2c3e50"),
+        align="left",
+        bgcolor="rgba(255,255,255,0.8)",
+        bordercolor="lightgray",
+        borderwidth=1
     )
-
-    # Create consistent mock results organized by evaluation levels
-    # Level 0: Root requirements (safety_check)
-    # Level 1: Next level requirements (initial_assessment)
-    # Level 2: Terminal requirements (terminal_action, emergency_protocol)
-    mock_results = {
-        "0": {  # Level 0 - Root requirements
-            "safety_check": {
-                "answer": 1.0,
-                "reasoning": "Response appropriately considers safety as the first priority",
-            }
-        },
-        "1": {  # Level 1 - Next level after safety_check passes
-            "initial_assessment": {
-                "answer": 1.0,
-                "reasoning": "Response includes appropriate initial assessment steps",
-            }
-        },
-        "2": {  # Level 2 - Terminal requirements
-            "terminal_action": {
-                "answer": 1.0,
-                "reasoning": "Response concludes with appropriate terminal actions",
-            },
-            "emergency_protocol": {
-                "answer": 1.0,
-                "reasoning": "Response mentions following emergency protocols",
-            },
-        },
-    }
-
-    simple_reqs = create_simple_demo_requirements()
-    rubric = MultiStepRubric(simple_reqs, judge_options)
-
-    print_process("🔍 Evaluated Scenario Results:")
-    print_info("This shows how the visualizer displays actual evaluation outcomes...")
-    print()
-    viz = CompletedRubricVisualizer(rubric)
-    viz.print_complete_evaluation(demo_scenario, mock_results)
+    
+    # Ensure outputs directory exists
+    outputs_dir = Path("outputs") / "visualizations"
+    outputs_dir.mkdir(parents=True, exist_ok=True)
+    
+    # Save as HTML file for viewing
+    output_file = outputs_dir / "enhanced_dependency_graph.html"
+    fig.write_html(str(output_file))
+    print(f"✅ Saved enhanced dependency graph to: {output_file}")
+    
+    return fig
 
 
-def demo_discrete_vs_continuous(judge_options: list[JudgeRewarder]):
-    """Demonstrate the difference between discrete and continuous requirements."""
-    print_header("⚡ DISCRETE VS CONTINUOUS SCORING DEMO")
-    print_info(
-        "Comparing how discrete and continuous requirements display in the visualizer."
+
+
+def demo_enhanced_metrics_dashboard(requirements: list[Requirement]) -> go.Figure:
+    """Demonstrate enhanced metrics dashboard with terminal state focus."""
+    print("\n=== Enhanced Metrics Dashboard Demo ===")
+    
+    
+    # Create enhanced metrics dashboard
+    metrics_fig = create_metrics_dashboard(requirements)
+    
+    # Add terminal state analysis to the dashboard
+    viz = RequirementsVisualizer(requirements)
+    terminal_analysis = viz.create_terminal_analysis()
+    
+    # Add terminal state summary as annotation
+    non_terminal_count = len(requirements) - terminal_analysis['terminal_nodes']
+    terminal_summary = (
+        f"💎 Terminal Analysis:<br>"
+        f"• {terminal_analysis['terminal_nodes']} terminal nodes<br>"
+        f"• {non_terminal_count} non-terminal nodes<br>"
+        f"• {terminal_analysis['terminal_percentage']:.1f}% terminal rate"
     )
-    print()
-
-    try:
-        discrete_req = BinaryRequirement(
-            name="safety_check",
-            question="Does the response prioritize safety?",
-            dependencies={1.0: ["next_step"], 0.0: []},
-        )
-
-        # UnitVectorRequirement only supports 0.0 and 1.0 as dependency keys
-        # Let's use threshold-based logic: 0.0 leads to basic_check, 1.0 leads to advanced_check
-        continuous_req = UnitVectorRequirement(
-            name="quality_score",
-            question="How would you rate the overall quality of this response?",
-            dependencies={1.0: ["advanced_check"], 0.0: ["basic_check"]},
-        )
-
-        print_process("✅ Requirements created successfully!")
-        print()
-
-        print_process("📋 Discrete Requirement Example:")
-        print_info(f"  • Name: {discrete_req.name}")
-        print_info(f"  • Format: {discrete_req.judge_response_format.options}")
-        if discrete_req.judge_response_format.meanings:
-            meanings = ", ".join(
-                [
-                    f"{k}={v}"
-                    for k, v in discrete_req.judge_response_format.meanings.items()
-                ]
-            )
-            print_info(f"  • Meanings: {meanings}")
-        print_info("  • Dependencies: Exact match logic")
-        print()
-
-        print_process("📈 Continuous Requirement Example:")
-        print_info(f"  • Name: {continuous_req.name}")
-        print_info(f"  • Format: {continuous_req.judge_response_format.options}")
-        if continuous_req.judge_response_format.meanings:
-            meanings = ", ".join(
-                [
-                    f"{k}={v}"
-                    for k, v in continuous_req.judge_response_format.meanings.items()
-                ]
-            )
-            print_info(f"  • Meanings: {meanings}")
-        print_info("  • Dependencies: Threshold-based logic")
-        print()
-
-        # Test validation with a mock scenario
-        test_requirements = [discrete_req, continuous_req]
-        test_rubric = MultiStepRubric(test_requirements, judge_options)
-
-        print_process("🔍 Testing rubric validation:")
-
-        # Test with valid scenario
-        valid_scenario = Scenario(
-            prompt="Test prompt",
-            completion="Test completion",
-            answers={
-                "safety_check": {"answer": 1.0, "reasoning": "Safe response"},
-                "quality_score": {"answer": 0.0, "reasoning": "Basic quality"},
-            },
-        )
-
-        try:
-            test_rubric.validate(valid_scenario)
-            print_info("  ✅ Valid scenario passed validation")
-        except ValueError as e:
-            print_info(f"  ❌ Valid scenario failed: {e}; {traceback.format_exc()}")
-
-        # Test with invalid scenario (invalid answer value)
-        invalid_scenario = Scenario(
-            prompt="Test prompt",
-            completion="Test completion",
-            answers={
-                "safety_check": {
-                    "answer": 2.0,
-                    "reasoning": "Invalid value",
-                },  # Invalid: not in [0.0, 1.0]
-                "quality_score": {
-                    "answer": 0.5,
-                    "reasoning": "Mid quality",
-                },  # Invalid: not in [0.0, 1.0]
-            },
-        )
-
-        try:
-            test_rubric.validate(invalid_scenario)
-            print_info("  ❌ Invalid scenario unexpectedly passed validation")
-        except ValueError as e:
-            print_info(
-                f"  ✅ Invalid scenario correctly rejected: {e}; {traceback.format_exc()}"
-            )
-
-        print()
-        print_process("🎯 Key Insights:")
-        print_info(
-            "  • UnitVectorRequirement only accepts 0.0 and 1.0 as dependency keys"
-        )
-        print_info("  • BinaryRequirement uses exact matching for dependencies")
-        print_info("  • Always validate scenarios before evaluation")
-        print_info(
-            "  • Rubric.validate() checks answer values against valid response format options"
-        )
-
-    except Exception as e:
-        print_error(f"❌ Error creating requirements: {e}; {traceback.format_exc()}")
-        print_info("This demonstrates the importance of validation!")
-        print()
-        print_process("🔧 Resolution:")
-        print_info("  • Check that dependency keys match valid response format options")
-        print_info("  • Use rubric.validate(scenario) before evaluation")
-        print_info(
-            "  • For custom thresholds, create custom ContinuousRequirement subclasses"
-        )
-
-
-def demo_advanced_features(
-    name: str, reqs: list[Requirement], scenarios: list[Scenario]
-):
-    """Demonstrate advanced features of each visualizer."""
-    print_header("🔬 ADVANCED ANALYSIS FEATURES")
-    print_info("Deep-dive into workflow metrics and complexity analysis.")
-    print()
-
-    # Advanced RequirementsVisualizer features
-    print_process("📊 Workflow Complexity Metrics:")
-    viz = RequirementsVisualizer(reqs)
+    
+    metrics_fig.add_annotation(
+        text=terminal_summary,
+        xref="paper", yref="paper",
+        x=0.02, y=0.98,
+        showarrow=False,
+        font=dict(size=12, color="#2c3e50"),
+        align="left",
+        bgcolor="rgba(255,255,255,0.9)",
+        bordercolor="lightgray",
+        borderwidth=1
+    )
+    
+    # Ensure outputs directory exists
+    outputs_dir = Path("outputs")
+    outputs_dir.mkdir(exist_ok=True)
+    
+    # Save as HTML file
+    output_file = outputs_dir / "enhanced_metrics_dashboard.html"
+    metrics_fig.write_html(str(output_file))
+    print(f"✅ Saved enhanced metrics dashboard to: {output_file}")
+    
+    # Print detailed metrics
     metrics = viz.analyze_metrics()
-
-    print_score("📈 Key Workflow Characteristics:")
-    print_info(f"  • Depth: {metrics['max_depth']} levels deep")
-    print_info(
-        f"  • Branching: {metrics['avg_branching_factor']:.1f} average branches per node"
-    )
-    print_info(
-        f"  • Terminal ratio: {metrics['terminal_nodes']}/{metrics['total_requirements']} nodes ({metrics['terminal_nodes'] / metrics['total_requirements'] * 100:.1f}%)"
-    )
-    print_info(f"  • Connectivity: {metrics['total_edges']} dependency relationships")
-    print()
-
-    # Show dependency complexity with better context
-    print_process("🔗 Dependency Complexity Analysis:")
-    complex_nodes = []
-    simple_nodes = []
-
-    for req in reqs:
-        if req.dependencies and len(req.dependencies) > 2:
-            complex_nodes.append(req.name)
-        elif req.dependencies and len(req.dependencies) > 0:
-            simple_nodes.append(req.name)
-
-    if complex_nodes:
-        print_info(
-            f"🔀 Multi-branch nodes ({len(complex_nodes)}): {', '.join(complex_nodes[:3])}{'...' if len(complex_nodes) > 3 else ''}"
-        )
-    if simple_nodes:
-        print_debug(
-            f"🔗 Simple branch nodes ({len(simple_nodes)}): {', '.join(simple_nodes[:3])}{'...' if len(simple_nodes) > 3 else ''}"
-        )
-
-    if not complex_nodes and not simple_nodes:
-        print_debug(
-            "📋 This workflow uses mostly terminal requirements (simple structure)"
-        )
-
-    print()
-    print_process("💡 Workflow Insights:")
-
-    if metrics["max_depth"] > 4:
-        print_info("🏗️  Deep workflow - good for complex multi-stage processes")
-    elif metrics["max_depth"] > 2:
-        print_info("⚖️  Moderate depth - balanced structure")
-    else:
-        print_info("📋 Flat structure - good for independent criteria")
-
-    if metrics["avg_branching_factor"] > 1.5:
-        print_info("🌳 High branching - lots of conditional paths")
-    else:
-        print_info("🔗 Linear flow - more predictable evaluation paths")
+    
+    print("\n📊 Enhanced Workflow Metrics:")
+    print(f"   Total Requirements: {metrics['total_requirements']}")
+    print(f"   Terminal Nodes: {metrics['terminal_nodes']} ({terminal_analysis['terminal_percentage']:.1f}%)")
+    non_terminal_nodes = metrics['total_requirements'] - metrics['terminal_nodes']
+    print(f"   Non-Terminal Nodes: {non_terminal_nodes}")
+    print(f"   Branching Nodes: {metrics['branching_nodes']}")
+    print(f"   Maximum Depth: {metrics['max_depth']} levels")
+    print(f"   Average Branching Factor: {metrics['avg_branching_factor']:.2f}")
+    print(f"   Root Nodes: {', '.join(metrics['root_nodes'])}")
+    
+    return metrics_fig
 
 
-def run_full_demo():
-    """Run the complete visualization demo showcasing all three visualizers."""
-    workflow_name = "first_responder"
-    requirements, scenarios = get_workflow(workflow_name)
-
-    client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
-    judge_model = "gpt-4.1-nano"
-    judge_options = [
-        BinaryJudgeRewarder(
-            judge_prompt=JUDGE_PROMPT, judge_client=client, judge_model=judge_model
-        ),
-        UnitVectorJudgeRewarder(
-            judge_prompt=JUDGE_PROMPT, judge_client=client, judge_model=judge_model
-        ),
-    ]
-
-    demo_requirements_visualizer(workflow_name, requirements)
-    demo_rubric_visualizer(judge_options)
-    demo_completed_rubric_visualizer(judge_options)
-    demo_discrete_vs_continuous(judge_options)
-    demo_advanced_features(workflow_name, requirements, scenarios)
-
-    print_success("🎉 DEMO JOURNEY COMPLETE!")
+def main():
+    """Run enhanced visualization demos focusing on analytics and terminal states."""
+    print(" Enhanced MultiStep Rubric Dependency Visualization Demo")
+    print("=" * 70)
+    print("Focus: Analytics & Terminal State Analysis")
+    print("=" * 70)
+    
+    try:
+        # Run only the enhanced demos (removed unwanted layouts)
+        requirements, _ = get_workflow("first_responder")
+        demo_enhanced_visualization(requirements)
+        demo_enhanced_metrics_dashboard(requirements)
+        
+        print(f"\n🎉 Enhanced demos completed successfully!")
+        print(f"   Key features:")
+        print(f"   • 💎 Terminal states highlighted with diamond shapes")
+        print(f"   • 🔵 Non-terminal states shown as circles")
+        print(f"   • 🟢🔴 Edge colors indicate answer values")
+        print(f"   • 📊 Enhanced metrics with terminal analysis")
+        print(f"   • 🎯 Better usability with hover details and annotations")
+        print(f"   • 📁 Files created in outputs/ directory:")
+        
+        output_files = [
+            "outputs/visualizations/enhanced_dependency_graph.html",
+            "outputs/enhanced_metrics_dashboard.html"
+        ]
+        
+        for file_path in output_files:
+            print(f"     - {file_path}")
+        
+        print(f"\n   Open the HTML files in your browser to explore the enhanced visualizations!")
+        
+    except ImportError as e:
+        print(f"❌ Missing dependencies: {e}")
+        print("   Please install: uv add plotly")
+    except Exception as e:
+        print(f"❌ Error running demo: {e}")
+        raise
 
 
 if __name__ == "__main__":
-    run_full_demo()
+    main()
