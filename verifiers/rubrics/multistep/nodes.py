@@ -138,17 +138,18 @@ class NodeFactory:
             The appropriate RequirementRewardNode subclass instance
         """
         selected_judge = None
-        
+
         # First, try name-based matching if judge_name is specified
-        if hasattr(requirement, 'judge_name') and requirement.judge_name is not None:
+        if hasattr(requirement, "judge_name") and requirement.judge_name is not None:
             named_judges = [
-                jr for jr in judge_options 
-                if hasattr(jr, 'name') and jr.name == requirement.judge_name
+                jr
+                for jr in judge_options
+                if hasattr(jr, "name") and jr.name == requirement.judge_name
             ]
             if named_judges:
                 selected_judge = named_judges[0]
                 # Validate that the named judge's response format is compatible
-                if hasattr(selected_judge, 'judge_response_format'):
+                if hasattr(selected_judge, "judge_response_format"):
                     judge_format = selected_judge.judge_response_format
                     req_format = requirement.judge_response_format
                     if judge_format.__class__ != req_format.__class__:
@@ -161,7 +162,7 @@ class NodeFactory:
                     f"No judge found with name '{requirement.judge_name}' for requirement '{requirement.name}'. "
                     f"Available judge names: {[getattr(jr, 'name', 'unnamed') for jr in judge_options]}"
                 )
-        
+
         # If no judge selected by name, fall back to type-based matching
         if selected_judge is None:
             # maintain order of precedence in REQUIREMENT_TO_JUDGE_MAPPING
@@ -176,10 +177,10 @@ class NodeFactory:
                         )
                     selected_judge = compatible_judges[0]
                     break
-            
+
             if selected_judge is None:
                 raise ValueError(
                     f"Requirement type {type(requirement)} not found in mapping {REQUIREMENT_TO_JUDGE_MAPPING}"
                 )
-        
+
         return RequirementJudgeRewardNode(requirement, selected_judge)
