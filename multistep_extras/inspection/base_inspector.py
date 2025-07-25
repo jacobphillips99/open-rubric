@@ -5,10 +5,11 @@ This module provides the core inspection functionality that is shared between
 the text-based inspector and the visualizer.
 """
 
-from typing import Any, Dict, List, Tuple
+from typing import Any, Dict, List, Tuple, Optional
 
 from verifiers.rewards.judge_utils import (ContinuousJudgeResponseFormat,
                                            DiscreteJudgeResponseFormat)
+from verifiers.rubrics.multistep.multistep_rubric import MultiStepRubric
 from verifiers.rubrics.multistep.requirement import (ContinuousRequirement,
                                                      DiscreteRequirement,
                                                      Requirement)
@@ -29,15 +30,15 @@ class BaseRequirementsInspector:
         self.requirements = requirements
         self.name_to_req = {req.name: req for req in requirements}
 
-        # Build dependency structure for topological sorting
-        self.dependencies = {
+        # Build enablement structure for topological sorting
+        # req.dependencies is already in the format {answer: [enabled_requirements]}
+        name_to_dependency_options: Dict[str, Optional[List[str]]] = {
             name: sum(req.dependencies.values(), []) if req.dependencies else None
             for name, req in self.name_to_req.items()
         }
 
         # Get topological levels
-        self.levels = topological_levels(self.dependencies)
-        self.levels.reverse()  # Start from root nodes
+        self.levels = topological_levels(name_to_dependency_options)
 
     def print_dependency_graph(self) -> None:
         """Print the dependency relationships between requirements."""
@@ -131,7 +132,7 @@ class BaseRequirementsInspector:
 
         # Count total edges
         total_edges = sum(
-            len(deps) if deps is not None else 0 for deps in self.dependencies.values()
+            len(enabled_reqs) for enabled_reqs in self.enables.values()
         )
 
         return {
@@ -233,7 +234,7 @@ class BaseRequirementsInspector:
 class BaseRubricInspector:
     """Base inspector for complete MultiStepRubric with nodes and judge rewarders."""
 
-    def __init__(self, rubric):
+    def __init__(self, rubric: MultiStepRubric):
         """
         Initialize inspector with a MultiStepRubric.
 
@@ -241,7 +242,9 @@ class BaseRubricInspector:
             rubric: MultiStepRubric object to inspect
         """
         self.rubric = rubric
-        self.requirements_inspector = BaseRequirementsInspector(list(rubric.requirements))
+        self.requirements_inspector = BaseRequirementsInspector(
+            list(rubric.requirements)
+        )
 
     def print_rubric_overview(self) -> None:
         """Print an overview of the rubric configuration."""
@@ -265,8 +268,6 @@ class BaseRubricInspector:
         for level_idx, level in enumerate(self.rubric.levels):
             print(f"\nLevel {level_idx}:")
             for req_name in level:
-                if req_name not in self.rubric.name_to_node:
-                    breakpoint()
                 node = self.rubric.name_to_node[req_name]
                 req = self.rubric.name_to_req[req_name]
 
@@ -286,7 +287,7 @@ class BaseRubricInspector:
     def print_judge_configuration(self) -> None:
         """Print details about the judge rewarder configuration."""
         from verifiers.rewards.judge_reward import JUDGE_PROMPT
-        
+
         print("JUDGE CONFIGURATION")
         print("=" * 60)
         for judge in self.rubric.judge_options:
@@ -556,4 +557,4 @@ class BaseEvaluationInspector:
         self.print_scenario_info(scenario)
         self.print_evaluation_results(scenario, results)
         self.print_evaluation_path_taken(scenario, results)
-        self.print_revealed_information(scenario, results) 
+        self.print_revealed_information(scenario, results)

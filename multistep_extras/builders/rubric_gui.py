@@ -8,8 +8,8 @@ This GUI allows you to build a MultiStepRubric by adding judge rewarders, requir
 """
 
 import json
-from pathlib import Path
 import traceback
+from pathlib import Path
 from typing import Any
 
 import streamlit as st
@@ -272,7 +272,6 @@ def _load_rubric_from_directory(rubric_name: str, directory: Path) -> None:
         st.rerun()
 
     except Exception as e:
-        breakpoint()
         st.error(f"Error loading rubric: {str(e)}\n{traceback.format_exc()}")
 
 
@@ -848,9 +847,7 @@ def _update_judge_response_format(
 def _render_existing_judge_rewarders() -> None:
     """Render the list of existing judge rewarders."""
     for i, judge in enumerate(st.session_state.judge_rewarders):
-        judge_display_name = (
-            getattr(judge, "name", None) or judge.__class__.__name__
-        )
+        judge_display_name = getattr(judge, "name", None) or judge.__class__.__name__
         with st.expander(f"Judge {i + 1}: {judge_display_name}", expanded=False):
             col1, col2, col3 = st.columns([2, 2, 1])
 
@@ -1811,29 +1808,27 @@ def render_visualization() -> None:
 
     # Enhanced visualization options
     col1, col2, col3, col4 = st.columns(4)
-    
+
     with col1:
         layout_algorithm = st.selectbox(
             "Layout Algorithm",
             options=["hierarchical", "force", "circular"],
             index=0,
-            help="Choose how to arrange the nodes in the graph"
+            help="Choose how to arrange the nodes in the graph",
         )
-    
+
     with col2:
         show_answer_labels = st.checkbox(
-            "Show Answer Labels",
-            value=True,
-            help="Display answer values on the edges"
+            "Show Answer Labels", value=True, help="Display answer values on the edges"
         )
-    
+
     with col3:
         show_terminal_states = st.checkbox(
             "Highlight Terminal States",
             value=True,
-            help="Emphasize terminal states with diamond shapes"
+            help="Emphasize terminal states with diamond shapes",
         )
-    
+
     with col4:
         graph_height = st.slider(
             "Graph Height",
@@ -1841,65 +1836,72 @@ def render_visualization() -> None:
             max_value=1000,
             value=600,
             step=50,
-            help="Adjust the height of the graph"
+            help="Adjust the height of the graph",
         )
 
     # Create the main dependency graph with enhanced features
     try:
-        from multistep_extras.visualization.visualizer import create_dependency_graph
-        
+        from multistep_extras.visualization.visualizer import \
+            create_dependency_graph
+
         st.subheader("🔗 Dependency Graph")
-        
+
         fig = create_dependency_graph(
             st.session_state.requirements,
             width=1000,
             height=graph_height,
             show_answer_labels=show_answer_labels,
             show_terminal_states=show_terminal_states,
-            show_requirement_types=True
+            show_requirement_types=True,
         )
-        
+
         # Add enhanced annotations like in the demo
         fig.add_annotation(
             text="💎 Diamond shapes = Terminal states<br>🔵 Circles = Non-terminal states<br>🟢 Green edges = Positive answers<br>🔴 Red edges = Negative answers",
-            xref="paper", yref="paper",
-            x=0.02, y=0.98,
+            xref="paper",
+            yref="paper",
+            x=0.02,
+            y=0.98,
             showarrow=False,
             font=dict(size=12, color="#2c3e50"),
             align="left",
             bgcolor="rgba(255,255,255,0.8)",
             bordercolor="lightgray",
-            borderwidth=1
+            borderwidth=1,
         )
-        
+
         st.plotly_chart(fig, use_container_width=True)
-        
+
         # Add explanation
         with st.expander("📚 How to Read This Graph", expanded=False):
-            st.markdown("""
+            st.markdown(
+                """
             **Understanding the Dependency Graph:**
-            
+
             - **Nodes (shapes)** represent requirements:
               - 💎 **Diamond shapes** = Terminal states (no dependencies)
               - 🔵 **Circle shapes** = Non-terminal states (have dependencies)
             - **Colors** indicate requirement types:
               - 🔵 Blue: Binary requirements
-              - 🟠 Orange: Discrete requirements  
+              - 🟠 Orange: Discrete requirements
               - 🟢 Green: Continuous requirements
               - 🔴 Red: Unit vector requirements
             - **Edges (arrows)** show dependencies between requirements
             - **Numbers on edges** show which answer triggers that dependency
             - **Size** indicates if a requirement is terminal (larger) or has dependencies
             - **Hover** over nodes to see detailed information
-            
+
             **Layout Algorithms:**
             - **Hierarchical**: Organizes by dependency levels (top-down flow)
             - **Force**: Uses physics simulation for natural clustering
             - **Circular**: Arranges nodes in a circle for overview
-            """)
+            """
+            )
 
     except ImportError as e:
-        st.error("Required dependencies not available. Please install: `pip install plotly networkx`")
+        st.error(
+            "Required dependencies not available. Please install: `pip install plotly networkx`"
+        )
         return
     except Exception as e:
         st.error(f"Error creating dependency graph: {str(e)}")
@@ -1908,23 +1910,23 @@ def render_visualization() -> None:
     # Enhanced path visualization section
     st.divider()
     st.subheader("🛤️ Path Visualization")
-    
+
     if st.session_state.requirements:
         st.markdown("**Simulate an evaluation path:**")
-        
+
         # Create input fields for answers with enhanced UI
         answers = {}
         req_names = [req.name for req in st.session_state.requirements]
-        
+
         # Use columns to organize the input
         cols = st.columns(min(3, len(req_names)))
-        
+
         for i, req in enumerate(st.session_state.requirements):
             col = cols[i % len(cols)]
-            
+
             with col:
                 # Enhanced input based on requirement type
-                if hasattr(req, 'judge_response_format'):
+                if hasattr(req, "judge_response_format"):
                     options = req.judge_response_format.options
                     if len(options) == 2 and set(options) == {0.0, 1.0}:
                         # Binary choice with better labels
@@ -1933,7 +1935,7 @@ def render_visualization() -> None:
                             options=[0.0, 1.0],
                             format_func=lambda x: "❌ No" if x == 0.0 else "✅ Yes",
                             key=f"path_answer_{req.name}",
-                            help=f"Question: {req.question[:50]}..."
+                            help=f"Question: {req.question[:50]}...",
                         )
                     elif isinstance(options, list) and len(options) > 2:
                         # Discrete choices
@@ -1941,7 +1943,7 @@ def render_visualization() -> None:
                             f"{req.name}:",
                             options=options,
                             key=f"path_answer_{req.name}",
-                            help=f"Question: {req.question[:50]}..."
+                            help=f"Question: {req.question[:50]}...",
                         )
                     else:
                         # Continuous or other
@@ -1954,7 +1956,7 @@ def render_visualization() -> None:
                                 value=float(options[0]),
                                 step=0.1,
                                 key=f"path_answer_{req.name}",
-                                help=f"Question: {req.question[:50]}..."
+                                help=f"Question: {req.question[:50]}...",
                             )
                         else:
                             # Fallback to number input
@@ -1963,7 +1965,7 @@ def render_visualization() -> None:
                                 value=1.0,
                                 step=0.1,
                                 key=f"path_answer_{req.name}",
-                                help=f"Question: {req.question[:50]}..."
+                                help=f"Question: {req.question[:50]}...",
                             )
                 else:
                     # Fallback for requirements without response format
@@ -1972,138 +1974,153 @@ def render_visualization() -> None:
                         value=1.0,
                         step=0.1,
                         key=f"path_answer_{req.name}",
-                        help=f"Question: {req.question[:50]}..."
+                        help=f"Question: {req.question[:50]}...",
                     )
-                
+
                 answers[req.name] = float(answer)
-        
+
         if st.button("🎯 Visualize Path", type="primary"):
             try:
-                from multistep_extras.visualization.visualizer import create_path_visualization
-                
+                from multistep_extras.visualization.visualizer import \
+                    create_path_visualization
+
                 path_fig = create_path_visualization(
                     st.session_state.requirements,
                     answers,
                     width=1000,
                     height=graph_height,
                     show_answer_labels=show_answer_labels,
-                    show_terminal_states=show_terminal_states
+                    show_terminal_states=show_terminal_states,
                 )
-                
+
                 st.plotly_chart(path_fig, use_container_width=True)
-                
+
                 # Show path explanation
-                st.success("🎯 **Path highlighted in red!** This shows which requirements would be evaluated given your answers.")
-                
+                st.success(
+                    "🎯 **Path highlighted in red!** This shows which requirements would be evaluated given your answers."
+                )
+
             except Exception as e:
                 st.error(f"Error creating path visualization: {str(e)}")
 
-    # Enhanced metrics dashboard section  
+    # Enhanced metrics dashboard section
     st.divider()
     st.subheader("📊 Enhanced Metrics Dashboard")
-    
+
     try:
-        from multistep_extras.visualization.visualizer import create_metrics_dashboard, RequirementsVisualizer
-        
+        from multistep_extras.visualization.visualizer import (
+            RequirementsVisualizer, create_metrics_dashboard)
+
         metrics_fig = create_metrics_dashboard(st.session_state.requirements)
-        
+
         # Add terminal state analysis like in the demo
         viz = RequirementsVisualizer(st.session_state.requirements)
         terminal_analysis = viz.create_terminal_analysis()
-        
+
         # Add terminal state summary as annotation
-        non_terminal_count = len(st.session_state.requirements) - terminal_analysis['terminal_nodes']
+        non_terminal_count = (
+            len(st.session_state.requirements) - terminal_analysis["terminal_nodes"]
+        )
         terminal_summary = (
             f"💎 Terminal Analysis:<br>"
             f"• {terminal_analysis['terminal_nodes']} terminal nodes<br>"
             f"• {non_terminal_count} non-terminal nodes<br>"
             f"• {terminal_analysis['terminal_percentage']:.1f}% terminal rate"
         )
-        
+
         metrics_fig.add_annotation(
             text=terminal_summary,
-            xref="paper", yref="paper",
-            x=0.02, y=0.98,
+            xref="paper",
+            yref="paper",
+            x=0.02,
+            y=0.98,
             showarrow=False,
             font=dict(size=12, color="#2c3e50"),
             align="left",
             bgcolor="rgba(255,255,255,0.9)",
             bordercolor="lightgray",
-            borderwidth=1
+            borderwidth=1,
         )
-        
+
         st.plotly_chart(metrics_fig, use_container_width=True)
-        
+
         # Show text metrics alongside
         metrics = viz.analyze_metrics()
-        
+
         col1, col2, col3, col4 = st.columns(4)
-        
+
         with col1:
             st.metric("Total Requirements", metrics["total_requirements"])
-            
+
         with col2:
-            st.metric("Terminal Nodes", metrics["terminal_nodes"], 
-                     delta=f"{terminal_analysis['terminal_percentage']:.1f}%")
-            
+            st.metric(
+                "Terminal Nodes",
+                metrics["terminal_nodes"],
+                delta=f"{terminal_analysis['terminal_percentage']:.1f}%",
+            )
+
         with col3:
             st.metric("Max Depth", metrics["max_depth"])
-            
+
         with col4:
             st.metric("Avg Branching", f"{metrics['avg_branching_factor']:.1f}")
-            
+
         # Enhanced metrics details
         with st.expander("📊 Detailed Metrics", expanded=False):
             col1, col2 = st.columns(2)
-            
+
             with col1:
                 st.markdown("**Structure Analysis:**")
                 st.markdown(f"• Branching Nodes: {metrics['branching_nodes']}")
                 st.markdown(f"• Multi-branch Nodes: {metrics['multi_branch_nodes']}")
                 st.markdown(f"• Root Nodes: {', '.join(metrics['root_nodes'])}")
                 st.markdown(f"• Total Edges: {metrics['total_edges']}")
-            
+
             with col2:
                 st.markdown("**Terminal Analysis:**")
-                for req_type, count in terminal_analysis['terminal_by_type'].items():
+                for req_type, count in terminal_analysis["terminal_by_type"].items():
                     st.markdown(f"• {req_type}: {count} terminal")
-                st.markdown(f"• Terminal Rate: {terminal_analysis['terminal_percentage']:.1f}%")
+                st.markdown(
+                    f"• Terminal Rate: {terminal_analysis['terminal_percentage']:.1f}%"
+                )
                 st.markdown(f"• Non-Terminal: {non_terminal_count}")
-            
+
     except Exception as e:
         st.error(f"Error creating metrics dashboard: {str(e)}")
 
     # Save visualization section
     st.divider()
     st.subheader("💾 Save Visualizations")
-    
+
     col1, col2 = st.columns(2)
-    
+
     with col1:
         if st.button("📁 Save Dependency Graph"):
             try:
                 from pathlib import Path
+
                 outputs_dir = Path("outputs") / "visualizations"
                 outputs_dir.mkdir(parents=True, exist_ok=True)
-                
+
                 output_file = outputs_dir / "dependency_graph.html"
                 fig.write_html(str(output_file))
                 st.success(f"✅ Saved dependency graph to: {output_file}")
-                
+
             except Exception as e:
                 st.error(f"Error saving dependency graph: {str(e)}")
-    
+
     with col2:
         if st.button("📊 Save Metrics Dashboard"):
             try:
                 from pathlib import Path
+
                 outputs_dir = Path("outputs") / "visualizations"
                 outputs_dir.mkdir(parents=True, exist_ok=True)
-                
+
                 output_file = outputs_dir / "metrics_dashboard.html"
                 metrics_fig.write_html(str(output_file))
                 st.success(f"✅ Saved metrics dashboard to: {output_file}")
-                
+
             except Exception as e:
                 st.error(f"Error saving metrics dashboard: {str(e)}")
 
@@ -2111,27 +2128,31 @@ def render_visualization() -> None:
     if "loaded_scenarios" in st.session_state and st.session_state.loaded_scenarios:
         st.divider()
         st.subheader("🔄 Scenario Compatibility")
-        
+
         try:
             rubric = _build_rubric()
             scenarios = st.session_state.loaded_scenarios
-            
+
             compatible_count = 0
             total_count = len(scenarios)
-            
+
             for scenario in scenarios:
                 if scenario.answers:
                     rubric_req_names = {req.name for req in rubric.requirements}
                     scenario_req_names = set(scenario.answers.keys())
                     if rubric_req_names.intersection(scenario_req_names):
                         compatible_count += 1
-            
+
             st.metric(
-                "Compatible Scenarios", 
+                "Compatible Scenarios",
                 f"{compatible_count}/{total_count}",
-                delta=f"{compatible_count/total_count*100:.0f}%" if total_count > 0 else "0%"
+                delta=(
+                    f"{compatible_count/total_count*100:.0f}%"
+                    if total_count > 0
+                    else "0%"
+                ),
             )
-            
+
         except Exception as e:
             st.warning(f"Could not analyze scenario compatibility: {str(e)}")
 

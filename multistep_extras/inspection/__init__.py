@@ -2,14 +2,15 @@
 Inspection utilities for MultiStep Rubric workflows.
 """
 
-from .base_inspector import (BaseRequirementsInspector, BaseRubricInspector,
-                             BaseEvaluationInspector)
-from .inspector import (RequirementsInspector, RubricInspector, EvaluationInspector,
-                       inspect_requirements, compare_requirements)
+from .base_inspector import (BaseEvaluationInspector,
+                             BaseRequirementsInspector, BaseRubricInspector)
+from .inspector import (EvaluationInspector, RequirementsInspector,
+                        RubricInspector, compare_requirements,
+                        inspect_requirements)
 
 __all__ = [
     "BaseRequirementsInspector",
-    "BaseRubricInspector", 
+    "BaseRubricInspector",
     "BaseEvaluationInspector",
     "RequirementsInspector",
     "RubricInspector",

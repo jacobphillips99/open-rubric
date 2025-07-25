@@ -13,22 +13,25 @@ from verifiers.rubrics.multistep.multistep_rubric import MultiStepRubric
 from verifiers.rubrics.multistep.requirement import Requirement
 from verifiers.rubrics.multistep.scenario import Scenario
 
-from .base_inspector import (BaseRequirementsInspector, BaseRubricInspector,
-                             BaseEvaluationInspector)
+from .base_inspector import (BaseEvaluationInspector,
+                             BaseRequirementsInspector, BaseRubricInspector)
 
 
 class RequirementsInspector(BaseRequirementsInspector):
     """Inspector focused on requirement dependencies and workflow structure."""
+
     pass
 
 
 class RubricInspector(BaseRubricInspector):
     """Inspector for complete MultiStepRubric with nodes and judge rewarders."""
+
     pass
 
 
 class EvaluationInspector(BaseEvaluationInspector):
     """Inspector for rubrics that have been evaluated with results."""
+
     pass
 
 

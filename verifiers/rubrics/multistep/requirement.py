@@ -42,7 +42,11 @@ class Requirement:
         self.name = name
         self.question = question
         self.dependencies = dependencies
-        self.judge_response_format = judge_response_format if isinstance(judge_response_format, JudgeResponseFormat) else JudgeResponseFormat.from_dict(judge_response_format)
+        self.judge_response_format = (
+            judge_response_format
+            if isinstance(judge_response_format, JudgeResponseFormat)
+            else JudgeResponseFormat.from_dict(judge_response_format)
+        )
         self.judge_name = judge_name
 
     def validate_dependencies(self) -> None:

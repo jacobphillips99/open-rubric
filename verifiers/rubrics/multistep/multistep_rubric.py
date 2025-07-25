@@ -94,7 +94,6 @@ class MultiStepRubric(Rubric):
 
         # Get topological levels (reversed to start from root nodes)
         self.levels = topological_levels(self.name_to_dependency_options)
-        self.levels.reverse()
 
     async def evaluate(
         self,

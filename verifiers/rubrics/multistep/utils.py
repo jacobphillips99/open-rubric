@@ -1,35 +1,31 @@
-from collections import defaultdict, deque
+from collections import defaultdict
+from typing import Dict, List
 
 
-def topological_levels(dependencies: dict[str, list[str] | None]) -> list[list[str]]:
-    """
-    Topological sort of a DAG of dependencies which returns a list of levels,
-    such that every node's dependencies live in earlier levels.
-    """
-    deps: dict[str, list[str]] = {k: (v or []) for k, v in dependencies.items()}
-    out_edges: dict[str, list[str]] = defaultdict(list)
-    in_degrees: dict[str, int] = defaultdict(int)
+def topological_levels(graph: Dict[str, List[str]]) -> List[List[str]]:
+    graph = {k: (v if v is not None else []) for k, v in graph.items()}
+    
+    # build in-degree (how many prerequisites each node has)
+    in_degree = defaultdict(int)
+    children = defaultdict(list)
+    
+    for parent, unlocks in graph.items():
+        for child in unlocks:
+            in_degree[child] += 1
+            children[parent].append(child)
+        in_degree[parent] += 0  # ensure key exists
 
-    for n, pres in deps.items():
-        in_degrees.setdefault(n, 0)
-        for p in pres:
-            out_edges[p].append(n)
-            in_degrees[n] += 1
-            in_degrees.setdefault(p, 0)
+    # start with nodes that have no prerequisites
+    layer = [node for node in graph if in_degree[node] == 0]
+    result = []
 
-    queue: deque[str] = deque([n for n, d in in_degrees.items() if d == 0])
-    levels: list[list[str]] = []
-
-    while queue:
-        this_lvl = list(queue)
-        levels.append(this_lvl)
-        for _ in range(len(this_lvl)):
-            n = queue.popleft()
-            for m in out_edges[n]:
-                in_degrees[m] -= 1
-                if in_degrees[m] == 0:
-                    queue.append(m)
-
-    if sum(len(level) for level in levels) != len(in_degrees):
-        raise ValueError("Cycle detected in dependencies; levelization impossible")
-    return levels 
+    while layer:
+        result.append(sorted(layer))
+        next_layer = []
+        for node in layer:
+            for child in children[node]:
+                in_degree[child] -= 1
+                if in_degree[child] == 0:
+                    next_layer.append(child)
+        layer = next_layer
+    return result
