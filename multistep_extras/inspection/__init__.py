@@ -1,6 +1,4 @@
-"""
-Inspection utilities for MultiStep Rubric workflows.
-"""
+"""Inspection utilities for MultiStep Rubric workflows."""
 
 from .base_inspector import (BaseEvaluationInspector,
                              BaseRequirementsInspector, BaseRubricInspector)

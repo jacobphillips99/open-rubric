@@ -19,10 +19,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 
 from multistep_extras.inspection.base_inspector import (
-    BaseEvaluationInspector,
-    BaseRequirementsInspector,
-    BaseRubricInspector,
-)
+    BaseEvaluationInspector, BaseRequirementsInspector, BaseRubricInspector)
 from verifiers.rubrics.multistep.multistep_rubric import MultiStepRubric
 from verifiers.rubrics.multistep.requirement import Requirement
 
@@ -161,7 +158,10 @@ class RequirementsVisualizer(BaseRequirementsInspector):
                 "dependency distribution",
                 "summary",
             ),
-            specs=[[{"type": "pie"}, {"type": "bar"}], [{"type": "histogram"}, {"type": "bar"}]],
+            specs=[
+                [{"type": "pie"}, {"type": "bar"}],
+                [{"type": "histogram"}, {"type": "bar"}],
+            ],
         )
 
         # 1. type + terminal counts
@@ -171,7 +171,10 @@ class RequirementsVisualizer(BaseRequirementsInspector):
             label = f"{t} ({'terminal' if req.terminal() else 'non-terminal'})"
             type_terminal_counts[label] = type_terminal_counts.get(label, 0) + 1
         fig.add_trace(
-            go.Pie(labels=list(type_terminal_counts.keys()), values=list(type_terminal_counts.values())),
+            go.Pie(
+                labels=list(type_terminal_counts.keys()),
+                values=list(type_terminal_counts.values()),
+            ),
             row=1,
             col=1,
         )
@@ -192,9 +195,12 @@ class RequirementsVisualizer(BaseRequirementsInspector):
 
         # 3. dependency distribution (# answer->deps keys per requirement)
         dep_counts = [
-            len(req.dependencies) if getattr(req, "dependencies", None) else 0 for req in self.requirements
+            len(req.dependencies) if getattr(req, "dependencies", None) else 0
+            for req in self.requirements
         ]
-        fig.add_trace(go.Histogram(x=dep_counts, nbinsx=min(10, len(dep_counts))), row=2, col=1)
+        fig.add_trace(
+            go.Histogram(x=dep_counts, nbinsx=min(10, len(dep_counts))), row=2, col=1
+        )
 
         # 4. summary bar: terminals vs non-terminals + max depth + avg branching (encoded as value)
         terminal = metrics["terminal_nodes"]
@@ -244,7 +250,10 @@ class RequirementsVisualizer(BaseRequirementsInspector):
             "non_terminal_nodes": len(non_terminal_nodes),
             "terminal_by_type": terminal_by_type,
             "paths_to_terminal": paths_to_terminal,
-            "terminal_percentage": (len(terminal_nodes) / max(1, len(self.requirements))) * 100.0,
+            "terminal_percentage": (
+                len(terminal_nodes) / max(1, len(self.requirements))
+            )
+            * 100.0,
         }
 
     # ---- internal data prep ---------------------------------------------
@@ -298,7 +307,11 @@ class RequirementsVisualizer(BaseRequirementsInspector):
             y = max_level_index - lvl_idx  # roots top
             if not node_names:
                 continue
-            xs = np.linspace(-1.5, 1.5, len(node_names)) if len(node_names) > 1 else [0.0]
+            xs = (
+                np.linspace(-1.5, 1.5, len(node_names))
+                if len(node_names) > 1
+                else [0.0]
+            )
             for x, name in zip(xs, node_names):
                 positions[name] = (float(x), float(y))
         for node in nodes:  # fallback
@@ -317,6 +330,7 @@ class RequirementsVisualizer(BaseRequirementsInspector):
         show_requirement_types: bool,
     ) -> None:
         """add node traces."""
+
         def group_key(n: Dict[str, Any]) -> str:
             return n["req_type"] if show_requirement_types else "all"
 
@@ -339,9 +353,15 @@ class RequirementsVisualizer(BaseRequirementsInspector):
                 ys.append(y)
                 texts.append(n["name"])
                 colors.append(self._node_color(n, show_terminal_states))
-                symbols.append("diamond" if (show_terminal_states and n["is_terminal"]) else "circle")
+                symbols.append(
+                    "diamond"
+                    if (show_terminal_states and n["is_terminal"])
+                    else "circle"
+                )
                 sizes.append(
-                    28 if (highlight_path and n["name"] in highlight_path) else (24 if n["is_terminal"] else 18)
+                    28
+                    if (highlight_path and n["name"] in highlight_path)
+                    else (24 if n["is_terminal"] else 18)
                 )
                 hover_texts.append(
                     "<br>".join(
@@ -357,7 +377,7 @@ class RequirementsVisualizer(BaseRequirementsInspector):
                     )
                 )
 
-            legend_name = ("all requirements" if key == "all" else key)
+            legend_name = "all requirements" if key == "all" else key
             fig.add_trace(
                 go.Scatter(
                     x=xs,
@@ -489,11 +509,13 @@ class RequirementsVisualizer(BaseRequirementsInspector):
 
 class RubricVisualizer(BaseRubricInspector):
     """visualizer for a complete multistep rubric (currently a placeholder)."""
+
     pass
 
 
 class CompletedRubricVisualizer(BaseEvaluationInspector):
     """visualizer for evaluated rubrics + results (currently a placeholder)."""
+
     pass
 
 
@@ -508,21 +530,27 @@ def visualize_requirements(requirements: Sequence[Requirement]) -> None:
     viz.print_metrics()
 
 
-def create_dependency_graph(requirements: Sequence[Requirement], **kwargs: Any) -> go.Figure:
+def create_dependency_graph(
+    requirements: Sequence[Requirement], **kwargs: Any
+) -> go.Figure:
     """create a dependency graph for a list of requirements."""
     return RequirementsVisualizer(list(requirements)).create_dependency_graph(**kwargs)
 
 
 def create_rubric_dependency_graph(rubric: MultiStepRubric, **kwargs: Any) -> go.Figure:
     """create a dependency graph for a multistep rubric."""
-    return RequirementsVisualizer(list(rubric.requirements)).create_dependency_graph(**kwargs)
+    return RequirementsVisualizer(list(rubric.requirements)).create_dependency_graph(
+        **kwargs
+    )
 
 
 def create_path_visualization(
     requirements: Sequence[Requirement], answers: Dict[str, Any], **kwargs: Any
 ) -> go.Figure:
     """highlight a specific evaluation path through the requirements."""
-    return RequirementsVisualizer(list(requirements)).create_path_visualization(answers, **kwargs)
+    return RequirementsVisualizer(list(requirements)).create_path_visualization(
+        answers, **kwargs
+    )
 
 
 def create_metrics_dashboard(requirements: Sequence[Requirement]) -> go.Figure:

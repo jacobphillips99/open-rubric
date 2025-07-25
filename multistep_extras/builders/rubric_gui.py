@@ -1379,7 +1379,7 @@ def _render_enhanced_preview() -> None:
 
                 with st.expander("View Details", expanded=False):
                     for i, judge in enumerate(st.session_state.judge_rewarders):
-                        judge_name = getattr(judge, "name", None) or f"Judge {i+1}"
+                        judge_name = getattr(judge, "name", None) or f"Judge {i + 1}"
                         judge_type = judge.__class__.__name__.replace(
                             "JudgeRewarder", ""
                         ).lower()
@@ -1810,7 +1810,7 @@ def render_visualization() -> None:
     col1, col2, col3, col4 = st.columns(4)
 
     with col1:
-        layout_algorithm = st.selectbox(
+        _ = st.selectbox(
             "Layout Algorithm",
             options=["hierarchical", "force", "circular"],
             index=0,
@@ -1900,7 +1900,7 @@ def render_visualization() -> None:
 
     except ImportError as e:
         st.error(
-            "Required dependencies not available. Please install: `pip install plotly networkx`"
+            f"Required dependencies not available. Please install: `pip install plotly networkx`. {e}"
         )
         return
     except Exception as e:
@@ -2147,7 +2147,7 @@ def render_visualization() -> None:
                 "Compatible Scenarios",
                 f"{compatible_count}/{total_count}",
                 delta=(
-                    f"{compatible_count/total_count*100:.0f}%"
+                    f"{compatible_count / total_count * 100:.0f}%"
                     if total_count > 0
                     else "0%"
                 ),

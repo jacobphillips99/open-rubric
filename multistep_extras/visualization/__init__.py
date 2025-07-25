@@ -1,6 +1,4 @@
-"""
-Visualization utilities for MultiStep Rubric workflows.
-"""
+"""Visualization utilities for MultiStep Rubric workflows."""
 
 from .visualizer import (CompletedRubricVisualizer, RequirementsVisualizer,
                          RubricVisualizer, compare_requirements,

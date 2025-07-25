@@ -7,12 +7,9 @@ This module provides three specialized inspectors for different use cases:
 3. EvaluationInspector - For inspecting evaluated rubrics with results
 """
 
-from typing import Any, Dict, List, Tuple
+from typing import List, Tuple
 
-from verifiers.rubrics.multistep.multistep_rubric import MultiStepRubric
 from verifiers.rubrics.multistep.requirement import Requirement
-from verifiers.rubrics.multistep.scenario import Scenario
-
 from .base_inspector import (BaseEvaluationInspector,
                              BaseRequirementsInspector, BaseRubricInspector)
 

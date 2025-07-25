@@ -4,11 +4,11 @@ from typing import Dict, List
 
 def topological_levels(graph: Dict[str, List[str]]) -> List[List[str]]:
     graph = {k: (v if v is not None else []) for k, v in graph.items()}
-    
+
     # build in-degree (how many prerequisites each node has)
     in_degree = defaultdict(int)
     children = defaultdict(list)
-    
+
     for parent, unlocks in graph.items():
         for child in unlocks:
             in_degree[child] += 1

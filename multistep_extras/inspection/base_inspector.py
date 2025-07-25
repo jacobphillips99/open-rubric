@@ -5,7 +5,7 @@ This module provides the core inspection functionality that is shared between
 the text-based inspector and the visualizer.
 """
 
-from typing import Any, Dict, List, Tuple, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from verifiers.rewards.judge_utils import (ContinuousJudgeResponseFormat,
                                            DiscreteJudgeResponseFormat)
@@ -131,9 +131,7 @@ class BaseRequirementsInspector:
         )
 
         # Count total edges
-        total_edges = sum(
-            len(enabled_reqs) for enabled_reqs in self.enables.values()
-        )
+        total_edges = sum(len(enabled_reqs) for enabled_reqs in self.enables.values())
 
         return {
             "total_requirements": len(self.requirements),

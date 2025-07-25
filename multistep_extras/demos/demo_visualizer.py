@@ -6,20 +6,14 @@ with better terminal state handling and usability improvements.
 Run with: python -m multistep_extras.demos.demo_visualizer
 """
 
-import os
 from pathlib import Path
-from typing import List
 
 import plotly.graph_objects as go
 
 from multistep_extras.example_rubrics import get_workflow
 from multistep_extras.visualization.visualizer import (
-    RequirementsVisualizer, create_dependency_graph, create_metrics_dashboard,
-    create_path_visualization)
-from verifiers.rubrics.multistep.requirement import (BinaryRequirement,
-                                                     ContinuousRequirement,
-                                                     DiscreteRequirement,
-                                                     Requirement)
+    RequirementsVisualizer, create_dependency_graph, create_metrics_dashboard)
+from verifiers.rubrics.multistep.requirement import Requirement
 
 
 def demo_enhanced_visualization(requirements: list[Requirement]) -> go.Figure:
@@ -137,14 +131,14 @@ def main():
         demo_enhanced_visualization(requirements)
         demo_enhanced_metrics_dashboard(requirements)
 
-        print(f"\n🎉 Enhanced demos completed successfully!")
-        print(f"   Key features:")
-        print(f"   • 💎 Terminal states highlighted with diamond shapes")
-        print(f"   • 🔵 Non-terminal states shown as circles")
-        print(f"   • 🟢🔴 Edge colors indicate answer values")
-        print(f"   • 📊 Enhanced metrics with terminal analysis")
-        print(f"   • 🎯 Better usability with hover details and annotations")
-        print(f"   • 📁 Files created in outputs/ directory:")
+        print("\n🎉 Enhanced demos completed successfully!")
+        print("   Key features:")
+        print("   • 💎 Terminal states highlighted with diamond shapes")
+        print("   • 🔵 Non-terminal states shown as circles")
+        print("   • 🟢🔴 Edge colors indicate answer values")
+        print("   • 📊 Enhanced metrics with terminal analysis")
+        print("   • 🎯 Better usability with hover details and annotations")
+        print("   • 📁 Files created in outputs/ directory:")
 
         output_files = [
             "outputs/visualizations/enhanced_dependency_graph.html",
