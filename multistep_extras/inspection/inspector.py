@@ -10,6 +10,7 @@ This module provides three specialized inspectors for different use cases:
 from typing import List, Tuple
 
 from verifiers.rubrics.multistep.requirement import Requirement
+
 from .base_inspector import (BaseEvaluationInspector,
                              BaseRequirementsInspector, BaseRubricInspector)
 

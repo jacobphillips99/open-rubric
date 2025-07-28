@@ -35,7 +35,7 @@ _FALLBACK_COLOR = "#7f8c8d"
 
 
 def _darken_hex(hex_color: str, factor: float) -> str:
-    """darken a #rrggbb color by multiplying channels by factor."""
+    """Darken a #rrggbb color by multiplying channels by factor."""
     try:
         r = int(hex_color[1:3], 16)
         g = int(hex_color[3:5], 16)
@@ -53,7 +53,7 @@ def _maybe_truncate(text: str, n: int = 80) -> str:
 
 
 class RequirementsVisualizer(BaseRequirementsInspector):
-    """visualizer focused on requirement dependencies and workflow structure."""
+    """Visualizer focused on requirement dependencies and workflow structure."""
 
     # ---- public api -----------------------------------------------------
 
@@ -67,7 +67,7 @@ class RequirementsVisualizer(BaseRequirementsInspector):
         show_requirement_types: bool = True,
     ) -> go.Figure:
         """
-        build an interactive dependency graph.
+        Build an interactive dependency graph.
 
         args:
             width: figure width in px.
@@ -136,7 +136,7 @@ class RequirementsVisualizer(BaseRequirementsInspector):
         show_answer_labels: bool = True,
         show_terminal_states: bool = True,
     ) -> go.Figure:
-        """visualize a specific evaluation path."""
+        """Visualize a specific evaluation path."""
         return self.create_dependency_graph(
             width=width,
             height=height,
@@ -146,7 +146,7 @@ class RequirementsVisualizer(BaseRequirementsInspector):
         )
 
     def create_metrics_dashboard(self) -> go.Figure:
-        """dashboard with structural metrics."""
+        """Dashboard with structural metrics."""
         metrics = self.analyze_metrics()
 
         fig = make_subplots(
@@ -227,7 +227,7 @@ class RequirementsVisualizer(BaseRequirementsInspector):
         return fig
 
     def create_terminal_analysis(self) -> Dict[str, Any]:
-        """detailed terminal state analysis."""
+        """Detailed terminal state analysis."""
         terminal_nodes = [req for req in self.requirements if req.terminal()]
         non_terminal_nodes = [req for req in self.requirements if not req.terminal()]
 
@@ -259,7 +259,7 @@ class RequirementsVisualizer(BaseRequirementsInspector):
     # ---- internal data prep ---------------------------------------------
 
     def _build_graph_data(self) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-        """extract node + edge metadata (plain dicts)."""
+        """Extract node + edge metadata (plain dicts)."""
         name_to_req = {r.name: r for r in self.requirements}
         nodes: List[Dict[str, Any]] = []
         edges: List[Dict[str, Any]] = []
@@ -297,8 +297,9 @@ class RequirementsVisualizer(BaseRequirementsInspector):
         self, nodes: Sequence[Dict[str, Any]]
     ) -> Dict[str, Tuple[float, float]]:
         """
-        compute simple topological layout:
-        each 'level' from BaseRequirementsInspector is a horizontal layer; we space nodes within.
+        Compute simple topological layout.
+
+        Each 'level' from BaseRequirementsInspector is a horizontal layer; we space nodes within.
         """
         positions: Dict[str, Tuple[float, float]] = {}
         max_level_index = len(self.levels) - 1
@@ -329,7 +330,7 @@ class RequirementsVisualizer(BaseRequirementsInspector):
         show_terminal_states: bool,
         show_requirement_types: bool,
     ) -> None:
-        """add node traces."""
+        """Add node traces."""
 
         def group_key(n: Dict[str, Any]) -> str:
             return n["req_type"] if show_requirement_types else "all"
@@ -413,7 +414,7 @@ class RequirementsVisualizer(BaseRequirementsInspector):
         show_answer_labels: bool,
         highlight_path: Optional[Dict[str, Any]],
     ) -> None:
-        """add edges + (optional) answer labels."""
+        """Add edges + (optional) answer labels."""
         for e in edges:
             x0, y0 = positions[e["source"]]
             x1, y1 = positions[e["target"]]
@@ -461,7 +462,7 @@ class RequirementsVisualizer(BaseRequirementsInspector):
             )
 
     def _edge_style(self, answer: Any, is_highlight: bool) -> Tuple[str, int]:
-        """color + width for an edge given its answer + highlight state."""
+        """Color + width for an edge given its answer + highlight state."""
         if is_highlight:
             return "#e74c3c", 4
         try:
@@ -486,7 +487,7 @@ class RequirementsVisualizer(BaseRequirementsInspector):
     def _paths_to_target(
         self, roots: Iterable[str], target: str, forward_adj: Dict[str, List[str]]
     ) -> List[List[str]]:
-        """enumerate all simple paths from any root in `roots` to `target` using dfs along forward edges."""
+        """Enumerate all simple paths from any root in `roots` to `target` using dfs along forward edges."""
         paths: List[List[str]] = []
 
         def dfs(node: str, path: List[str], visited: Set[str]) -> None:
@@ -523,7 +524,7 @@ class CompletedRubricVisualizer(BaseEvaluationInspector):
 
 
 def visualize_requirements(requirements: Sequence[Requirement]) -> None:
-    """print summary information for quick inspection."""
+    """Print summary information for quick inspection."""
     viz = RequirementsVisualizer(list(requirements))
     viz.print_dependency_graph()
     viz.print_workflow_structure()
@@ -533,12 +534,12 @@ def visualize_requirements(requirements: Sequence[Requirement]) -> None:
 def create_dependency_graph(
     requirements: Sequence[Requirement], **kwargs: Any
 ) -> go.Figure:
-    """create a dependency graph for a list of requirements."""
+    """Create a dependency graph for a list of requirements."""
     return RequirementsVisualizer(list(requirements)).create_dependency_graph(**kwargs)
 
 
 def create_rubric_dependency_graph(rubric: MultiStepRubric, **kwargs: Any) -> go.Figure:
-    """create a dependency graph for a multistep rubric."""
+    """Create a dependency graph for a multistep rubric."""
     return RequirementsVisualizer(list(rubric.requirements)).create_dependency_graph(
         **kwargs
     )
@@ -547,14 +548,14 @@ def create_rubric_dependency_graph(rubric: MultiStepRubric, **kwargs: Any) -> go
 def create_path_visualization(
     requirements: Sequence[Requirement], answers: Dict[str, Any], **kwargs: Any
 ) -> go.Figure:
-    """highlight a specific evaluation path through the requirements."""
+    """Highlight a specific evaluation path through the requirements."""
     return RequirementsVisualizer(list(requirements)).create_path_visualization(
         answers, **kwargs
     )
 
 
 def create_metrics_dashboard(requirements: Sequence[Requirement]) -> go.Figure:
-    """build metrics dashboard."""
+    """Build metrics dashboard."""
     return RequirementsVisualizer(list(requirements)).create_metrics_dashboard()
 
 
@@ -563,7 +564,7 @@ def compare_requirements(
     workflow2: Sequence[Requirement],
     names: Tuple[str, str] = ("workflow 1", "workflow 2"),
 ) -> None:
-    """print side-by-side metric comparison."""
+    """Print side-by-side metric comparison."""
     print(f"comparing requirements: {names[0]} vs {names[1]}")
     print("=" * 80)
 

@@ -149,7 +149,7 @@ def main():
             print(f"     - {file_path}")
 
         print(
-            f"\n   Open the HTML files in your browser to explore the enhanced visualizations!"
+            "\n   Open the HTML files in your browser to explore the enhanced visualizations!"
         )
 
     except ImportError as e:

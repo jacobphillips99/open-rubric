@@ -32,13 +32,13 @@ class BaseRequirementsInspector:
 
         # Build enablement structure for topological sorting
         # req.dependencies is already in the format {answer: [enabled_requirements]}
-        name_to_dependency_options: Dict[str, Optional[List[str]]] = {
+        self.name_to_dependency_options: Dict[str, Optional[List[str]]] = {
             name: sum(req.dependencies.values(), []) if req.dependencies else None
             for name, req in self.name_to_req.items()
         }
 
         # Get topological levels
-        self.levels = topological_levels(name_to_dependency_options)
+        self.levels = topological_levels(self.name_to_dependency_options)
 
     def print_dependency_graph(self) -> None:
         """Print the dependency relationships between requirements."""
@@ -131,7 +131,9 @@ class BaseRequirementsInspector:
         )
 
         # Count total edges
-        total_edges = sum(len(enabled_reqs) for enabled_reqs in self.enables.values())
+        total_edges = sum(
+            len(enabled_reqs) for enabled_reqs in self.name_to_dependency_options.values()
+        )
 
         return {
             "total_requirements": len(self.requirements),
