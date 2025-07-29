@@ -2,7 +2,6 @@
 name = "open-rubric"
 authors = [
     {name = "Jacob Phillips", email = "jacob.phillips8905@gmail.com"},
-    {name = "William Brown", email = "williambrown97@gmail.com"},
 ]
 version = "0.1.1"
 description = "Advanced Multi-Step Rubric Evaluation Framework for LLMs"
@@ -27,6 +26,7 @@ dependencies = [
     "datasets",
     "plotly>=6.2.0",
     "networkx>=3.5",
+    "prime-cli>=0.2.13",
 ]
 
 [project.optional-dependencies]

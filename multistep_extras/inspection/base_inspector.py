@@ -132,7 +132,8 @@ class BaseRequirementsInspector:
 
         # Count total edges
         total_edges = sum(
-            len(enabled_reqs) for enabled_reqs in self.name_to_dependency_options.values()
+            len(enabled_reqs)
+            for enabled_reqs in self.name_to_dependency_options.values()
         )
 
         return {

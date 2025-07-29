@@ -33,6 +33,9 @@ This repository is a specialized fork of [verifiers](https://github.com/willccbb
 
 
 ```bash
+# Install uv package manager (if not already installed)
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
 # Clone the repository
 git clone https://github.com/jacobphillips99/open-rubric.git
 cd open-rubric
