@@ -51,10 +51,17 @@ set -g default-terminal "screen-256color"
 # Enable vi mode
 setw -g mode-keys vi
 
-# Better copy/paste bindings
+# Better copy/paste bindings with proper mouse handling
 bind-key -T copy-mode-vi v send-keys -X begin-selection
 bind-key -T copy-mode-vi y send-keys -X copy-pipe-and-cancel "pbcopy"
 bind-key -T copy-mode-vi r send-keys -X rectangle-toggle
+
+# Fix mouse selection to work properly with copy/paste
+bind-key -T copy-mode-vi MouseDragEnd1Pane send-keys -X copy-pipe-and-cancel "pbcopy"
+bind-key -T copy-mode MouseDragEnd1Pane send-keys -X copy-pipe-and-cancel "pbcopy"
+
+# Allow Option+click to select text in terminal (bypass tmux)
+set -g @shell_mode 'vi'
 
 # Easy config reload
 bind-key r source-file ~/.tmux.conf \; display-message "~/.tmux.conf reloaded"
@@ -66,13 +73,14 @@ bind - split-window -v
 # Enable clipboard integration (if available)
 set -g set-clipboard on
 
-# macOS clipboard integration
+# macOS clipboard integration with better mouse handling
 if command -v pbcopy &> /dev/null; then
     bind-key -T copy-mode-vi y send-keys -X copy-pipe-and-cancel "pbcopy"
     bind-key -T copy-mode-vi Enter send-keys -X copy-pipe-and-cancel "pbcopy"
+    bind-key -T copy-mode-vi MouseDragEnd1Pane send-keys -X copy-pipe-and-cancel "pbcopy"
 fi
 
-# Status bar configuration  
+# Status bar configuration
 set -g status-bg green
 set -g status-fg black
 set -g status-left-length 40
@@ -82,6 +90,9 @@ set -g status-interval 60
 EOF
 
 echo "Tmux configuration saved to ~/.tmux.conf"
+echo "Note: To copy/paste in tmux:"
+echo "  - Hold Option (Alt) key while selecting text with mouse"
+echo "  - Or use tmux copy mode: Ctrl+b then [ to enter, v to select, y to copy"
 
 # Clone repository if not already in it
 if [[ ! -f "pyproject.toml" ]]; then
