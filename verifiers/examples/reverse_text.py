@@ -55,13 +55,13 @@ args.gradient_accumulation_steps = 8
 args.max_steps = 100
 args.eval_strategy = 'steps'
 args.eval_steps = 2
+args.report_to = 'none'
 
 model, tokenizer = vf.get_model_and_tokenizer(model_name)
 trainer = vf.GRPOTrainer(
     model=model,
     processing_class=tokenizer,
     env=vf_env,
-    #peft_config=vf.lora_defaults(),
     args=args,
 )
 trainer.train()

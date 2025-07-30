@@ -10,26 +10,67 @@ source ~/.zshrc
 # Install system monitoring tools
 echo "Installing system monitoring tools..."
 
-# Detect OS and install nvtop and btop
+# Detect OS and install nvtop, btop, and tmux
 if command -v apt &> /dev/null; then
     # Ubuntu/Debian
-    sudo apt update
-    sudo apt install -y nvtop btop
+    apt update
+    apt install -y nvtop btop tmux
 elif command -v dnf &> /dev/null; then
     # Fedora/RHEL/CentOS  
-    sudo dnf install -y nvtop btop
+    dnf install -y nvtop btop tmux
+elif command -v yum &> /dev/null; then
+    # Older RHEL/CentOS
+    yum install -y tmux
+    # nvtop and btop might not be available in older repos
+    echo "Note: nvtop and btop may need to be installed from EPEL or compiled from source"
+elif command -v apk &> /dev/null; then
+    # Alpine Linux
+    apk update
+    apk add tmux
+    echo "Note: nvtop and btop may need to be installed manually on Alpine"
 elif command -v brew &> /dev/null; then
     # macOS with Homebrew
-    brew install nvtop btop
+    brew install nvtop btop tmux
 else
-    # Fallback to snap if available
-    if command -v snap &> /dev/null; then
-        sudo snap install nvtop
-        sudo snap install btop
-    else
-        echo "Warning: Could not install nvtop and btop - no supported package manager found"
-    fi
+    echo "Warning: Could not detect package manager"
+    echo "You may need to install tmux, nvtop, and btop manually"
 fi
+
+# Configure tmux with scrolling enabled
+echo "Configuring tmux..."
+cat > ~/.tmux.conf << 'EOF'
+# Enable mouse mode (scrolling, pane selection, etc.)
+set -g mouse on
+
+# Increase scrollback buffer size
+set -g history-limit 10000
+
+# Improve colors
+set -g default-terminal "screen-256color"
+
+# Enable vi mode
+setw -g mode-keys vi
+
+# Easy config reload
+bind-key r source-file ~/.tmux.conf \; display-message "~/.tmux.conf reloaded"
+
+# Better pane splitting
+bind | split-window -h
+bind - split-window -v
+
+# Enable clipboard integration (if available)
+set -g set-clipboard on
+
+# Status bar configuration
+set -g status-bg black
+set -g status-fg white
+set -g status-left-length 40
+set -g status-left "#[fg=green]Session: #S #[fg=yellow]#I #[fg=cyan]#P"
+set -g status-right "#[fg=cyan]%d %b %R"
+set -g status-interval 60
+EOF
+
+echo "Tmux configuration saved to ~/.tmux.conf"
 
 # Clone repository if not already in it
 if [[ ! -f "pyproject.toml" ]]; then
@@ -43,3 +84,7 @@ uv pip install flash-attn --no-build-isolation
 uv pip install -e .
 
 echo "Installation complete!"
+echo "To use tmux with scrolling:"
+echo "  - Start tmux: 'tmux'"
+echo "  - Scroll with mouse wheel or trackpad"
+echo "  - Reload config: 'tmux source ~/.tmux.conf'"
