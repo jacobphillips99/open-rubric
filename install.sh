@@ -16,7 +16,7 @@ if command -v apt &> /dev/null; then
     apt update
     apt install -y nvtop btop tmux
 elif command -v dnf &> /dev/null; then
-    # Fedora/RHEL/CentOS  
+    # Fedora/RHEL/CentOS
     dnf install -y nvtop btop tmux
 elif command -v yum &> /dev/null; then
     # Older RHEL/CentOS
@@ -51,6 +51,11 @@ set -g default-terminal "screen-256color"
 # Enable vi mode
 setw -g mode-keys vi
 
+# Better copy/paste bindings
+bind-key -T copy-mode-vi v send-keys -X begin-selection
+bind-key -T copy-mode-vi y send-keys -X copy-pipe-and-cancel "pbcopy"
+bind-key -T copy-mode-vi r send-keys -X rectangle-toggle
+
 # Easy config reload
 bind-key r source-file ~/.tmux.conf \; display-message "~/.tmux.conf reloaded"
 
@@ -61,12 +66,18 @@ bind - split-window -v
 # Enable clipboard integration (if available)
 set -g set-clipboard on
 
-# Status bar configuration
-set -g status-bg black
-set -g status-fg white
+# macOS clipboard integration
+if command -v pbcopy &> /dev/null; then
+    bind-key -T copy-mode-vi y send-keys -X copy-pipe-and-cancel "pbcopy"
+    bind-key -T copy-mode-vi Enter send-keys -X copy-pipe-and-cancel "pbcopy"
+fi
+
+# Status bar configuration  
+set -g status-bg green
+set -g status-fg black
 set -g status-left-length 40
-set -g status-left "#[fg=green]Session: #S #[fg=yellow]#I #[fg=cyan]#P"
-set -g status-right "#[fg=cyan]%d %b %R"
+set -g status-left "#[fg=black,bold]Session: #S #[fg=black]#I #[fg=black]#P"
+set -g status-right "#[fg=black]%d %b %R"
 set -g status-interval 60
 EOF
 
