@@ -1,9 +1,9 @@
-# Open Rubric: Advanced Multi-Step Rubric Evaluation Framework
+# Open Rubric: Multi-Step Rubric Evaluation Framework
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-This repository is a specialized fork of [verifiers](https://github.com/willccbb/verifiers) that focuses on **multi-step rubric evaluation capabilities** for LLMs. OpenRubric adds the **MultiStepRubric** for complex, dependency-based evaluation workflows that dynamically adapt based on judge-determined correctness.
+This repository is a fork of [verifiers](https://github.com/willccbb/verifiers) that focuses on **multi-step rubric evaluation capabilities** for LLMs. OpenRubric adds the **MultiStepRubric** for complex, dependency-based evaluation workflows that dynamically adapt based on judge-determined correctness.
 
 ## **MultiStepRubric in OpenRubric**
 - **Branching workflows**: Support for complex, multi-path evaluation scenarios (e.g. emergency response, debugging, etc.) as a directed acyclic graph (DAG)
