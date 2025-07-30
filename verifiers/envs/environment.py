@@ -1,4 +1,5 @@
 import asyncio
+import json
 import logging
 from abc import ABC, abstractmethod
 from concurrent.futures import ThreadPoolExecutor
@@ -8,8 +9,11 @@ from typing import TYPE_CHECKING, List, Literal, Tuple
 from datasets import Dataset
 from openai import AsyncOpenAI, OpenAI
 
-from verifiers import (
+from verifiers.parsers.parser import Parser
+from verifiers.rubrics.rubric import Rubric
+from verifiers.types import (
     ChatCompletion,
+    ChatCompletionToolParam,
     ChatMessage,
     GenerateInputs,
     GenerateOutputs,
@@ -17,16 +21,16 @@ from verifiers import (
     Messages,
     MessageType,
     ModelResponse,
-    Parser,
     ProcessedOutputs,
     RewardFunc,
-    Rubric,
     SamplingArgs,
     State,
 )
 
 if TYPE_CHECKING:
-    from transformers.tokenization_utils_base import PreTrainedTokenizerBase
+    from transformers.tokenization_utils_base import (  # type: ignore
+        PreTrainedTokenizerBase,
+    )
 
 
 class Environment(ABC):
@@ -46,12 +50,14 @@ class Environment(ABC):
         rubric: Rubric = Rubric(),
         sampling_args: SamplingArgs = {},
         message_type: MessageType = "chat",
+        oai_tools: List[ChatCompletionToolParam] | None = None,
         max_workers: int = 512,
         **kwargs,
     ):
         self.client = client
         self.model = model
         self.message_type: Literal["chat", "completion"] = message_type
+        self.oai_tools: List[ChatCompletionToolParam] | None = oai_tools
         self.system_prompt = system_prompt
         self.few_shot = few_shot
 
@@ -79,13 +85,7 @@ class Environment(ABC):
             self.eval_dataset = eval_dataset
         self.parser = parser
         self.rubric = rubric
-        self.sampling_args = {
-            "n": 1,  # n > 1 not supported; use duplicate prompts for multiple completions
-            "extra_body": {
-                #    'skip_special_tokens': False,
-                #    'spaces_between_special_tokens': False,
-            },
-        }
+        self.sampling_args = {"n": 1, "extra_body": {}}
         if sampling_args is not None and "extra_body" in sampling_args:
             self.sampling_args["extra_body"].update(sampling_args["extra_body"])
         for k, v in sampling_args.items():
@@ -149,7 +149,7 @@ class Environment(ABC):
                 }
             )
 
-    def get_dataset(self, n: int = -1, seed: int | None = None, **kwargs) -> Dataset:
+    def get_dataset(self, n: int = -1, seed: int | None = None) -> Dataset:
         if self.dataset is None:
             raise ValueError("dataset is not set")
         if seed is not None:
@@ -158,31 +158,30 @@ class Environment(ABC):
             return self.dataset.select(range(n))
         return self.dataset
 
-    def get_eval_dataset(
-        self, n: int = -1, seed: int | None = None, **kwargs
-    ) -> Dataset | None:
+    def get_eval_dataset(self, n: int = -1, seed: int | None = None) -> Dataset | None:
         if self.eval_dataset is None:
             self.logger.warning(
                 "eval_dataset is not set, falling back to train dataset"
             )
-            return self.get_dataset(n, seed, **kwargs)
+            return self.get_dataset(n, seed)
         if seed is not None:
             self.eval_dataset = self.eval_dataset.shuffle(seed=seed)
         if n > 0:
             return self.eval_dataset.select(range(n))
         return self.eval_dataset
 
-    def get_reward_funcs(self, **kwargs) -> List[RewardFunc]:
+    def get_reward_funcs(self) -> List[RewardFunc]:
         return self.rubric.get_reward_funcs()
 
-    def get_reward_weights(self, **kwargs) -> List[float]:
+    def get_reward_weights(self) -> List[float]:
         return self.rubric.get_reward_weights()
 
     async def get_model_response(
         self,
-        prompt: Messages,
         client: AsyncOpenAI,
         model: str,
+        prompt: Messages,
+        oai_tools: List[ChatCompletionToolParam] | None = None,
         sampling_args: SamplingArgs = {},
         message_type: MessageType | None = None,
         **kwargs,
@@ -193,23 +192,39 @@ class Environment(ABC):
         Convenience function for wrapping (chat, completion) API calls.
         Returns special error messages for context length issues.
         """
-        if message_type is None:
-            message_type = self.message_type
+        try:
+            if message_type is None:
+                message_type = self.message_type
 
-        if message_type == "chat":
-            assert isinstance(prompt, list)
-            response = await client.chat.completions.create(
-                model=model,
-                messages=prompt,  # type: ignore
-                **sampling_args,
-            )
-            return response
-        elif message_type == "completion":
-            assert isinstance(prompt, str)
-            response = await client.completions.create(
-                model=model, prompt=prompt, **sampling_args
-            )
-            return response
+            if message_type == "chat":
+                assert isinstance(prompt, list)
+                if oai_tools:
+                    response = await client.chat.completions.create(
+                        model=model,
+                        messages=prompt,  # type: ignore
+                        tools=oai_tools,
+                        **sampling_args,
+                    )
+                else:
+                    response = await client.chat.completions.create(
+                        model=model,
+                        messages=prompt,  # type: ignore
+                        **sampling_args,
+                    )
+                return response
+            elif message_type == "completion":
+                if oai_tools:
+                    raise ValueError(
+                        "oai_tools are not supported for completion tasks."
+                    )
+                assert isinstance(prompt, str)
+                response = await client.completions.create(
+                    model=model, prompt=prompt, **sampling_args
+                )
+                return response
+        except Exception as e:
+            self.logger.error(f"Error getting model response: {e} \n\nExiting...")
+            raise e
 
     @abstractmethod
     async def rollout(
@@ -295,7 +310,7 @@ class Environment(ABC):
 
     async def a_generate(
         self,
-        inputs: GenerateInputs | Dataset,
+        inputs: GenerateInputs | Dataset | dict,
         client: AsyncOpenAI | None = None,
         model: str | None = None,
         sampling_args: SamplingArgs = {},
@@ -306,6 +321,8 @@ class Environment(ABC):
         """
         Generate completions and rewards for a given set of inputs.
         """
+        if isinstance(inputs, GenerateInputs):
+            inputs = inputs.model_dump()
         # use class-level client and model if not provided
         if client is None:
             assert self.client is not None
@@ -316,48 +333,71 @@ class Environment(ABC):
         gen_sampling_args = deepcopy(self.sampling_args)
         gen_sampling_args.update(sampling_args)
 
-        # run rollouts
+        # preprocess dataset or GenerateInputs to GenerateOutputs
+        results_dict = {}
         if isinstance(inputs, Dataset):
             # get prompt column
-            results = {col: deepcopy(inputs[col]) for col in inputs.column_names}
+            results_dict = {}
+            for col in inputs.column_names:
+                if col == "info":
+                    # handle info column to ensure mutable dicts
+                    results_dict[col] = [dict(item) for item in inputs[col]]
+                else:
+                    results_dict[col] = deepcopy(inputs[col])
         else:
-            results = {col: deepcopy(inputs[col]) for col in inputs}
-        if "prompt" not in results:
+            results_dict = {col: deepcopy(inputs[col]) for col in inputs}
+        if "prompt" not in results_dict:
             raise ValueError("prompt column not found in inputs")
-        if "answer" not in results and "info" not in results:
+        if "answer" not in results_dict and "info" not in results_dict:
             raise ValueError("answer or info column must be found in inputs")
-        if "answer" not in results:
-            results["answer"] = [""] * len(results["prompt"])
-        if "task" not in results:
-            results["task"] = ["default"] * len(results["prompt"])
-        if "info" not in results:
-            results["info"] = [{}] * len(results["prompt"])
+        if "answer" not in results_dict:
+            results_dict["answer"] = [""] * len(results_dict["prompt"])
+        if "task" not in results_dict:
+            results_dict["task"] = ["default"] * len(results_dict["prompt"])
+        if "info" not in results_dict:
+            results_dict["info"] = [{}] * len(results_dict["prompt"])
+        for i, info in enumerate(results_dict["info"]):
+            if isinstance(info, str):
+                info = json.loads(info)
+            if self.oai_tools and "oai_tools" not in info:
+                info["oai_tools"] = self.oai_tools
 
+        # prepare GenerateOutputs and run rollouts
+        results = GenerateOutputs(
+            prompt=results_dict["prompt"],
+            answer=results_dict["answer"],
+            task=results_dict["task"],
+            info=results_dict["info"],
+            completion=[],
+            state=[],
+            reward=[],
+            metrics={},
+        )
         rollouts = await self.run_rollouts(
-            prompts=results["prompt"],
-            answers=results["answer"],
-            tasks=results["task"],
-            infos=results["info"],
+            prompts=results.prompt,
+            answers=results.answer,
+            tasks=results.task,
+            infos=results.info,
             client=client,
             model=model,
             sampling_args=gen_sampling_args,
             max_concurrent=max_concurrent,
             **kwargs,
         )
-        results["completion"] = [rollout[0] for rollout in rollouts]
-        results["state"] = [rollout[1] for rollout in rollouts]
+        results.completion = [rollout[0] for rollout in rollouts]
+        results.state = [rollout[1] for rollout in rollouts]
         if score_rollouts:
-            results_rewards = await self.rubric.score_rollouts(
-                prompts=results["prompt"],
-                completions=results["completion"],
-                answers=results["answer"],
-                states=results["state"],
-                tasks=results["task"],
-                infos=results["info"],
+            rollout_scores = await self.rubric.score_rollouts(
+                prompts=results.prompt,
+                completions=results.completion,
+                answers=results.answer,
+                states=results.state,
+                tasks=results.task,
+                infos=results.info,
                 apply_weights=True,
             )
-            # add rewards to results
-            results.update(results_rewards)
+            results.reward = rollout_scores.reward
+            results.metrics = rollout_scores.metrics
         return results
 
     def generate(
@@ -382,26 +422,27 @@ class Environment(ABC):
             **kwargs,
         )
 
-        executor = ThreadPoolExecutor(max_workers=self.max_workers)
-
+        # check if we're in existing event loop (e.g. Jupyter)
         try:
-            loop = asyncio.new_event_loop()
-            loop.set_default_executor(executor)
-            asyncio.set_event_loop(loop)
-            try:
-                return loop.run_until_complete(coro)
-            finally:
-                loop.close()
-                asyncio.set_event_loop(None)
-        except RuntimeError:
+            loop = asyncio.get_running_loop()
             import nest_asyncio  # type: ignore
 
             nest_asyncio.apply()
-            loop = asyncio.get_running_loop()
+            return loop.run_until_complete(coro)
+        except RuntimeError:
+            pass
+
+        # script case: create new loop and executor
+        executor = ThreadPoolExecutor(max_workers=self.max_workers)
+        loop = asyncio.new_event_loop()
+        try:
             loop.set_default_executor(executor)
+            asyncio.set_event_loop(loop)
             return loop.run_until_complete(coro)
         finally:
-            # Critical: shutdown the executor to prevent thread leaks
+            loop.close()
+            asyncio.set_event_loop(None)
+            # shutdown the executor to prevent thread leaks
             executor.shutdown(wait=False)
 
     def process_chat_format(
@@ -581,14 +622,14 @@ Model copies with swapped templates are available here: https://huggingface.co/c
                 all_rewards.append(0.0)
             else:
                 all_rewards.append(reward)
-        return {
-            "prompt_ids": all_prompt_ids,
-            "prompt_mask": all_prompt_masks,
-            "completion_ids": all_completion_ids,
-            "completion_mask": all_completion_masks,
-            "completion_logprobs": all_completion_logprobs,
-            "rewards": all_rewards,
-        }
+        return ProcessedOutputs(
+            prompt_ids=all_prompt_ids,
+            prompt_mask=all_prompt_masks,
+            completion_ids=all_completion_ids,
+            completion_mask=all_completion_masks,
+            completion_logprobs=all_completion_logprobs,
+            rewards=all_rewards,
+        )
 
     def parse_chat_completion_logprobs(
         self, chat_completion: ChatCompletion
@@ -639,14 +680,15 @@ Model copies with swapped templates are available here: https://huggingface.co/c
         Process chat format conversations using incremental prefixes.
         """
         responses = state["responses"]
+        responses_idx = 0
         zipped = []
         for turn in completion:
             if turn["role"] == "assistant":
-                # tuple = turn + popped first response
-                zipped.append((turn, responses.pop(0)))
+                zipped.append((turn, responses[responses_idx]))
+                responses_idx += 1
             else:
                 zipped.append((turn, None))
-        assert len(responses) == 0, "Responses not fully consumed"
+        assert len(responses) == responses_idx, "Responses not fully consumed"
         assert len(zipped) == len(completion), "Length mismatch"
         prompt_ids: list[int] = processing_class.apply_chat_template(
             conversation=prompt,  # type: ignore
@@ -657,7 +699,9 @@ Model copies with swapped templates are available here: https://huggingface.co/c
         completion_ids: list[int] = []
         completion_mask: list[int] = []
         completion_logprobs: list[float] = []
-        for message, response in zipped:
+        i = 0
+        while i < len(zipped):
+            message, response = zipped[i]
             # assistant case -- use response
             if message["role"] == "assistant":
                 assert response is not None, "Response should not be None"
@@ -668,15 +712,22 @@ Model copies with swapped templates are available here: https://huggingface.co/c
                 completion_mask.extend(completion_turn_mask)
                 completion_logprobs.extend(completion_turn_logprobs)
                 messages_consumed.append(message)
-            # user case -- use message
+                i += 1
+            # user/tool case -- use message
             else:
                 assert message["role"] == "user" or message["role"] == "tool"
+                # Collect all consecutive non-assistant messages
+                consecutive_messages = [message]
+                j = i + 1
+                while j < len(zipped) and zipped[j][0]["role"] != "assistant":
+                    consecutive_messages.append(zipped[j][0])
+                    j += 1
                 token_prefix: list[int] = processing_class.apply_chat_template(
                     conversation=messages_consumed  # type: ignore
                 )
                 token_prefix_with_turn: list[int] = (
                     processing_class.apply_chat_template(
-                        conversation=messages_consumed + [message],  # type: ignore
+                        conversation=messages_consumed + consecutive_messages,  # type: ignore
                     )
                 )
                 assert token_prefix_with_turn[: len(token_prefix)] == token_prefix, (
@@ -691,7 +742,8 @@ Model copies with swapped templates are available here: https://huggingface.co/c
                 completion_ids.extend(completion_turn_ids)
                 completion_mask.extend(completion_turn_mask)
                 completion_logprobs.extend(completion_turn_logprobs)
-                messages_consumed.append(message)
+                messages_consumed.extend(consecutive_messages)
+                i = j
         return (
             prompt_ids,
             prompt_mask,
@@ -747,16 +799,17 @@ Model copies with swapped templates are available here: https://huggingface.co/c
                 prompt_ids, prompt_mask, completion_ids, completion_mask = (
                     self.process_completion_format(prompt, completion, processing_class)
                 )
+                completion_logprobs = [0] * len(completion_ids)
             is_truncated = False
             if max_seq_len > 0 and len(prompt_ids) + len(completion_ids) > max_seq_len:
                 if len(prompt_ids) > max_seq_len:
                     prompt_ids = prompt_ids[:max_seq_len]
                 completion_ids = completion_ids[: max_seq_len - len(prompt_ids)]
                 completion_mask = completion_mask[: max_seq_len - len(prompt_ids)]
+                completion_logprobs = completion_logprobs[
+                    : max_seq_len - len(prompt_ids)
+                ]
                 is_truncated = True
-                assert len(prompt_ids) + len(completion_ids) <= max_seq_len, (
-                    f"Prompt length: {len(prompt_ids)}, completion length: {len(completion_ids)}, max_seq_len: {max_seq_len}"
-                )
             if is_truncated and mask_truncated_completions:
                 completion_mask = [0] * len(completion_ids)
             assert len(prompt_ids) == len(prompt_mask), (
@@ -765,7 +818,11 @@ Model copies with swapped templates are available here: https://huggingface.co/c
             assert len(completion_ids) == len(completion_mask), (
                 f"Completion ids: {len(completion_ids)}, completion mask: {len(completion_mask)}"
             )
-            completion_logprobs = [0] * len(completion_ids)
+            assert (
+                len(completion_mask) == len(completion_ids) == len(completion_logprobs)
+            ), (
+                f"completion mask: {len(completion_mask)}, completion ids: {len(completion_ids)}, completion logprobs: {len(completion_logprobs)}"
+            )
             all_prompt_ids.append(prompt_ids)
             all_prompt_masks.append(prompt_mask)
             all_completion_ids.append(completion_ids)
@@ -775,14 +832,14 @@ Model copies with swapped templates are available here: https://huggingface.co/c
                 all_rewards.append(0)
             else:
                 all_rewards.append(reward)
-        return {
-            "prompt_ids": all_prompt_ids,
-            "prompt_mask": all_prompt_masks,
-            "completion_ids": all_completion_ids,
-            "completion_mask": all_completion_masks,
-            "completion_logprobs": all_completion_logprobs,
-            "rewards": all_rewards,
-        }
+        return ProcessedOutputs(
+            prompt_ids=all_prompt_ids,
+            prompt_mask=all_prompt_masks,
+            completion_ids=all_completion_ids,
+            completion_mask=all_completion_masks,
+            completion_logprobs=all_completion_logprobs,
+            rewards=all_rewards,
+        )
 
     # Evaluation and dataset generation
     def evaluate(
@@ -819,13 +876,34 @@ Model copies with swapped templates are available here: https://huggingface.co/c
         )
         return results
 
+    def _sanitize_tool_calls(self, completion: Messages) -> Messages:
+        """
+        Sanitize tool calls from a completion.
+        """
+
+        assert isinstance(completion, list)
+        sanitized_completion = []
+        for m in completion:
+            if "tool_calls" in m:
+                new_m = {
+                    "role": m["role"],
+                    "content": m.get("content", ""),
+                    "tool_calls": [
+                        json.dumps(tc.model_dump())  # type: ignore
+                        for tc in m.get("tool_calls", [])
+                    ],
+                }
+                sanitized_completion.append(new_m)
+            else:
+                sanitized_completion.append(m)
+        return sanitized_completion
+
     def make_dataset(
         self,
         results: GenerateOutputs,
         push_to_hub: bool = False,
         hub_name: str | None = None,
         state_columns: List[str] = [],
-        extra_columns: List[str] = [],
         **kwargs,
     ) -> Dataset:
         """
@@ -834,26 +912,31 @@ Model copies with swapped templates are available here: https://huggingface.co/c
         if push_to_hub and hub_name is None:
             raise ValueError("hub_name must be provided if push_to_hub is True")
 
-        cols = ["prompt", "completion", "answer", "reward"]
-        if results["task"][0] is not None:
-            cols.append("task")
-        if "state" in results:
+        cols = ["prompt", "completion", "answer", "info", "task", "reward"]
+
+        results_dict = {
+            "prompt": results.prompt,
+            "completion": [],
+            "answer": results.answer,
+            "info": results.info,
+            "task": results.task,
+            "reward": results.reward,
+        }
+        for i in range(len(results.completion)):
+            results_dict["completion"].append(
+                self._sanitize_tool_calls(results.completion[i])
+            )
+        results_dict.update(results.metrics)
+        if results.state[0] is not None:
             for col in state_columns:
-                if col in results["state"][0]:
-                    results[col] = [state[col] for state in results["state"]]
+                if col in results.state[0]:
+                    results_dict[col] = [state[col] for state in results.state]
                     cols.append(col)
                 else:
                     self.logger.warning(
                         f"Column {col} not found in state, skipping from dataset."
                     )
-        for col in extra_columns:
-            if col in results:
-                cols.append(col)
-            else:
-                self.logger.warning(
-                    f"Column {col} not found in results, skipping from dataset."
-                )
-        dataset = Dataset.from_dict({col: results[col] for col in cols})
+        dataset = Dataset.from_dict({col: results_dict[col] for col in cols})
         if push_to_hub:
             assert hub_name is not None
             dataset.push_to_hub(hub_name)

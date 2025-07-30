@@ -4,14 +4,15 @@ import queue
 import threading
 import time
 from collections import deque
-from dataclasses import dataclass, field
 from typing import Any, Dict, List, Optional
 
+from pydantic import BaseModel, Field
+
 from verifiers import GenerateOutputs
+from verifiers.types import ProcessedOutputs
 
 
-@dataclass
-class BatchRequest:
+class BatchRequest(BaseModel):
     """Request for batch generation"""
 
     batch_id: int
@@ -24,20 +25,19 @@ class BatchRequest:
     max_concurrent: int
 
 
-@dataclass
-class BatchResult:
+class BatchResult(BaseModel):
     """Result from batch generation"""
 
     batch_id: int
-    processed_results: Dict[str, Any]
+    processed_results: ProcessedOutputs
     generation_time: float = 0.0
-    all_reward_dict: Dict[str, List[float]] = field(
+    all_reward_dict: Dict[str, List[float]] = Field(
         default_factory=dict
     )  # All reward scores
-    completions: List[Any] = field(
+    completions: List[Any] = Field(
         default_factory=list
     )  # Store completions for logging
-    prompts: List[Any] = field(default_factory=list)  # Store prompts for logging
+    prompts: List[Any] = Field(default_factory=list)  # Store prompts for logging
 
 
 class AsyncBatchGenerator:
@@ -275,19 +275,18 @@ class AsyncBatchGenerator:
         self.is_generating = False
 
         # Extract all reward-related keys
-        all_reward_dict = {}
-        reward_keys = [
-            k for k in env_results.keys() if k.endswith("_func") or k == "reward"
-        ]
-        for key in reward_keys:
-            all_reward_dict[key] = env_results[key]
+        all_reward_dict = {
+            "reward": env_results.reward,
+        }
+        for k in env_results.metrics:
+            all_reward_dict[k] = env_results.metrics[k]
 
         # Process results
         processed_results = self.env.process_env_results_vllm(
-            env_results["prompt"],
-            env_results["completion"],
-            env_results["state"],
-            env_results["reward"],
+            prompts=env_results.prompt,
+            completions=env_results.completion,
+            states=env_results.state,
+            rewards=env_results.reward,
             processing_class=request.processing_class,
             max_seq_len=request.max_seq_len,
             mask_env_responses=request.mask_env_responses,
@@ -299,8 +298,8 @@ class AsyncBatchGenerator:
             batch_id=request.batch_id,
             processed_results=processed_results,
             all_reward_dict=all_reward_dict,
-            completions=env_results["completion"],
-            prompts=env_results["prompt"],
+            completions=env_results.completion,
+            prompts=env_results.prompt,
         )
 
     async def _evaluate_async(self, num_samples: int = -1) -> GenerateOutputs:

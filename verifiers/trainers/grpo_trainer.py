@@ -352,6 +352,40 @@ class GRPOTrainer(Trainer):
 
         eval_dataset = env.get_eval_dataset()
 
+        if "prompt" not in train_dataset.column_names:
+            raise ValueError("Train dataset must contain a 'prompt' column")
+        if "answer" not in train_dataset.column_names:
+            train_dataset = train_dataset.map(
+                lambda x: {"answer": ""},
+                num_proc=self.max_data_workers,
+            )
+        if eval_dataset is not None and "answer" not in eval_dataset.column_names:
+            eval_dataset = eval_dataset.map(
+                lambda x: {"answer": ""},
+                num_proc=self.max_data_workers,
+            )
+        if "info" not in train_dataset.column_names:
+            train_dataset = train_dataset.map(
+                lambda x: {"info": {}},
+                num_proc=self.max_data_workers,
+            )
+        if eval_dataset is not None and "info" not in eval_dataset.column_names:
+            eval_dataset = eval_dataset.map(
+                lambda x: {"info": {}},
+                num_proc=self.max_data_workers,
+            )
+
+        if "task" not in train_dataset.column_names:
+            train_dataset = train_dataset.map(
+                lambda x: {"task": "default"},
+                num_proc=self.max_data_workers,
+            )
+        if eval_dataset is not None and "task" not in eval_dataset.column_names:
+            eval_dataset = eval_dataset.map(
+                lambda x: {"task": "default"},
+                num_proc=self.max_data_workers,
+            )
+
         # Filter out prompts that are too long if max_prompt_length is set
         if self.max_prompt_length is not None:
             self.logger.info(
@@ -526,9 +560,10 @@ class GRPOTrainer(Trainer):
         if self.sync_ref_model:
             self.add_callback(
                 SyncRefModelCallback(
-                    ref_model=self.ref_model, accelerator=self.accelerator
+                    ref_model=self.ref_model,  # type: ignore
+                    accelerator=self.accelerator,
                 )
-            )  # type: ignore
+            )
 
         # Environment
         self.env = env
@@ -732,11 +767,14 @@ class GRPOTrainer(Trainer):
         is_generating = is_generating_list[0]
 
         # All processes wait if generation is happening
+        waits = 0
         while is_generating:
             time.sleep(0.5)
-            self.logger.info(
-                "Waiting for background batch generation to complete before weight syncing."
-            )
+            waits += 1
+            if waits % 10 == 0:
+                self.logger.info(
+                    "Waiting for background batch generation to complete before weight syncing."
+                )
 
             # Check again and broadcast
             if self.accelerator.is_main_process:
@@ -1004,20 +1042,14 @@ class GRPOTrainer(Trainer):
 
                 # Package raw data for broadcast (not tensors yet)
                 broadcast_data = {
-                    "prompt_ids": processed_results["prompt_ids"],
-                    "prompt_mask": processed_results["prompt_mask"],
-                    "completion_ids": processed_results["completion_ids"],
-                    "completion_mask": processed_results["completion_mask"],
-                    "rewards": processed_results["rewards"],
-                    "all_reward_dict": batch_result.all_reward_dict
-                    if hasattr(batch_result, "all_reward_dict")
-                    else {"reward": processed_results["rewards"]},
-                    "completions": batch_result.completions
-                    if hasattr(batch_result, "completions")
-                    else [],
-                    "prompts": batch_result.prompts
-                    if hasattr(batch_result, "prompts")
-                    else [],
+                    "prompt_ids": processed_results.prompt_ids,
+                    "prompt_mask": processed_results.prompt_mask,
+                    "completion_ids": processed_results.completion_ids,
+                    "completion_mask": processed_results.completion_mask,
+                    "rewards": processed_results.rewards,
+                    "all_reward_dict": batch_result.all_reward_dict,
+                    "completions": batch_result.completions,
+                    "prompts": batch_result.prompts,
                 }
             else:
                 broadcast_data = None
@@ -1066,7 +1098,7 @@ class GRPOTrainer(Trainer):
 
             input_ids = pad(
                 input_ids_list,
-                padding_value=self.processing_class.pad_token_id,
+                padding_value=self.processing_class.pad_token_id,  # type: ignore
                 padding_side="right",
             )  # type: ignore
             attention_mask = pad(attention_mask_list, padding_side="right")  # type: ignore
@@ -1141,7 +1173,7 @@ class GRPOTrainer(Trainer):
 
         return advantages
 
-    def compute_loss(
+    def compute_loss(  # type: ignore
         self,  # type: ignore
         model: PreTrainedModel,
         inputs: Dict[str, torch.Tensor],
@@ -1202,8 +1234,8 @@ class GRPOTrainer(Trainer):
             per_token_loss = per_token_loss + self.beta * per_token_kl
             mean_kl = (per_token_kl * completion_mask).sum() / completion_mask.sum()
             self._metrics[mode]["kl"].append(
-                self.accelerator.gather_for_metrics(mean_kl).nanmean().item()
-            )  # type: ignore
+                self.accelerator.gather_for_metrics(mean_kl).nanmean().item()  # type: ignore
+            )
         if self.loss_type == "grpo":
             loss = (
                 (per_token_loss * completion_mask).sum(-1)
@@ -1215,7 +1247,7 @@ class GRPOTrainer(Trainer):
             ).sum() / completion_mask.sum().clamp(min=1.0)
         elif self.loss_type == "dr_grpo":
             loss = (per_token_loss * completion_mask).sum() / (
-                per_token_loss.size(0) * self.max_completion_length
+                per_token_loss.size(0) * self.max_seq_len
             )  # type: ignore
         else:
             raise ValueError(f"Unknown loss type: {self.loss_type}")
@@ -1233,23 +1265,46 @@ class GRPOTrainer(Trainer):
 
         gathered_low_clip = self.accelerator.gather_for_metrics(low_clip)
         self._metrics[mode]["clip_ratio/low_mean"].append(
-            gathered_low_clip.nanmean().item()
-        )  # type: ignore
+            gathered_low_clip.nanmean().item()  # type: ignore
+        )
         self._metrics[mode]["clip_ratio/low_min"].append(
-            nanmin(gathered_low_clip).item()
-        )  # type: ignore
+            nanmin(gathered_low_clip).item()  # type: ignore
+        )
         gathered_high_clip = self.accelerator.gather_for_metrics(high_clip)
         self._metrics[mode]["clip_ratio/high_mean"].append(
-            gathered_high_clip.nanmean().item()
-        )  # type: ignore
+            gathered_high_clip.nanmean().item()  # type: ignore
+        )
         self._metrics[mode]["clip_ratio/high_max"].append(
-            nanmax(gathered_high_clip).item()
-        )  # type: ignore
+            nanmax(gathered_high_clip).item()  # type: ignore
+        )
         gathered_clip_ratio = self.accelerator.gather_for_metrics(clip_ratio)
         self._metrics[mode]["clip_ratio/region_mean"].append(
-            gathered_clip_ratio.nanmean().item()
-        )  # type: ignore
+            gathered_clip_ratio.nanmean().item()  # type: ignore
+        )
         return loss
+
+    def _sanitize_tool_calls(
+        self,
+        completion: list[dict[str, Any]] | str,
+    ) -> list[dict[str, Any]] | str:
+        if isinstance(completion, str):
+            return completion
+        for msg in completion:
+            if "tool_calls" in msg:
+                tool_calls = []
+                msg["tool_calls"] = []
+                for tc in msg["tool_calls"]:
+                    tool_calls.append(
+                        {
+                            "name": tc.get("function", {}).get("name", ""),
+                            "args": tc.get("function", {}).get("arguments", {}),
+                        }
+                    )
+                msg["content"] += str({"tool_calls": tool_calls})
+                msg.pop("tool_calls")
+            if "tool_call_id" in msg:
+                msg.pop("tool_call_id")
+        return completion
 
     def evaluate(
         self, eval_dataset=None, ignore_keys=None, metric_key_prefix="eval", **kwargs
@@ -1266,77 +1321,91 @@ class GRPOTrainer(Trainer):
 
         self.logger.info("Running evaluation using environment's evaluate method")
 
-        # Use async generator's evaluate method to run in the same event loop
-        eval_results = self.async_generator.evaluate(num_samples=-1)
+        # Only the main process computes evaluation to avoid duplicate work
+        if self.accelerator.is_main_process:
+            eval_results = self.async_generator.evaluate(num_samples=-1)
+        else:
+            eval_results = None
 
+        # Broadcast the results from rank 0 to all other ranks
+        broadcast_list = [eval_results]
+        broadcast_object_list(broadcast_list, from_process=0)
+        eval_results = broadcast_list[0]
+        assert eval_results is not None
         # Process results to compute metrics
         metrics = {}
 
         # Compute reward statistics
-        if "reward" in eval_results:
-            rewards = torch.tensor(eval_results["reward"])
-            metrics["eval_reward"] = rewards.mean().item()
-            metrics["eval_reward_std"] = rewards.std().item()
+        rewards = torch.tensor(eval_results.reward)
+        metrics["eval_reward"] = rewards.mean().item()
+        metrics["eval_reward_std"] = rewards.std().item()
 
         # Log individual reward function scores
-        for key in eval_results:
-            if key.startswith("reward_") and key != "reward":
-                reward_values = eval_results[key]
+        non_reward_metric_keys = [
+            "reward",
+            "prompt",
+            "completion",
+            "info",
+            "answer",
+            "state",
+            "task",
+        ]
+        for key in eval_results.metrics:
+            if key not in non_reward_metric_keys:
+                reward_values = eval_results.metrics[key]
                 if isinstance(reward_values, list):
-                    metrics[f"eval_rewards/{key[7:]}"] = float(np.mean(reward_values))
+                    metrics[f"eval_rewards/{key}"] = float(np.mean(reward_values))
                 else:
-                    metrics[f"eval_rewards/{key[7:]}"] = reward_values.mean().item()
+                    try:
+                        metrics[f"eval_rewards/{key}"] = reward_values.mean().item()
+                    except Exception:
+                        continue
 
         # Compute completion length statistics
-        if "completion" in eval_results:
-            completions = eval_results["completion"]
-            if isinstance(completions[0], str):
-                # Completion format - directly tokenize strings
-                completion_lengths = [
-                    len(self.processing_class.encode(c)) for c in completions
-                ]  # type: ignore
-            else:
-                # Chat format - use apply_chat_template
-                completion_lengths = []
-                for comp in completions:
-                    # Apply chat template to get the full text
-                    tokens = self.processing_class.apply_chat_template(
-                        comp, tokenize=True, add_generation_prompt=False
-                    )  # type: ignore
-                    # Tokenize and count
-                    completion_lengths.append(len(tokens))
+        assert isinstance(self.processing_class, PreTrainedTokenizerBase)
+        completions = eval_results.completion
+        if isinstance(completions[0], str):
+            # Completion format - directly tokenize strings
+            completion_lengths = [
+                len(self.processing_class.encode(c))  # type: ignore
+                for c in completions
+            ]
+        else:
+            # Chat format - use apply_chat_template
+            completion_lengths = []
+            for comp in completions:
+                # Apply chat template to get the full text
+                tokens = self.processing_class.apply_chat_template(
+                    comp,  # type: ignore
+                    tokenize=True,
+                    add_generation_prompt=False,
+                )
+                # Tokenize and count
+                completion_lengths.append(len(tokens))
 
-            metrics["eval_completions/mean_length"] = float(np.mean(completion_lengths))
-            metrics["eval_completions/min_length"] = int(np.min(completion_lengths))
-            metrics["eval_completions/max_length"] = int(np.max(completion_lengths))
+        metrics["eval_completions/mean_length"] = float(np.mean(completion_lengths))
+        metrics["eval_completions/min_length"] = int(np.min(completion_lengths))
+        metrics["eval_completions/max_length"] = int(np.max(completion_lengths))
 
         # Log sample completions if requested
-        if (
-            self.accelerator.is_main_process
-            and self.log_completions
-            and "prompt" in eval_results
-        ):
+        if self.accelerator.is_main_process and self.log_completions:
             # Prepare textual logs
-            prompts = eval_results["prompt"][: self.num_completions_to_print]
-            completions = eval_results["completion"][: self.num_completions_to_print]
+            prompts = eval_results.prompt[: self.num_completions_to_print]
+            completions = eval_results.completion[: self.num_completions_to_print]
 
             # Extract rewards for logging
             reward_dict = {}
-            if "reward" in eval_results:
-                reward_dict["reward"] = eval_results["reward"][
+            reward_dict["reward"] = eval_results.reward[: self.num_completions_to_print]
+            for key in eval_results.metrics:
+                reward_dict[key] = eval_results.metrics[key][
                     : self.num_completions_to_print
                 ]
-            for key in eval_results:
-                if key.startswith("reward_") and key != "reward":
-                    reward_dict[key] = eval_results[key][
-                        : self.num_completions_to_print
-                    ]
 
             # Print sample
             print_prompt_completions_sample(
                 prompts,
                 completions,
-                reward_dict,
+                reward_dict["reward"],
                 self.state.global_step,
             )
 
@@ -1351,7 +1420,10 @@ class GRPOTrainer(Trainer):
                 table_data = {
                     "step": [str(self.state.global_step)] * len(prompts),
                     "prompt": prompts,
-                    "completion": completions,
+                    "completion": [
+                        self._sanitize_tool_calls(c)  # type: ignore
+                        for c in completions
+                    ],
                 }
                 for k, v in reward_dict.items():
                     table_data[k] = v
@@ -1388,7 +1460,7 @@ class GRPOTrainer(Trainer):
                 print_prompt_completions_sample(
                     self._textual_logs["prompt"],
                     self._textual_logs["completion"],
-                    self._textual_logs["rewards"],
+                    self._textual_logs["rewards"]["reward"],
                     self.state.global_step,
                 )
 
@@ -1403,7 +1475,10 @@ class GRPOTrainer(Trainer):
                     "step": [str(self.state.global_step)]
                     * len(self._textual_logs["prompt"]),
                     "prompt": list(self._textual_logs["prompt"]),
-                    "completion": list(self._textual_logs["completion"]),
+                    "completion": [
+                        self._sanitize_tool_calls(c)
+                        for c in self._textual_logs["completion"]
+                    ],
                     **{k: list(v) for k, v in self._textual_logs["rewards"].items()},
                 }
                 if len(table["prompt"]) > 0:
@@ -1506,10 +1581,10 @@ class GRPOTrainer(Trainer):
         term_lengths = []
         for comp_ids, comp_mask in zip(all_completion_ids, all_completion_mask):
             has_eos = any(
-                token == self.processing_class.eos_token_id
+                token == self.processing_class.eos_token_id  # type: ignore
                 for token, mask in zip(comp_ids, comp_mask)
                 if mask
-            )  # type: ignore
+            )
             if has_eos:
                 term_lengths.append(sum(comp_mask))
 

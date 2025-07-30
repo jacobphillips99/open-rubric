@@ -32,6 +32,7 @@ This repository is a specialized fork of [verifiers](https://github.com/willccbb
 ### From Source
 
 
+We recommend using `verifiers` with along [uv](https://docs.astral.sh/uv/getting-started/installation/) for dependency management in your own project:
 ```bash
 # Install uv package manager (if not already installed)
 curl -LsSf https://astral.sh/uv/install.sh | sh
