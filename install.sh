@@ -51,17 +51,9 @@ set -g default-terminal "screen-256color"
 # Enable vi mode
 setw -g mode-keys vi
 
-# Better copy/paste bindings with proper mouse handling
+# Better copy/paste bindings
 bind-key -T copy-mode-vi v send-keys -X begin-selection
-bind-key -T copy-mode-vi y send-keys -X copy-pipe-and-cancel "pbcopy"
 bind-key -T copy-mode-vi r send-keys -X rectangle-toggle
-
-# Fix mouse selection to work properly with copy/paste
-bind-key -T copy-mode-vi MouseDragEnd1Pane send-keys -X copy-pipe-and-cancel "pbcopy"
-bind-key -T copy-mode MouseDragEnd1Pane send-keys -X copy-pipe-and-cancel "pbcopy"
-
-# Allow Option+click to select text in terminal (bypass tmux)
-set -g @shell_mode 'vi'
 
 # Easy config reload
 bind-key r source-file ~/.tmux.conf \; display-message "~/.tmux.conf reloaded"
@@ -70,15 +62,21 @@ bind-key r source-file ~/.tmux.conf \; display-message "~/.tmux.conf reloaded"
 bind | split-window -h
 bind - split-window -v
 
-# Enable clipboard integration (if available)
+# Enable clipboard integration
 set -g set-clipboard on
 
-# macOS clipboard integration with better mouse handling
-if command -v pbcopy &> /dev/null; then
-    bind-key -T copy-mode-vi y send-keys -X copy-pipe-and-cancel "pbcopy"
-    bind-key -T copy-mode-vi Enter send-keys -X copy-pipe-and-cancel "pbcopy"
-    bind-key -T copy-mode-vi MouseDragEnd1Pane send-keys -X copy-pipe-and-cancel "pbcopy"
-fi
+# macOS-specific clipboard integration
+if-shell "command -v pbcopy" \
+    "bind-key -T copy-mode-vi y send-keys -X copy-pipe-and-cancel 'pbcopy'; \
+     bind-key -T copy-mode-vi Enter send-keys -X copy-pipe-and-cancel 'pbcopy'; \
+     bind-key -T copy-mode y send-keys -X copy-pipe-and-cancel 'pbcopy'; \
+     bind-key -T copy-mode Enter send-keys -X copy-pipe-and-cancel 'pbcopy'"
+
+# Ensure scrolling works properly
+bind-key -T copy-mode-vi WheelUpPane select-pane \; send-keys -X -N 3 scroll-up
+bind-key -T copy-mode-vi WheelDownPane select-pane \; send-keys -X -N 3 scroll-down
+bind-key -T copy-mode WheelUpPane select-pane \; send-keys -X -N 3 scroll-up
+bind-key -T copy-mode WheelDownPane select-pane \; send-keys -X -N 3 scroll-down
 
 # Status bar configuration
 set -g status-bg green
