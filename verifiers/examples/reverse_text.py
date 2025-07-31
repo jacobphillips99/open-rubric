@@ -50,7 +50,7 @@ vf_env = vf.SingleTurnEnv(
 args = vf.grpo_defaults(run_name='reverse_text_warmup')
 args.per_device_train_batch_size = 12
 args.num_generations = 12
-args.gradient_accumulation_steps = 8
+args.gradient_accumulation_steps = 4
 args.max_steps = 100
 args.eval_strategy = 'steps'
 args.eval_steps = 2
