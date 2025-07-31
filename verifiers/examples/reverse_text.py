@@ -12,17 +12,17 @@ CUDA_VISIBLE_DEVICES=1 accelerate launch --num-processes 1 --config-file configs
 
 model_name = 'willcb/Qwen3-4B'
 dataset = load_dataset('agentlans/wikipedia-paragraphs', split='train').map(lambda x: {'question': x['text'], 'answer': x['text'][::-1]})
+num_train = 9500
+num_eval = 500
 
-ratio = 0.8
-train_dataset = dataset.select(range(int(len(dataset) * ratio))) # type: ignore
-eval_dataset = dataset.select(range(int(len(dataset) * ratio), len(dataset))) # type: ignore
-
+train_dataset = dataset.select(range(num_train)) # type: ignore
+eval_dataset = dataset.select(range(num_train, num_train + num_eval)) # type: ignore
+breakpoint()
 parser = vf.XMLParser(['think', 'answer'], answer_field='answer')
 system_prompt = f"""Reverse the given text.
 
 Respond in the following format:
 {parser.get_format_str()}"""
-breakpoint()
 
 def lcs_ratio(x: str, y: str) -> float:
     """
@@ -39,7 +39,9 @@ def lcs_reward_func(completion, answer, **kwargs) -> float:
     return lcs_ratio(response, answer)
 
 
-breakpoint()
+
+
+
 rubric = vf.Rubric(funcs=[
 	lcs_reward_func,
 	parser.get_format_reward_func(),
