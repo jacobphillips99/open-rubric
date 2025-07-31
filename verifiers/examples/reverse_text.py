@@ -17,7 +17,6 @@ num_eval = 500
 
 train_dataset = dataset.select(range(num_train)) # type: ignore
 eval_dataset = dataset.select(range(num_train, num_train + num_eval)) # type: ignore
-breakpoint()
 parser = vf.XMLParser(['think', 'answer'], answer_field='answer')
 system_prompt = f"""Reverse the given text.
 
