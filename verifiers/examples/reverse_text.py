@@ -3,14 +3,14 @@ import verifiers as vf
 
 """
 inference:
-CUDA_VISIBLE_DEVICES=0 vf-vllm --model willcb/Qwen3-1.7B --enforce-eager
+CUDA_VISIBLE_DEVICES=0 vf-vllm --model willcb/Qwen3-0.6B-Reverse --enforce-eager
 
 training:
 CUDA_VISIBLE_DEVICES=1 accelerate launch --num-processes 1 --config-file configs/zero3.yaml verifiers/examples/reverse_text.py
 """
 
 
-model_name = 'willcb/Qwen3-1.7B'
+model_name = 'willcb/Qwen3-0.6B-Reverse'
 dataset = load_dataset('agentlans/wikipedia-paragraphs', split='train').map(lambda x: {'question': x['text'], 'answer': x['text'][::-1]})
 num_train = 9500
 num_eval = 500
