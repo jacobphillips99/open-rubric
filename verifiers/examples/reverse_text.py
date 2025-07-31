@@ -3,14 +3,14 @@ import verifiers as vf
 
 """
 inference:
-CUDA_VISIBLE_DEVICES=0 vf-vllm --model willcb/Qwen3-0.6B-Reverse --enforce-eager
+CUDA_VISIBLE_DEVICES=0 vf-vllm --model willcb/Qwen2.5-0.5B-Reverse-SFT --enforce-eager
 
 training:
 CUDA_VISIBLE_DEVICES=1 accelerate launch --num-processes 1 --config-file configs/zero3.yaml verifiers/examples/reverse_text.py
 """
 
 
-model_name = 'willcb/Qwen3-0.6B-Reverse'
+model_name = 'willcb/Qwen2.5-0.5B-Reverse-SFT'
 dataset = load_dataset('agentlans/wikipedia-paragraphs', split='train').map(lambda x: {'question': x['text'], 'answer': x['text'][::-1]})
 num_train = 9500
 num_eval = 500
@@ -48,13 +48,14 @@ vf_env = vf.SingleTurnEnv(
     rubric=rubric
 )
 args = vf.grpo_defaults(run_name='reverse_text_warmup')
-args.per_device_train_batch_size = 6
+args.per_device_train_batch_size = 12
 args.num_generations = 12
 args.gradient_accumulation_steps = 8
 args.max_steps = 100
 args.eval_strategy = 'steps'
 args.eval_steps = 2
 args.report_to = 'wandb'
+args.max_tokens = 1024
 
 model, tokenizer = vf.get_model_and_tokenizer(model_name)
 trainer = vf.GRPOTrainer(
