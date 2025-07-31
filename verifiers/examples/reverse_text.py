@@ -3,39 +3,43 @@ import verifiers as vf
 
 """
 inference:
-CUDA_VISIBLE_DEVICES=0 vf-vllm --model willcb/Qwen2.5-0.5B-Reverse-SFT --enforce-eager
+CUDA_VISIBLE_DEVICES=0 vf-vllm --model willcb/Qwen3-4B --enforce-eager
 
 training:
 CUDA_VISIBLE_DEVICES=1 accelerate launch --num-processes 1 --config-file configs/zero3.yaml verifiers/examples/reverse_text.py
 """
 
 
-model_name = 'willcb/Qwen2.5-0.5B-Reverse-SFT'
+model_name = 'willcb/Qwen3-4B'
 dataset = load_dataset('agentlans/wikipedia-paragraphs', split='train').map(lambda x: {'question': x['text'], 'answer': x['text'][::-1]})
-TRAIN_SIZE = 100
-EVAL_SIZE = 10
-train_dataset = dataset.select(range(TRAIN_SIZE)) # type: ignore
-eval_dataset = dataset.select(range(TRAIN_SIZE, TRAIN_SIZE + EVAL_SIZE)) # type: ignore
+
+ratio = 0.8
+train_dataset = dataset.select(range(int(len(dataset) * ratio))) # type: ignore
+eval_dataset = dataset.select(range(int(len(dataset) * ratio), len(dataset))) # type: ignore
 
 parser = vf.XMLParser(['think', 'answer'], answer_field='answer')
 system_prompt = f"""Reverse the given text.
 
 Respond in the following format:
 {parser.get_format_str()}"""
+breakpoint()
+
+def lcs_ratio(x: str, y: str) -> float:
+    """
+    Return the longest common subsequence ratio of x and y.
+    """
+    from difflib import SequenceMatcher
+    return SequenceMatcher(None, x, y).ratio()
 
 def lcs_reward_func(completion, answer, **kwargs) -> float:
     """
     LCS ratio of the reversed prompt and the parsed completion.
     """
-    def lcs_ratio(x: str, y: str) -> float:
-        """
-        Return the longest common subsequence ratio of x and y.
-        """
-        from difflib import SequenceMatcher
-        return SequenceMatcher(None, x, y).ratio()
     response = parser.parse_answer(completion) or ''
     return lcs_ratio(response, answer)
 
+
+breakpoint()
 rubric = vf.Rubric(funcs=[
 	lcs_reward_func,
 	parser.get_format_reward_func(),
