@@ -53,7 +53,7 @@ args.num_generations = 12
 args.gradient_accumulation_steps = 8
 args.max_steps = 100
 args.eval_strategy = 'steps'
-args.eval_steps = 2
+args.eval_steps = 100
 args.report_to = 'wandb'
 args.max_tokens = 1024
 
