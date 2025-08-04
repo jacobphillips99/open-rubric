@@ -56,7 +56,7 @@ args.eval_strategy = 'steps'
 args.eval_steps = 50
 args.report_to = 'wandb'
 args.max_tokens = 1024
-args.learning_rate = 1e-5
+args.learning_rate = 1e-6
 
 model, tokenizer = vf.get_model_and_tokenizer(model_name)
 trainer = vf.GRPOTrainer(
