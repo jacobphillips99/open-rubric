@@ -1907,105 +1907,9 @@ def render_visualization() -> None:
         st.error(f"Error creating dependency graph: {str(e)}")
         return
 
-    # Enhanced path visualization section
-    st.divider()
-    st.subheader("🛤️ Path Visualization")
-
-    if st.session_state.requirements:
-        st.markdown("**Simulate an evaluation path:**")
-
-        # Create input fields for answers with enhanced UI
-        answers = {}
-        req_names = [req.name for req in st.session_state.requirements]
-
-        # Use columns to organize the input
-        cols = st.columns(min(3, len(req_names)))
-
-        for i, req in enumerate(st.session_state.requirements):
-            col = cols[i % len(cols)]
-
-            with col:
-                # Enhanced input based on requirement type
-                if hasattr(req, "judge_response_format"):
-                    options = req.judge_response_format.options
-                    if len(options) == 2 and set(options) == {0.0, 1.0}:
-                        # Binary choice with better labels
-                        answer = st.selectbox(
-                            f"{req.name}:",
-                            options=[0.0, 1.0],
-                            format_func=lambda x: "❌ No" if x == 0.0 else "✅ Yes",
-                            key=f"path_answer_{req.name}",
-                            help=f"Question: {req.question[:50]}...",
-                        )
-                    elif isinstance(options, list) and len(options) > 2:
-                        # Discrete choices
-                        answer = st.selectbox(
-                            f"{req.name}:",
-                            options=options,
-                            key=f"path_answer_{req.name}",
-                            help=f"Question: {req.question[:50]}...",
-                        )
-                    else:
-                        # Continuous or other
-                        if isinstance(options, list) and len(options) == 2:
-                            # Continuous range
-                            answer = st.slider(
-                                f"{req.name}:",
-                                min_value=float(options[0]),
-                                max_value=float(options[1]),
-                                value=float(options[0]),
-                                step=0.1,
-                                key=f"path_answer_{req.name}",
-                                help=f"Question: {req.question[:50]}...",
-                            )
-                        else:
-                            # Fallback to number input
-                            answer = st.number_input(
-                                f"{req.name}:",
-                                value=1.0,
-                                step=0.1,
-                                key=f"path_answer_{req.name}",
-                                help=f"Question: {req.question[:50]}...",
-                            )
-                else:
-                    # Fallback for requirements without response format
-                    answer = st.number_input(
-                        f"{req.name}:",
-                        value=1.0,
-                        step=0.1,
-                        key=f"path_answer_{req.name}",
-                        help=f"Question: {req.question[:50]}...",
-                    )
-
-                answers[req.name] = float(answer)
-
-        if st.button("🎯 Visualize Path", type="primary"):
-            try:
-                from multistep_extras.visualization.visualizer import \
-                    create_path_visualization
-
-                path_fig = create_path_visualization(
-                    st.session_state.requirements,
-                    answers,
-                    width=1000,
-                    height=graph_height,
-                    show_answer_labels=show_answer_labels,
-                    show_terminal_states=show_terminal_states,
-                )
-
-                st.plotly_chart(path_fig, use_container_width=True)
-
-                # Show path explanation
-                st.success(
-                    "🎯 **Path highlighted in red!** This shows which requirements would be evaluated given your answers."
-                )
-
-            except Exception as e:
-                st.error(f"Error creating path visualization: {str(e)}")
-
     # Enhanced metrics dashboard section
     st.divider()
-    st.subheader("📊 Enhanced Metrics Dashboard")
+    st.subheader("📊 Metrics")
 
     try:
         from multistep_extras.visualization.visualizer import (
@@ -2086,6 +1990,7 @@ def render_visualization() -> None:
                 st.markdown(f"• Non-Terminal: {non_terminal_count}")
 
     except Exception as e:
+        breakpoint()
         st.error(f"Error creating metrics dashboard: {str(e)}")
 
     # Save visualization section

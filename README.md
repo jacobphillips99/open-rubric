@@ -62,42 +62,159 @@ For remote node setup, see [install.sh](https://github.com/jacobphillips99/open-
 
 ## Quick Start
 
+### 🚀 Your First Multi-Step Rubric
+
+Let's build a **medical emergency response workflow** to see OpenRubric in action! This example demonstrates how complex decision trees adapt based on real-world conditions.
+
+#### Step 1: Import the Framework
+
 ```python
 from verifiers.rubrics.multistep import MultiStepRubric, BinaryRequirement, Scenario
 from verifiers.rewards.judge_reward import BinaryJudgeRewarder, JUDGE_PROMPT
+```
 
-# Define workflow
+#### Step 2: Design Your Workflow
+
+Create a **branching emergency protocol** where each decision point leads to different response paths:
+
+```python
+# Emergency Response Workflow
 requirements = [
+    # Initial Assessment
     BinaryRequirement(
-        name="check_prerequisites",
-        question="Does the response check if prerequisites are met?",
-        dependencies={1.0: ["make_decision"], 0.0: []}
+        name="scene_safety",
+        question="Does the response prioritize scene safety before approaching?",
+        dependencies={
+            1.0: ["patient_consciousness", "vital_signs"],  # Safe → parallel assessments
+            0.0: []  # Unsafe → stop workflow
+        }
     ),
+    
+    # Branching Based on Patient State
     BinaryRequirement(
-        name="make_decision", 
-        question="Does the response make a clear decision?",
-        dependencies={1.0: ["take_action"], 0.0: []}
+        name="patient_consciousness", 
+        question="Does the response assess if the patient is conscious and responsive?",
+        dependencies={
+            1.0: ["communication", "pain_assessment"],  # Conscious → gather info
+            0.0: ["airway_management", "emergency_protocols"]  # Unconscious → life support
+        }
     ),
+    
     BinaryRequirement(
-        name="take_action",
-        question="Does the response specify what action to take?"
+        name="vital_signs",
+        question="Does the response check vital signs for stability?",
+        dependencies={
+            1.0: ["transport_decision"],  # Stable → consider transport
+            0.0: ["immediate_intervention"]  # Unstable → emergency action
+        }
+    ),
+    
+    # Conscious Patient Path
+    BinaryRequirement(
+        name="communication",
+        question="Does the response attempt to communicate with the patient?"
+    ),
+    
+    BinaryRequirement(
+        name="pain_assessment", 
+        question="Does the response assess and address patient pain levels?"
+    ),
+    
+    # Unconscious Patient Path
+    BinaryRequirement(
+        name="airway_management",
+        question="Does the response ensure airway is clear and protected?"
+    ),
+    
+    BinaryRequirement(
+        name="emergency_protocols",
+        question="Does the response activate appropriate emergency protocols?"
+    ),
+    
+    # Terminal Actions
+    BinaryRequirement(
+        name="immediate_intervention",
+        question="Does the response perform immediate life-saving interventions?"
+    ),
+    
+    BinaryRequirement(
+        name="transport_decision",
+        question="Does the response make appropriate transport arrangements?"
     )
 ]
+```
 
-# Create and evaluate
-rubric = MultiStepRubric(requirements, [BinaryJudgeRewarder(JUDGE_PROMPT)])
-scenario = Scenario(
-    prompt="Should we deploy the new feature?",
-    completion="Let me check our testing status first. All tests pass, so I recommend deploying tonight.",
+#### Step 3: Create Test Scenarios
+
+**Scenario A: Conscious Trauma Patient**
+```python
+conscious_scenario = Scenario(
+    prompt="""You arrive at a car accident. The driver is sitting upright, alert, 
+    but has a deep cut on their arm bleeding heavily. The scene is secure.""",
+    
+    completion="""First, I confirm the scene is safe - no traffic hazards or fuel leaks. 
+    The patient is conscious and talking, so I'll introduce myself and ask about their 
+    condition while applying direct pressure to control the bleeding. I'll assess their 
+    pain level and other injuries, then prepare for ambulance transport.""",
+    
     answers={
-        "check_prerequisites": {"answer": 1.0, "reasoning": "Explicitly checks test status"},
-        "make_decision": {"answer": 1.0, "reasoning": "Clear deployment recommendation"},
-        "take_action": {"answer": 1.0, "reasoning": "Specifies deployment timing"}
+        "scene_safety": {"answer": 1.0, "reasoning": "Confirms scene safety first"},
+        "patient_consciousness": {"answer": 1.0, "reasoning": "Patient is alert and talking"}, 
+        "communication": {"answer": 1.0, "reasoning": "Introduces self and gathers info"},
+        "pain_assessment": {"answer": 1.0, "reasoning": "Assesses pain and bleeding"},
+        "transport_decision": {"answer": 1.0, "reasoning": "Prepares for ambulance"}
     }
 )
-
-result = await rubric.evaluate(scenario)
 ```
+
+**Scenario B: Unconscious Emergency**
+```python
+unconscious_scenario = Scenario(
+    prompt="""You find an unconscious person on the sidewalk. They're not responding 
+    to verbal stimuli and breathing appears shallow. No obvious hazards present.""",
+    
+    completion="""Scene appears safe with no immediate dangers. The patient is 
+    unconscious and not responding to my voice. I'll check their airway immediately 
+    and call for advanced life support while beginning CPR protocols.""",
+    
+    answers={
+        "scene_safety": {"answer": 1.0, "reasoning": "Assesses scene for dangers"},
+        "patient_consciousness": {"answer": 0.0, "reasoning": "Patient unconscious, no response"},
+        "airway_management": {"answer": 1.0, "reasoning": "Checks airway immediately"}, 
+        "emergency_protocols": {"answer": 1.0, "reasoning": "Calls ALS and begins CPR"}
+    }
+)
+```
+
+#### Step 4: Evaluate and See the Magic
+
+```python
+# Create the rubric with judge-based evaluation
+rubric = MultiStepRubric(requirements, [BinaryJudgeRewarder(JUDGE_PROMPT)])
+
+# Evaluate different scenarios
+conscious_result = await rubric.evaluate(conscious_scenario)
+unconscious_result = await rubric.evaluate(unconscious_scenario)
+
+# Each scenario follows a different path through the workflow!
+print(f"Conscious path reward: {conscious_result.total_reward}")
+print(f"Unconscious path reward: {unconscious_result.total_reward}")
+```
+
+#### 🎯 What Just Happened?
+
+- **Dynamic Branching**: Each scenario triggered different workflow paths based on patient consciousness
+- **Progressive Evaluation**: Only relevant requirements were evaluated based on dependencies  
+- **Judge-Driven Scoring**: AI judges determined if each requirement was properly addressed
+- **Realistic Training**: Models learn complex decision-making rather than simple pattern matching
+
+### Next Steps
+
+🔧 **Try the Interactive Builder**: `streamlit run multistep_extras/builders/rubric_gui.py`
+
+🧠 **Advanced Scenarios**: Check out `multistep_extras/example_rubrics/` for debugging workflows, complex medical protocols, and more
+
+🚂 **Model Training**: See our [training examples](examples/) for GRPO reinforcement learning with multi-step rubrics
 
 ## Workflow Builder
 

@@ -102,7 +102,7 @@ class RequirementsVisualizer(BaseRequirementsInspector):
 
         fig.update_layout(
             title=dict(
-                text="multistep rubric dependency graph",
+                text="Dependency Graph",
                 x=0.5,
                 xanchor="center",
                 font=dict(size=18, color="#2c3e50"),
@@ -297,26 +297,50 @@ class RequirementsVisualizer(BaseRequirementsInspector):
         self, nodes: Sequence[Dict[str, Any]]
     ) -> Dict[str, Tuple[float, float]]:
         """
-        Compute simple topological layout.
+        Compute simple topological layout with all terminal requirements at the bottom.
 
         Each 'level' from BaseRequirementsInspector is a horizontal layer; we space nodes within.
+        Terminal requirements are grouped at the bottom regardless of their topological level.
         """
         positions: Dict[str, Tuple[float, float]] = {}
         max_level_index = len(self.levels) - 1
+        
+        # Collect terminal requirement names
+        terminal_names = {node["name"] for node in nodes if node["is_terminal"]}
+        
+        # Position non-terminal requirements using topological levels
         for lvl_idx, level in enumerate(self.levels):
-            node_names = list(level)
+            # Filter out terminal requirements from this level
+            non_terminal_names = [name for name in level if name not in terminal_names]
             y = max_level_index - lvl_idx  # roots top
-            if not node_names:
+            
+            if not non_terminal_names:
                 continue
+                
             xs = (
-                np.linspace(-1.5, 1.5, len(node_names))
-                if len(node_names) > 1
+                np.linspace(-1.5, 1.5, len(non_terminal_names))
+                if len(non_terminal_names) > 1
                 else [0.0]
             )
-            for x, name in zip(xs, node_names):
+            for x, name in zip(xs, non_terminal_names):
                 positions[name] = (float(x), float(y))
-        for node in nodes:  # fallback
+        
+        # Position all terminal requirements at the bottom
+        if terminal_names:
+            terminal_list = list(terminal_names)
+            y_terminal = -1  # Below all other levels
+            xs_terminal = (
+                np.linspace(-1.5, 1.5, len(terminal_list))
+                if len(terminal_list) > 1
+                else [0.0]
+            )
+            for x, name in zip(xs_terminal, terminal_list):
+                positions[name] = (float(x), float(y_terminal))
+        
+        # Fallback for any missed nodes
+        for node in nodes:
             positions.setdefault(node["name"], (0.0, 0.0))
+            
         return positions
 
     # ---- drawing helpers -------------------------------------------------
