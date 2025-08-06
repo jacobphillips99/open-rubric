@@ -1,15 +1,4 @@
-"""
-visualization utilities for multistep rubric workflows.
-
-improvements vs original:
-- clearer separation of data prep vs rendering
-- simpler layout calc
-- fixed path-finding logic (previous version walked edges backwards + duplicated nodes)
-- optional collapsing of requirement types into a single legend entry
-- less duplication of color/shape logic
-- stricter type hints + docstrings
-"""
-
+"""Visualization tools for multistep rubrics and requirements."""
 from __future__ import annotations
 
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Set, Tuple
@@ -33,6 +22,15 @@ _TYPE_COLORS: Dict[str, str] = {
 _TERMINAL_DARKEN: float = 0.85  # multiply rgb to get darker shade
 _FALLBACK_COLOR = "#7f8c8d"
 
+# layout/sizing heuristic (streamlit-friendly; small graphs)
+_MIN_BOX_W: float = 0.9
+_MAX_BOX_W: float = 3.2
+_CHAR_W: float = 0.09
+_BOX_H: float = 0.45
+_X_SEP: float = 0.35
+_Y_STEP: float = 2.2
+_TERMINAL_Y_GAP: float = 1.4
+
 
 def _darken_hex(hex_color: str, factor: float) -> str:
     """Darken a #rrggbb color by multiplying channels by factor."""
@@ -48,8 +46,38 @@ def _darken_hex(hex_color: str, factor: float) -> str:
     return f"#{r:02x}{g:02x}{b:02x}"
 
 
+def _get_contrasting_text_color(hex_color: str) -> str:
+    """Return black or white hex color for best contrast against a hex background."""
+    try:
+        r = int(hex_color[1:3], 16)
+        g = int(hex_color[3:5], 16)
+        b = int(hex_color[5:7], 16)
+    except Exception:
+        return "#000000"  # default to black
+    luminance = 0.299 * r + 0.587 * g + 0.114 * b
+    return "#ffffff" if luminance < 140 else "#000000"
+
+
 def _maybe_truncate(text: str, n: int = 80) -> str:
     return (text[: n - 3] + "...") if len(text) > n else text
+
+
+def _estimate_box_size(name: str) -> Tuple[float, float]:
+    """Estimate a rectangle size that fits the node label reasonably."""
+    # More responsive sizing: increased character width multiplier and wider range
+    char_width_multiplier = 0.12  # increased from 0.09
+    min_chars = 8  # minimum character assumption for readability
+    padding = 0.4  # horizontal padding
+
+    # Calculate width based on name length with more responsive scaling
+    base_width = char_width_multiplier * max(min_chars, len(name)) + padding
+
+    # More flexible min/max bounds for better responsiveness
+    min_width = 0.8  # slightly smaller minimum
+    max_width = 4.0  # larger maximum for long names
+
+    w = min(max_width, max(min_width, base_width))
+    return w, _BOX_H
 
 
 class RequirementsVisualizer(BaseRequirementsInspector):
@@ -61,7 +89,7 @@ class RequirementsVisualizer(BaseRequirementsInspector):
         self,
         width: int = 1200,
         height: int = 800,
-        show_answer_labels: bool = True,
+        show_answer_labels: bool = False,  # default off: cleaner; labels on edge hover instead
         highlight_path: Optional[Dict[str, Any]] = None,
         show_terminal_states: bool = True,
         show_requirement_types: bool = True,
@@ -69,12 +97,12 @@ class RequirementsVisualizer(BaseRequirementsInspector):
         """
         Build an interactive dependency graph.
 
-        args:
+        Args:
             width: figure width in px.
             height: figure height in px.
-            show_answer_labels: show answer values at edge midpoints.
+            show_answer_labels: draw static edge labels at midpoints (hover covers most needs).
             highlight_path: mapping {requirement_name: answer_value} to highlight the path taken.
-            show_terminal_states: visually emphasize terminal nodes.
+            show_terminal_states: visually emphasize terminal nodes (draw diamonds).
             show_requirement_types: if false, collapse all types into one legend entry.
 
         returns:
@@ -84,12 +112,17 @@ class RequirementsVisualizer(BaseRequirementsInspector):
         positions = self._calculate_hierarchical_positions(nodes)
 
         fig = go.Figure()
+
+        # draw elements in order: edges, then shapes, then text
         self._add_edges_to_figure(
             fig,
             edges,
             positions,
             show_answer_labels=show_answer_labels,
             highlight_path=highlight_path,
+        )
+        self._add_rectangle_nodes(
+            fig, nodes, positions, highlight_path, show_terminal_states
         )
         self._add_nodes_to_figure(
             fig,
@@ -100,20 +133,21 @@ class RequirementsVisualizer(BaseRequirementsInspector):
             show_requirement_types=show_requirement_types,
         )
 
+        self._add_unified_legend(fig, show_requirement_types, show_terminal_states)
+
+        # fixed reasonable margins
+        margin_sides = 80
+        margin_top = 60
+        margin_bottom = 40
+
         fig.update_layout(
-            title=dict(
-                text="Dependency Graph",
-                x=0.5,
-                xanchor="center",
-                font=dict(size=18, color="#2c3e50"),
-            ),
             width=width,
             height=height,
             hovermode="closest",
             xaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
             yaxis=dict(showgrid=False, zeroline=False, showticklabels=False),
             plot_bgcolor="white",
-            margin=dict(l=20, r=20, t=60, b=20),
+            margin=dict(l=margin_sides, r=margin_sides, t=margin_top, b=margin_bottom),
             legend=dict(
                 orientation="h",
                 yanchor="bottom",
@@ -133,7 +167,7 @@ class RequirementsVisualizer(BaseRequirementsInspector):
         answers: Dict[str, Any],
         width: int = 1200,
         height: int = 800,
-        show_answer_labels: bool = True,
+        show_answer_labels: bool = False,
         show_terminal_states: bool = True,
     ) -> go.Figure:
         """Visualize a specific evaluation path."""
@@ -202,7 +236,7 @@ class RequirementsVisualizer(BaseRequirementsInspector):
             go.Histogram(x=dep_counts, nbinsx=min(10, len(dep_counts))), row=2, col=1
         )
 
-        # 4. summary bar: terminals vs non-terminals + max depth + avg branching (encoded as value)
+        # 4. summary bar
         terminal = metrics["terminal_nodes"]
         non_terminal = metrics["total_requirements"] - terminal
         summary_keys = ["terminal", "non-terminal", "max depth", "avg branching"]
@@ -259,7 +293,7 @@ class RequirementsVisualizer(BaseRequirementsInspector):
     # ---- internal data prep ---------------------------------------------
 
     def _build_graph_data(self) -> Tuple[List[Dict[str, Any]], List[Dict[str, Any]]]:
-        """Extract node + edge metadata (plain dicts)."""
+        """Extract node + edge metadata (plain dicts), ignoring dangling edge targets."""
         name_to_req = {r.name: r for r in self.requirements}
         nodes: List[Dict[str, Any]] = []
         edges: List[Dict[str, Any]] = []
@@ -268,10 +302,8 @@ class RequirementsVisualizer(BaseRequirementsInspector):
             req_type = req.__class__.__name__.replace("Requirement", "").lower()
             judge_name = getattr(req, "judge_name", "auto-select") or "auto-select"
 
-            branching_factor = 0
             dep_map = getattr(req, "dependencies", None) or {}
-            for deps in dep_map.values():
-                branching_factor += len(deps)
+            branching_factor = sum(len(deps) for deps in dep_map.values())
 
             nodes.append(
                 dict(
@@ -287,63 +319,195 @@ class RequirementsVisualizer(BaseRequirementsInspector):
 
             for answer_val, deps in dep_map.items():
                 for dep in deps:
-                    if dep not in name_to_req:
-                        pass  # dangling ok
-                    edges.append(dict(source=req.name, target=dep, answer=answer_val))
+                    if dep in name_to_req:  # ignore dangling targets cleanly
+                        edges.append(
+                            dict(source=req.name, target=dep, answer=answer_val)
+                        )
 
         return nodes, edges
 
+    # ---- layout helpers --------------------------------------------------
+
+    def _adj(self) -> Tuple[Dict[str, List[str]], Dict[str, List[str]]]:
+        """Forward and reverse adjacency."""
+        fwd: Dict[str, List[str]] = {}
+        rev: Dict[str, List[str]] = {}
+        for req in self.requirements:
+            for deps in (getattr(req, "dependencies", None) or {}).values():
+                if not deps:
+                    continue
+                fwd.setdefault(req.name, []).extend(deps)
+                for d in deps:
+                    rev.setdefault(d, []).append(req.name)
+        # ensure keys exist
+        for r in self.requirements:
+            fwd.setdefault(r.name, [])
+            rev.setdefault(r.name, [])
+        return fwd, rev
+
+    def _order_levels_barycenter(
+        self,
+        levels: List[List[str]],
+        fwd: Dict[str, List[str]],
+        rev: Dict[str, List[str]],
+        iters: int = 2,
+    ) -> List[List[str]]:
+        """Perform simple sugiyama-style crossing reduction by barycenter; cheap and good-enough."""
+        L: List[List[str]] = [lvl[:] for lvl in levels]
+        for _ in range(iters):
+            # downward: order by parents (rev)
+            for i in range(1, len(L)):
+                prev = {n: idx for idx, n in enumerate(L[i - 1])}
+
+                def score_down(n: str, prev=prev, level_len=len(L[i - 1])) -> float:
+                    ps = rev.get(n, [])
+                    return (
+                        float(np.mean([prev.get(p, 0) for p in ps]))
+                        if ps
+                        else float(level_len) / 2
+                    )
+
+                L[i].sort(key=score_down)
+            # upward: order by children (fwd)
+            for i in range(len(L) - 2, -1, -1):
+                nxt = {n: idx for idx, n in enumerate(L[i + 1])}
+
+                def score_up(n: str, nxt=nxt, level_len=len(L[i + 1])) -> float:
+                    cs = fwd.get(n, [])
+                    return (
+                        float(np.mean([nxt.get(c, 0) for c in cs]))
+                        if cs
+                        else float(level_len) / 2
+                    )
+
+                L[i].sort(key=score_up)
+        return L
+
     def _calculate_hierarchical_positions(
-        self, nodes: Sequence[Dict[str, Any]]
+        self, nodes: Sequence[Dict[str, Any]], spacing_factor: float = 1.0
     ) -> Dict[str, Tuple[float, float]]:
         """
-        Compute simple topological layout with all terminal requirements at the bottom.
-
-        Each 'level' from BaseRequirementsInspector is a horizontal layer; we space nodes within.
-        Terminal requirements are grouped at the bottom regardless of their topological level.
+        Compute topological layout with all terminal requirements at the bottom.
+        - keep topo levels (roots at level 0, etc.)
+        - remove terminals from their native level and put them on a single bottom row
+        - reduce crossings by a light barycenter pass on non-terminal levels
         """
+        # name_to_node: Dict[str, Dict[str, Any]] = {n["name"]: n for n in nodes}  # unused
+        fwd, rev = self._adj()
+
+        terminals = [n for n in nodes if n["is_terminal"]]
+        terminal_names = set(n["name"] for n in terminals)
+
+        # strip terminals from levels; keep only non-terminals for layered layout
+        nonterm_levels: List[List[str]] = []
+        for lvl in self.levels:
+            non = [n for n in lvl if n not in terminal_names]
+            if non:
+                nonterm_levels.append(non)
+
+        # crossing reduction
+        ordered_levels = self._order_levels_barycenter(nonterm_levels, fwd, rev)
+
         positions: Dict[str, Tuple[float, float]] = {}
-        max_level_index = len(self.levels) - 1
-        
-        # Collect terminal requirement names
-        terminal_names = {node["name"] for node in nodes if node["is_terminal"]}
-        
-        # Position non-terminal requirements using topological levels
-        for lvl_idx, level in enumerate(self.levels):
-            # Filter out terminal requirements from this level
-            non_terminal_names = [name for name in level if name not in terminal_names]
-            y = max_level_index - lvl_idx  # roots top
-            
-            if not non_terminal_names:
-                continue
-                
-            xs = (
-                np.linspace(-1.5, 1.5, len(non_terminal_names))
-                if len(non_terminal_names) > 1
-                else [0.0]
-            )
-            for x, name in zip(xs, non_terminal_names):
-                positions[name] = (float(x), float(y))
-        
-        # Position all terminal requirements at the bottom
-        if terminal_names:
-            terminal_list = list(terminal_names)
-            y_terminal = -1  # Below all other levels
-            xs_terminal = (
-                np.linspace(-1.5, 1.5, len(terminal_list))
-                if len(terminal_list) > 1
-                else [0.0]
-            )
-            for x, name in zip(xs_terminal, terminal_list):
-                positions[name] = (float(x), float(y_terminal))
-        
-        # Fallback for any missed nodes
+
+        # compute layout dimensions
+        max_width = max(len(lvl) for lvl in ordered_levels) if ordered_levels else 1
+        if terminals:
+            max_width = max(max_width, len(terminals))
+
+        # adaptive horizontal spacing based on node count + new estimate_box_size
+        base_spread = max(4.0, max_width * 1.5) * spacing_factor
+
+        # position non-terminal levels (top-down)
+        for i, lvl in enumerate(ordered_levels):
+            y = float(len(ordered_levels) - 1 - i) * _Y_STEP
+            if len(lvl) == 1:
+                positions[lvl[0]] = (0.0, y)
+            else:
+                xs = np.linspace(-base_spread / 2, base_spread / 2, len(lvl))
+                for x, name in zip(xs, lvl):
+                    positions[name] = (float(x), y)
+
+        # position terminals at bottom
+        if terminals:
+            y_terminal = -_Y_STEP if ordered_levels else 0.0
+            if not ordered_levels:
+                y_terminal -= _TERMINAL_Y_GAP
+
+            if len(terminals) == 1:
+                positions[terminals[0]["name"]] = (0.0, y_terminal)
+            else:
+                xs = np.linspace(-base_spread / 2, base_spread / 2, len(terminals))
+                for x, term_node in zip(xs, terminals):
+                    positions[term_node["name"]] = (float(x), y_terminal)
+
+        # fallback for missed nodes
         for node in nodes:
             positions.setdefault(node["name"], (0.0, 0.0))
-            
+
         return positions
 
-    # ---- drawing helpers -------------------------------------------------
+    def _add_unified_legend(
+        self, fig: go.Figure, show_requirement_types: bool, show_terminal_states: bool
+    ) -> None:
+        """Add a single, clean legend for all visual elements."""
+
+        def add_legend_item(name, mode, **kwargs):
+            fig.add_trace(
+                go.Scatter(
+                    x=[None], y=[None], name=name, mode=mode, showlegend=True, **kwargs
+                )
+            )
+
+        # Node Shapes
+        if show_terminal_states:
+            add_legend_item(
+                "Non-Terminal",
+                "markers",
+                marker=dict(symbol="square", color=_FALLBACK_COLOR, size=10),
+            )
+            add_legend_item(
+                "Terminal",
+                "markers",
+                marker=dict(
+                    symbol="diamond",
+                    color=_darken_hex(_FALLBACK_COLOR, _TERMINAL_DARKEN),
+                    size=10,
+                ),
+            )
+        else:
+            add_legend_item(
+                "Requirement",
+                "markers",
+                marker=dict(symbol="square", color=_FALLBACK_COLOR, size=10),
+            )
+
+        # Node Colors
+        if show_requirement_types:
+            for req_type, color in _TYPE_COLORS.items():
+                add_legend_item(
+                    f"Type: {req_type.capitalize()}",
+                    "markers",
+                    marker=dict(symbol="square", color=color, size=10),
+                )
+
+        # Edge Colors
+        edge_styles = {
+            "Correct Path": self._edge_style_for_type("correct")[0],
+            "Incorrect Path": self._edge_style_for_type("incorrect")[0],
+            "Other Path": self._edge_style_for_type("partial")[0],
+            "Highlighted Path": "#e74c3c",
+        }
+        for name, color in edge_styles.items():
+            add_legend_item(name, "lines", line=dict(color=color, width=3))
+
+    # ---- drawing helpers --------------------------------------------------
+
+    def _node_color(self, node: Dict[str, Any], show_terminal_states: bool) -> str:
+        base = _TYPE_COLORS.get(node["req_type"], _FALLBACK_COLOR)
+        if show_terminal_states and node["is_terminal"]:
+            return _darken_hex(base, _TERMINAL_DARKEN)
+        return base
 
     def _add_nodes_to_figure(
         self,
@@ -354,7 +518,7 @@ class RequirementsVisualizer(BaseRequirementsInspector):
         show_terminal_states: bool,
         show_requirement_types: bool,
     ) -> None:
-        """Add node traces."""
+        """Add node traces (text labels for clean overlays on shapes)."""
 
         def group_key(n: Dict[str, Any]) -> str:
             return n["req_type"] if show_requirement_types else "all"
@@ -363,31 +527,27 @@ class RequirementsVisualizer(BaseRequirementsInspector):
         for n in nodes:
             grouped.setdefault(group_key(n), []).append(n)
 
-        for key, group_nodes in grouped.items():
+        for _key, group_nodes in grouped.items():
             xs: List[float] = []
             ys: List[float] = []
             texts: List[str] = []
             hover_texts: List[str] = []
-            sizes: List[int] = []
             colors: List[str] = []
-            symbols: List[str] = []
+            text_colors: List[str] = []
 
             for n in group_nodes:
                 x, y = positions[n["name"]]
                 xs.append(x)
                 ys.append(y)
-                texts.append(n["name"])
-                colors.append(self._node_color(n, show_terminal_states))
-                symbols.append(
-                    "diamond"
-                    if (show_terminal_states and n["is_terminal"])
-                    else "circle"
-                )
-                sizes.append(
-                    28
-                    if (highlight_path and n["name"] in highlight_path)
-                    else (24 if n["is_terminal"] else 18)
-                )
+
+                # use readable truncated name
+                name = n["name"]
+                texts.append(name)
+
+                node_color = self._node_color(n, show_terminal_states)
+                colors.append(node_color)
+                text_colors.append("#ffffff")
+
                 hover_texts.append(
                     "<br>".join(
                         [
@@ -402,33 +562,103 @@ class RequirementsVisualizer(BaseRequirementsInspector):
                     )
                 )
 
-            legend_name = "all requirements" if key == "all" else key
+            # text layer with better visibility
             fig.add_trace(
                 go.Scatter(
                     x=xs,
                     y=ys,
-                    mode="markers+text",
+                    mode="text",
                     text=texts,
+                    textfont=dict(
+                        size=10,
+                        color=text_colors,
+                        family="Arial",
+                    ),
                     textposition="middle center",
-                    textfont=dict(size=10, color="white"),
                     hovertext=hover_texts,
                     hoverinfo="text",
-                    marker=dict(
-                        size=sizes,
-                        color=colors,
-                        line=dict(width=2, color="white"),
-                        symbol=symbols,
-                        opacity=0.9,
-                    ),
-                    name=legend_name,
+                    showlegend=False,
                 )
             )
 
-    def _node_color(self, node: Dict[str, Any], show_terminal_states: bool) -> str:
-        base = _TYPE_COLORS.get(node["req_type"], _FALLBACK_COLOR)
-        if show_terminal_states and node["is_terminal"]:
-            return _darken_hex(base, _TERMINAL_DARKEN)
-        return base
+    def _add_rectangle_nodes(
+        self,
+        fig: go.Figure,
+        nodes: Sequence[Dict[str, Any]],
+        positions: Dict[str, Tuple[float, float]],
+        highlight_path: Optional[Dict[str, Any]],
+        show_terminal_states: bool,
+    ) -> None:
+        """Add rectangle/diamond shapes for nodes with text-fitting dimensions."""
+        for node in nodes:
+            x, y = positions[node["name"]]
+            name = node["name"]
+
+            # estimate dimensions
+            w, h = _estimate_box_size(name)
+
+            # adjust for highlight/terminal status
+            if highlight_path and node["name"] in highlight_path:
+                w *= 1.1
+                h *= 1.1
+                line_width = 3
+            elif node["is_terminal"]:
+                w *= 1.05
+                h *= 1.05
+                line_width = 2
+            else:
+                line_width = 2
+
+            color = self._node_color(node, show_terminal_states)
+
+            # shape type based on terminal status
+            if show_terminal_states and node["is_terminal"]:
+                self._add_diamond_shape(fig, x, y, w, h, color, line_width)
+            else:
+                fig.add_shape(
+                    type="rect",
+                    x0=x - w / 2,
+                    y0=y - h / 2,
+                    x1=x + w / 2,
+                    y1=y + h / 2,
+                    fillcolor=color,
+                    line=dict(color="white", width=line_width),
+                    opacity=1.0,
+                    layer="below",
+                )
+
+    def _add_diamond_shape(
+        self,
+        fig: go.Figure,
+        x: float,
+        y: float,
+        width: float,
+        height: float,
+        color: str,
+        line_width: int,
+    ) -> None:
+        """Add a diamond shape for terminal nodes."""
+        half_width = width / 2
+        half_height = height / 2
+
+        # diamond points: top, right, bottom, left
+        diamond_x = [x, x + half_width, x, x - half_width, x]
+        diamond_y = [y + half_height, y, y - half_height, y, y + half_height]
+
+        # create path string
+        path = f"M {diamond_x[0]},{diamond_y[0]}"
+        for i in range(1, len(diamond_x)):
+            path += f" L {diamond_x[i]},{diamond_y[i]}"
+        path += " Z"
+
+        fig.add_shape(
+            type="path",
+            path=path,
+            fillcolor=color,
+            line=dict(color="white", width=line_width),
+            opacity=1.0,
+            layer="below",
+        )
 
     def _add_edges_to_figure(
         self,
@@ -450,6 +680,7 @@ class RequirementsVisualizer(BaseRequirementsInspector):
             )
 
             color, width = self._edge_style(e["answer"], is_highlight)
+
             fig.add_trace(
                 go.Scatter(
                     x=[x0, x1],
@@ -484,6 +715,30 @@ class RequirementsVisualizer(BaseRequirementsInspector):
                     showlegend=False,
                 )
             )
+
+    def _answer_type_for_legend(self, answer: Any) -> str:
+        """Categorize answer for legend purposes."""
+        try:
+            val = float(answer)
+            if val == 1.0:
+                return "correct (1.0)"
+            elif val == 0.0:
+                return "incorrect (0.0)"
+            else:
+                return "partial"
+        except Exception:
+            return "other"
+
+    def _edge_style_for_type(self, answer_type: str) -> Tuple[str, int]:
+        """Get color and width for a specific answer type."""
+        if "correct" in answer_type:
+            return "#27ae60", 2
+        elif "incorrect" in answer_type:
+            return "#e74c3c", 2
+        elif "partial" in answer_type:
+            return "#f39c12", 2
+        else:
+            return "#f39c12", 2
 
     def _edge_style(self, answer: Any, is_highlight: bool) -> Tuple[str, int]:
         """Color + width for an edge given its answer + highlight state."""
@@ -533,13 +788,13 @@ class RequirementsVisualizer(BaseRequirementsInspector):
 
 
 class RubricVisualizer(BaseRubricInspector):
-    """visualizer for a complete multistep rubric (currently a placeholder)."""
+    """Visualizer for a complete multistep rubric (currently a placeholder)."""
 
     pass
 
 
 class CompletedRubricVisualizer(BaseEvaluationInspector):
-    """visualizer for evaluated rubrics + results (currently a placeholder)."""
+    """Visualizer for evaluated rubrics + results (currently a placeholder)."""
 
     pass
 

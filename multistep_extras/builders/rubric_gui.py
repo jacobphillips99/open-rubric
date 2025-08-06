@@ -1855,20 +1855,20 @@ def render_visualization() -> None:
             show_requirement_types=True,
         )
 
-        # Add enhanced annotations like in the demo
-        fig.add_annotation(
-            text="💎 Diamond shapes = Terminal states<br>🔵 Circles = Non-terminal states<br>🟢 Green edges = Positive answers<br>🔴 Red edges = Negative answers",
-            xref="paper",
-            yref="paper",
-            x=0.02,
-            y=0.98,
-            showarrow=False,
-            font=dict(size=12, color="#2c3e50"),
-            align="left",
-            bgcolor="rgba(255,255,255,0.8)",
-            bordercolor="lightgray",
-            borderwidth=1,
-        )
+        # # Add enhanced annotations like in the demo
+        # fig.add_annotation(
+        #     text="💎 Diamond shapes = Terminal states<br>🔵 Circles = Non-terminal states<br>🟢 Green edges = Positive answers<br>🔴 Red edges = Negative answers",
+        #     xref="paper",
+        #     yref="paper",
+        #     x=0.02,
+        #     y=0.98,
+        #     showarrow=False,
+        #     font=dict(size=12, color="#2c3e50"),
+        #     align="left",
+        #     bgcolor="rgba(255,255,255,0.8)",
+        #     bordercolor="lightgray",
+        #     borderwidth=1,
+        # )
 
         st.plotly_chart(fig, use_container_width=True)
 
@@ -1897,11 +1897,6 @@ def render_visualization() -> None:
             - **Circular**: Arranges nodes in a circle for overview
             """
             )
-
-    except ImportError as e:
-        st.error(
-            f"Required dependencies not available. Please install: `pip install plotly networkx`. {e}"
-        )
         return
     except Exception as e:
         st.error(f"Error creating dependency graph: {str(e)}")
@@ -1990,8 +1985,10 @@ def render_visualization() -> None:
                 st.markdown(f"• Non-Terminal: {non_terminal_count}")
 
     except Exception as e:
+        st.error(
+            f"Error creating metrics dashboard: {str(e)}; {traceback.format_exc()}"
+        )
         breakpoint()
-        st.error(f"Error creating metrics dashboard: {str(e)}")
 
     # Save visualization section
     st.divider()

@@ -91,20 +91,3 @@ def compare_requirements(
         else:
             print(f"{metric:<25} {val1:<20} {val2:<20}")
     print()
-
-
-# Legacy function aliases for backward compatibility
-def visualize_requirements(requirements: List[Requirement]) -> None:
-    """
-    Legacy alias for inspect_requirements. Use inspect_requirements instead.
-
-    Args:
-        requirements: List of requirement objects
-    """
-    inspect_requirements(requirements)
-
-
-# Legacy class aliases for backward compatibility
-RequirementsVisualizer = RequirementsInspector
-RubricVisualizer = RubricInspector
-CompletedRubricVisualizer = EvaluationInspector

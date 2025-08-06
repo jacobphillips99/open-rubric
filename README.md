@@ -89,17 +89,17 @@ requirements = [
             0.0: []  # Unsafe → stop workflow
         }
     ),
-    
+
     # Branching Based on Patient State
     BinaryRequirement(
-        name="patient_consciousness", 
+        name="patient_consciousness",
         question="Does the response assess if the patient is conscious and responsive?",
         dependencies={
             1.0: ["communication", "pain_assessment"],  # Conscious → gather info
             0.0: ["airway_management", "emergency_protocols"]  # Unconscious → life support
         }
     ),
-    
+
     BinaryRequirement(
         name="vital_signs",
         question="Does the response check vital signs for stability?",
@@ -108,35 +108,35 @@ requirements = [
             0.0: ["immediate_intervention"]  # Unstable → emergency action
         }
     ),
-    
+
     # Conscious Patient Path
     BinaryRequirement(
         name="communication",
         question="Does the response attempt to communicate with the patient?"
     ),
-    
+
     BinaryRequirement(
-        name="pain_assessment", 
+        name="pain_assessment",
         question="Does the response assess and address patient pain levels?"
     ),
-    
+
     # Unconscious Patient Path
     BinaryRequirement(
         name="airway_management",
         question="Does the response ensure airway is clear and protected?"
     ),
-    
+
     BinaryRequirement(
         name="emergency_protocols",
         question="Does the response activate appropriate emergency protocols?"
     ),
-    
+
     # Terminal Actions
     BinaryRequirement(
         name="immediate_intervention",
         question="Does the response perform immediate life-saving interventions?"
     ),
-    
+
     BinaryRequirement(
         name="transport_decision",
         question="Does the response make appropriate transport arrangements?"
@@ -149,17 +149,17 @@ requirements = [
 **Scenario A: Conscious Trauma Patient**
 ```python
 conscious_scenario = Scenario(
-    prompt="""You arrive at a car accident. The driver is sitting upright, alert, 
+    prompt="""You arrive at a car accident. The driver is sitting upright, alert,
     but has a deep cut on their arm bleeding heavily. The scene is secure.""",
-    
-    completion="""First, I confirm the scene is safe - no traffic hazards or fuel leaks. 
-    The patient is conscious and talking, so I'll introduce myself and ask about their 
-    condition while applying direct pressure to control the bleeding. I'll assess their 
+
+    completion="""First, I confirm the scene is safe - no traffic hazards or fuel leaks.
+    The patient is conscious and talking, so I'll introduce myself and ask about their
+    condition while applying direct pressure to control the bleeding. I'll assess their
     pain level and other injuries, then prepare for ambulance transport.""",
-    
+
     answers={
         "scene_safety": {"answer": 1.0, "reasoning": "Confirms scene safety first"},
-        "patient_consciousness": {"answer": 1.0, "reasoning": "Patient is alert and talking"}, 
+        "patient_consciousness": {"answer": 1.0, "reasoning": "Patient is alert and talking"},
         "communication": {"answer": 1.0, "reasoning": "Introduces self and gathers info"},
         "pain_assessment": {"answer": 1.0, "reasoning": "Assesses pain and bleeding"},
         "transport_decision": {"answer": 1.0, "reasoning": "Prepares for ambulance"}
@@ -170,17 +170,17 @@ conscious_scenario = Scenario(
 **Scenario B: Unconscious Emergency**
 ```python
 unconscious_scenario = Scenario(
-    prompt="""You find an unconscious person on the sidewalk. They're not responding 
+    prompt="""You find an unconscious person on the sidewalk. They're not responding
     to verbal stimuli and breathing appears shallow. No obvious hazards present.""",
-    
-    completion="""Scene appears safe with no immediate dangers. The patient is 
-    unconscious and not responding to my voice. I'll check their airway immediately 
+
+    completion="""Scene appears safe with no immediate dangers. The patient is
+    unconscious and not responding to my voice. I'll check their airway immediately
     and call for advanced life support while beginning CPR protocols.""",
-    
+
     answers={
         "scene_safety": {"answer": 1.0, "reasoning": "Assesses scene for dangers"},
         "patient_consciousness": {"answer": 0.0, "reasoning": "Patient unconscious, no response"},
-        "airway_management": {"answer": 1.0, "reasoning": "Checks airway immediately"}, 
+        "airway_management": {"answer": 1.0, "reasoning": "Checks airway immediately"},
         "emergency_protocols": {"answer": 1.0, "reasoning": "Calls ALS and begins CPR"}
     }
 )
@@ -204,7 +204,7 @@ print(f"Unconscious path reward: {unconscious_result.total_reward}")
 #### 🎯 What Just Happened?
 
 - **Dynamic Branching**: Each scenario triggered different workflow paths based on patient consciousness
-- **Progressive Evaluation**: Only relevant requirements were evaluated based on dependencies  
+- **Progressive Evaluation**: Only relevant requirements were evaluated based on dependencies
 - **Judge-Driven Scoring**: AI judges determined if each requirement was properly addressed
 - **Realistic Training**: Models learn complex decision-making rather than simple pattern matching
 

@@ -9,8 +9,7 @@ from .example_rubrics import (AVAILABLE_WORKFLOWS, all_scenarios,
 # Legacy aliases for backward compatibility
 from .inspection import (EvaluationInspector, RequirementsInspector,
                          RubricInspector, inspect_requirements)
-from .visualization import (CompletedRubricVisualizer, RequirementsVisualizer,
-                            RubricVisualizer, visualize_requirements)
+from .visualization import RequirementsVisualizer
 
 __all__ = [
     # Builders
@@ -34,8 +33,6 @@ __all__ = [
     # Legacy aliases for backward compatibility
     "RequirementsVisualizer",
     "RubricVisualizer",
-    "CompletedRubricVisualizer",
-    "visualize_requirements",
     # Demos
     "MultiStepTutorial",
     "run_inspector_demo",
