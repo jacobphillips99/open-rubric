@@ -16,6 +16,7 @@ from openai import OpenAI
 
 from multistep_extras.builders.scenario_generator import \
     generate_scenario_from_hidden_description
+from multistep_extras.example_rubrics import get_workflow, list_workflows
 from verifiers.rubrics.multistep.multistep_rubric import MultiStepRubric
 from verifiers.rubrics.multistep.scenario import Scenario
 
@@ -147,24 +148,34 @@ def load_hidden_descriptions(file_path: str) -> list[dict]:
 
 
 def load_rubric_from_path(rubric_path: str) -> MultiStepRubric:
-    """Load a rubric from a directory path."""
-    rubric_path = Path(rubric_path)
+    """Load a rubric from a directory path or built-in workflow name."""
+    # Support built-in example workflows by short name
+    try:
+        available = set(list_workflows())
+    except Exception:
+        available = set()
 
-    if rubric_path.is_dir():
-        # Load from directory (assumes 'rubric' as base name)
-        return MultiStepRubric.load(rubric_path, "rubric")
-    else:
-        # Assume it's a file path pattern like path/to/rubric_requirements.yaml
-        # Extract directory and base name
-        if rubric_path.name.endswith("_requirements.yaml"):
-            directory = rubric_path.parent
-            base_name = rubric_path.name[: -len("_requirements.yaml")]
-            return MultiStepRubric.load(directory, base_name)
-        else:
-            raise ValueError(
-                f"Invalid rubric path: {rubric_path}. "
-                "Expected directory or file ending with '_requirements.yaml'"
-            )
+    if rubric_path in available:
+        requirements, _scenarios = get_workflow(rubric_path)
+
+        class _SimpleRubric:
+            def __init__(self, reqs):
+                self.requirements = reqs
+
+        return _SimpleRubric(requirements)  # type: ignore[return-value]
+
+    rubric_path_obj = Path(rubric_path)
+
+    if rubric_path_obj.is_dir():
+        return MultiStepRubric.load(rubric_path_obj, "rubric")
+    if rubric_path_obj.name.endswith("_requirements.yaml"):
+        directory = rubric_path_obj.parent
+        base_name = rubric_path_obj.name[: -len("_requirements.yaml")]
+        return MultiStepRubric.load(directory, base_name)
+
+    raise ValueError(
+        f"Invalid rubric input: {rubric_path}. Expected a directory, a file ending with '_requirements.yaml', or one of {sorted(available) if available else '[no built-ins found]'}"
+    )
 
 
 def save_scenarios(scenarios: list[Scenario], output_file: str) -> None:

@@ -216,6 +216,31 @@ print(f"Unconscious path reward: {unconscious_result.total_reward}")
 
 🚂 **Model Training**: See our [training examples](examples/) for GRPO reinforcement learning with multi-step rubrics
 
+### Synthetic Data Generation (with Hugging Face push)
+
+Generate synthetic scenarios from a rubric and optionally push to the Hugging Face Hub. See full docs in `multistep_extras/synthetic/README.md`.
+
+```bash
+# Generate 20 first responder scenarios and save locally
+python -m multistep_extras.synthetic.synthetic first_responder \
+  --num-descriptions 20 \
+  --hidden-temp 0.7 \
+  --scenario-temp 0.1 \
+  --output-dir ./outputs
+
+# Push dataset to Hugging Face Hub (requires HF token)
+export HF_TOKEN=YOUR_TOKEN
+python -m multistep_extras.synthetic.synthetic /path/to/rubric \
+  --num-descriptions 100 \
+  --model gpt-4.1-turbo \
+  --max-concurrent 15 \
+  --output-dir ./my_scenarios \
+  --hf-repo-id username/my_scenarios \
+  --hf-private
+```
+
+This creates two splits: `hidden` (hidden descriptions) and `scenarios` (full scenarios). Local JSONL exports are saved under `outputs/hf/`.
+
 ## Workflow Builder
 
 Launch the interactive GUI:

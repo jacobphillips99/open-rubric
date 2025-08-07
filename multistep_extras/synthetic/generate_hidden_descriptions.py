@@ -17,6 +17,7 @@ from openai import OpenAI
 from verifiers.parsers.xml_parser import XMLParser
 from verifiers.rubrics.multistep.multistep_rubric import MultiStepRubric
 from verifiers.rubrics.multistep.requirement import Requirement
+from multistep_extras.example_rubrics import get_workflow, list_workflows
 
 HIDDEN_DESCRIPTION_GENERATION_PROMPT = """
 You are an expert scenario designer for evaluation rubrics. Your task is to generate comprehensive hidden descriptions that capture all the ground truth information needed to evaluate scenarios against a rubric.
@@ -138,24 +139,41 @@ def _format_requirements_for_prompt(requirements: list[Requirement]) -> str:
 
 
 def load_rubric_from_path(rubric_path: str) -> MultiStepRubric:
-    """Load a rubric from a directory path."""
-    rubric_path = Path(rubric_path)
+    """Load a rubric from a directory path or built-in workflow name."""
+    # Support built-in example workflows by short name
+    try:
+        available = set(list_workflows())
+    except Exception:
+        available = set()
 
-    if rubric_path.is_dir():
-        # Load from directory (assumes 'rubric' as base name)
-        return MultiStepRubric.load(rubric_path, "rubric")
-    else:
-        # Assume it's a file path pattern like path/to/rubric_requirements.yaml
-        # Extract directory and base name
-        if rubric_path.name.endswith("_requirements.yaml"):
-            directory = rubric_path.parent
-            base_name = rubric_path.name[: -len("_requirements.yaml")]
-            return MultiStepRubric.load(directory, base_name)
-        else:
-            raise ValueError(
-                f"Invalid rubric path: {rubric_path}. "
-                "Expected directory or file ending with '_requirements.yaml'"
-            )
+    if rubric_path in available:
+        # Use built-in requirements and construct an in-memory rubric
+        requirements, _scenarios = get_workflow(rubric_path)
+        # Build a simple rubric with default judge and reward strategy via save/load roundtrip
+        # We leverage MultiStepRubric.save/load behavior by creating a temporary directory in-memory.
+        # Instead of touching disk, we construct a minimal rubric directly.
+        # MultiStepRubric requires judge_options and reward_strategy, but load() provides them from config.
+        # Here we bypass by constructing a transient rubric-like object exposing `.requirements`.
+
+        class _SimpleRubric:
+            def __init__(self, reqs: list[Requirement]):
+                self.requirements = reqs
+
+        return _SimpleRubric(requirements)  # type: ignore[return-value]
+
+    rubric_path_obj = Path(rubric_path)
+
+    if rubric_path_obj.is_dir():
+        return MultiStepRubric.load(rubric_path_obj, "rubric")
+    # Handle direct requirements file pattern
+    if rubric_path_obj.name.endswith("_requirements.yaml"):
+        directory = rubric_path_obj.parent
+        base_name = rubric_path_obj.name[: -len("_requirements.yaml")]
+        return MultiStepRubric.load(directory, base_name)
+
+    raise ValueError(
+        f"Invalid rubric input: {rubric_path}. Expected a directory, a file ending with '_requirements.yaml', or one of {sorted(available) if available else '[no built-ins found]'}"
+    )
 
 
 async def main() -> None:
@@ -185,8 +203,8 @@ async def main() -> None:
     parser.add_argument(
         "--temperature",
         type=float,
-        default=0.1,
-        help="Temperature for generation (default: 0.1)",
+        default=0.7,
+        help="Temperature for generation (default: 0.7 for diversity)",
     )
 
     args = parser.parse_args()
