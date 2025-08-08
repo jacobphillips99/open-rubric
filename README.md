@@ -232,7 +232,7 @@ python -m multistep_extras.synthetic.synthetic first_responder \
 export HF_TOKEN=YOUR_TOKEN
 python -m multistep_extras.synthetic.synthetic /path/to/rubric \
   --num-descriptions 100 \
-  --model gpt-4.1-turbo \
+  --model gpt-4.1 \
   --max-concurrent 15 \
   --output-dir ./my_scenarios \
   --hf-repo-id username/my_scenarios \

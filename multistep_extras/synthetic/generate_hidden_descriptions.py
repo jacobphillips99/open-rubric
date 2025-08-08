@@ -14,10 +14,10 @@ from typing import Optional
 
 from openai import OpenAI
 
+from multistep_extras.example_rubrics import get_workflow, list_workflows
 from verifiers.parsers.xml_parser import XMLParser
 from verifiers.rubrics.multistep.multistep_rubric import MultiStepRubric
 from verifiers.rubrics.multistep.requirement import Requirement
-from multistep_extras.example_rubrics import get_workflow, list_workflows
 
 HIDDEN_DESCRIPTION_GENERATION_PROMPT = """
 You are an expert scenario designer for evaluation rubrics. Your task is to generate comprehensive hidden descriptions that capture all the ground truth information needed to evaluate scenarios against a rubric.

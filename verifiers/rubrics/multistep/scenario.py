@@ -77,6 +77,7 @@ class Scenario:
             _hidden_description: Optional full-information view of the entire scene and setup,
                                containing all ground truth details that could inform the correct
                                answers. This serves as the source of truth for generating
+           
                                prompts, answers, and revealed_info.
         """
         self.prompt = prompt

@@ -9,16 +9,9 @@ The synthetic generation pipeline creates datasets given a rubric.
 - `generate_scenarios.py` generates scenarios from the hidden descriptions
 - `synthetic.py` is the main entrypoint orchestrating the full pipeline
 
-## Files
-
-- `generate_hidden_descriptions.py` - Generate comprehensive scenario descriptions from rubrics
-- `generate_scenarios.py` - Convert hidden descriptions into complete scenarios
-- `synthetic.py` - Main entrypoint orchestrating the full pipeline
-- `__init__.py` - Package exports for programmatic use
-
 ## Quick Start
 
-### Full Pipeline (Recommended)
+### Full Pipeline
 
 Generate complete synthetic scenarios in one command:
 
@@ -30,7 +23,7 @@ python -m multistep_extras.synthetic.synthetic first_responder --num-description
 # With custom settings and Hugging Face upload
 python -m multistep_extras.synthetic.synthetic /path/to/rubric \
     --num-descriptions 100 \
-    --model gpt-4.1-turbo \
+    --model gpt-4.1 \
     --hidden-temp 0.7 \
     --scenario-temp 0.1 \
     --max-concurrent 15 \
@@ -63,15 +56,20 @@ python -m multistep_extras.synthetic.generate_scenarios \
 You can push the generated dataset (two splits: `hidden` and `scenarios`) directly to the Hub using the full pipeline. Set an auth token via `HF_TOKEN` or pass `--hf-token`.
 
 ```bash
-# Push to a private repo
+# Generate and push first responder scenarios to existing repo
 export HF_TOKEN=YOUR_TOKEN
-python -m multistep_extras.synthetic.synthetic /path/to/rubric \
+python -m multistep_extras.synthetic.synthetic first_responder \
   --num-descriptions 100 \
   --hidden-temp 0.7 \
   --scenario-temp 0.1 \
   --max-concurrent 15 \
+  --hf-repo-id jacobphillips99/open-rubric-first-responder-scenarios
+
+# Push to a private repo with custom rubric
+python -m multistep_extras.synthetic.synthetic /path/to/rubric \
+  --num-descriptions 50 \
   --output-dir ./my_scenarios \
-  --hf-repo-id username/my_scenarios \
+  --hf-repo-id username/my_private_scenarios \
   --hf-private
 
 # Skip pushing but still export Hugging Face-ready JSONL files locally
@@ -79,6 +77,60 @@ python -m multistep_extras.synthetic.synthetic first_responder \
   --num-descriptions 20 \
   --no-push \
   --output-dir ./outputs
+```
+
+### Push-Only Mode
+
+If you've already generated scenarios and just want to push them to Hugging Face Hub:
+
+```bash
+# Push existing first responder data to the repo
+python -m multistep_extras.synthetic.synthetic \
+  --push-only \
+  --hf-repo-id jacobphillips99/open-rubric-first-responder-scenarios \
+  --output-dir ./outputs
+
+# Push existing data to a different repo
+python -m multistep_extras.synthetic.synthetic \
+  --push-only \
+  --hf-repo-id username/my_scenarios \
+  --output-dir ./my_scenarios \
+  --hf-private
+```
+
+This mode expects to find `hidden_descriptions.json` and `synthetic_scenarios.yaml` in the specified output directory.
+
+## Example Dataset
+
+An example dataset has been created and is available at:
+**[jacobphillips99/open-rubric-first-responder-scenarios](https://huggingface.co/datasets/jacobphillips99/open-rubric-first-responder-scenarios)**
+
+### Loading the Example Dataset
+
+```python
+from datasets import load_dataset
+
+# Load the first responder scenarios dataset
+dataset = load_dataset("jacobphillips99/open-rubric-first-responder-scenarios")
+
+# Access the splits
+hidden_descriptions = dataset["hidden"]
+scenarios = dataset["scenarios"]
+
+# Convert to pandas for analysis
+scenarios_df = scenarios.to_pandas()
+print(f"Dataset contains {len(scenarios_df)} scenarios")
+```
+
+### Contributing to the Example Dataset
+
+You can contribute more scenarios to the existing repository:
+
+```bash
+# Generate additional scenarios and add to the existing repo
+python -m multistep_extras.synthetic.synthetic first_responder \
+  --num-descriptions 25 \
+  --hf-repo-id jacobphillips99/open-rubric-first-responder-scenarios
 ```
 
 ## Using Built-in Example Rubrics
@@ -89,7 +141,12 @@ You can use the pre-built example rubrics:
 # Generate scenarios from first responder workflow
 python -m multistep_extras.synthetic.synthetic first_responder --num-descriptions 20
 
-# Generate scenarios from debugging workflow  
+# Generate and push to existing first responder repo
+python -m multistep_extras.synthetic.synthetic first_responder \
+  --num-descriptions 50 \
+  --hf-repo-id jacobphillips99/open-rubric-first-responder-scenarios
+
+# Generate scenarios from debugging workflow
 python -m multistep_extras.synthetic.synthetic debugging --num-descriptions 15
 ```
 
@@ -171,7 +228,7 @@ Intermediate hidden descriptions are saved as JSON for reuse and inspection:
 
 ### Model Settings
 
-- `--model`: LLM model to use (default: `gpt-4.1-nano`)
+- `--model`: LLM model to use (default: `gpt-4.1.1-nano`)
 - `--hidden-temp`: Temperature for hidden descriptions (default: `0.7` for diversity)
 - `--scenario-temp`: Temperature for scenarios (default: `0.1` for consistency)
 
@@ -182,7 +239,7 @@ Intermediate hidden descriptions are saved as JSON for reuse and inspection:
 
 ### Output Settings
 
-- `--output-dir`: Directory to save all outputs (default: current directory)
+- `--output-dir`: Directory to save all outputs (default: `./outputs` at the project root)
 - `--no-intermediates`: Skip saving intermediate hidden descriptions (synthetic.py only)
 
 ### Hugging Face Upload
@@ -192,6 +249,7 @@ Intermediate hidden descriptions are saved as JSON for reuse and inspection:
 - `--hf-branch`: Optional target branch
 - `--hf-token`: Token to authenticate (falls back to `HF_TOKEN` or `HUGGINGFACE_HUB_TOKEN`)
 - `--no-push`: Skip pushing even if `--hf-repo-id` is provided
+- `--push-only`: Skip generation and only push existing data to Hub (requires `--hf-repo-id`)
 
 ## Programmatic Usage
 
@@ -243,7 +301,7 @@ python -m multistep_extras.synthetic.synthetic first_responder \
 
 ### Cost Optimization
 
-- Use `gpt-4.1-nano` for cost-effective generation
+- Use `gpt-4.1.1-nano` for cost-effective generation
 - Lower `--scenario-temp` (0.1) for more consistent scenario generation
 - Increase `--max-concurrent` to reduce total time
 - Monitor intermediate files to resume if interrupted
@@ -275,10 +333,24 @@ output_directory/
 ### Emergency Response Dataset
 
 ```bash
-# Generate comprehensive first responder dataset
+# Generate comprehensive first responder dataset and push to Hub
 python -m multistep_extras.synthetic.synthetic first_responder \
     --num-descriptions 200 \
-    --model gpt-4.1-turbo \
+    --model gpt-4.1 \
+    --hf-repo-id jacobphillips99/open-rubric-first-responder-scenarios \
+    --output-dir ./emergency_response_dataset
+
+# Or generate locally first, then push separately
+python -m multistep_extras.synthetic.synthetic first_responder \
+    --num-descriptions 200 \
+    --model gpt-4.1 \
+    --output-dir ./emergency_response_dataset \
+    --no-push
+
+# Then push when ready
+python -m multistep_extras.synthetic.synthetic \
+    --push-only \
+    --hf-repo-id jacobphillips99/open-rubric-first-responder-scenarios \
     --output-dir ./emergency_response_dataset
 ```
 
@@ -300,14 +372,6 @@ python -m multistep_extras.synthetic.synthetic ./my_custom_rubric/ \
     --num-descriptions 50 \
     --output-dir ./custom_scenarios
 ```
-
-## Dependencies
-
-Required packages:
-- `openai` - LLM API access
-- `pyyaml` - YAML file handling
-- `asyncio` - Async processing
-- Core verifiers package components
 
 ## Tips and Best Practices
 
