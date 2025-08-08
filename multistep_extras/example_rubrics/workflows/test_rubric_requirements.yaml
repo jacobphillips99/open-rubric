@@ -1,0 +1,198 @@
+requirements:
+- name: step_one
+  question: Does the response complete step one correctly?
+  type: binary
+  judge_response_format:
+    base_str: "Respond with just a JSON object containing two fields: 'answer' and 'reasoning'."
+    meanings: {0.0: "no", 1.0: "yes"}
+    options: [1.0, 0.0]
+    reasoning_str: The 'reasoning' field should contain your explanation for the answer.
+  dependencies:
+    1.0: [standard_procedure, quality_check]
+    0.0: [basic_review]
+
+- name: step_two
+  question: Does the response complete step two correctly?
+  type: binary
+  judge_response_format:
+    base_str: "Respond with just a JSON object containing two fields: 'answer' and 'reasoning'."
+    meanings: {0.0: "no", 1.0: "yes"}
+    options: [1.0, 0.0]
+    reasoning_str: The 'reasoning' field should contain your explanation for the answer.
+  dependencies:
+    1.0: [optimization, basic_improvement]
+    0.0: [improvement_needed]
+
+- name: step_three
+  question: Does the response complete step three correctly?
+  type: binary
+  judge_response_format:
+    base_str: "Respond with just a JSON object containing two fields: 'answer' and 'reasoning'."
+    meanings: {0.0: "no", 1.0: "yes"}
+    options: [1.0, 0.0]
+    reasoning_str: The 'reasoning' field should contain your explanation for the answer.
+  dependencies:
+    1.0: [quality_enhancement]
+    0.0: [fundamental_review]
+
+- name: standard_procedure
+  question: Does the response follow standard procedures correctly?
+  type: binary
+  judge_response_format:
+    base_str: "Respond with just a JSON object containing two fields: 'answer' and 'reasoning'."
+    meanings: {0.0: "no", 1.0: "yes"}
+    options: [1.0, 0.0]
+    reasoning_str: The 'reasoning' field should contain your explanation for the answer.
+  dependencies:
+    1.0: [quality_enhancement]
+    0.0: []
+
+- name: quality_check
+  question: Does the response pass quality assurance checks?
+  type: binary
+  judge_response_format:
+    base_str: "Respond with just a JSON object containing two fields: 'answer' and 'reasoning'."
+    meanings: {0.0: "no", 1.0: "yes"}
+    options: [1.0, 0.0]
+    reasoning_str: The 'reasoning' field should contain your explanation for the answer.
+  dependencies:
+    1.0: [optimization]
+    0.0: []
+
+- name: basic_improvement
+  question: Does the response need basic improvements and refinements?
+  type: binary
+  judge_response_format:
+    base_str: "Respond with just a JSON object containing two fields: 'answer' and 'reasoning'."
+    meanings: {0.0: "no", 1.0: "yes"}
+    options: [1.0, 0.0]
+    reasoning_str: The 'reasoning' field should contain your explanation for the answer.
+  dependencies:
+    1.0: [quality_enhancement]
+    0.0: []
+
+- name: optimization
+  question: Can the response be optimized for better performance?
+  type: binary
+  judge_response_format:
+    base_str: "Respond with just a JSON object containing two fields: 'answer' and 'reasoning'."
+    meanings: {0.0: "no", 1.0: "yes"}
+    options: [1.0, 0.0]
+    reasoning_str: The 'reasoning' field should contain your explanation for the answer.
+  dependencies:
+    1.0: [excellence_validation]
+    0.0: []
+
+- name: quality_enhancement
+  question: Can the response be enhanced for higher quality standards?
+  type: binary
+  judge_response_format:
+    base_str: "Respond with just a JSON object containing two fields: 'answer' and 'reasoning'."
+    meanings: {0.0: "no", 1.0: "yes"}
+    options: [1.0, 0.0]
+    reasoning_str: The 'reasoning' field should contain your explanation for the answer.
+  dependencies:
+    1.0: [excellence_validation]
+    0.0: []
+
+- name: basic_review
+  question: Does the response need basic review and minor corrections?
+  type: binary
+  judge_response_format:
+    base_str: "Respond with just a JSON object containing two fields: 'answer' and 'reasoning'."
+    meanings: {0.0: "no", 1.0: "yes"}
+    options: [1.0, 0.0]
+    reasoning_str: The 'reasoning' field should contain your explanation for the answer.
+  dependencies:
+    1.0: [improvement_needed]
+    0.0: []
+
+- name: improvement_needed
+  question: Does the response need significant improvements?
+  type: binary
+  judge_response_format:
+    base_str: "Respond with just a JSON object containing two fields: 'answer' and 'reasoning'."
+    meanings: {0.0: "no", 1.0: "yes"}
+    options: [1.0, 0.0]
+    reasoning_str: The 'reasoning' field should contain your explanation for the answer.
+  dependencies:
+    1.0: [critical_review, fundamental_review]
+    0.0: []
+
+- name: critical_review
+  question: Does the response need critical review and major corrections?
+  type: binary
+  judge_response_format:
+    base_str: "Respond with just a JSON object containing two fields: 'answer' and 'reasoning'."
+    meanings: {0.0: "no", 1.0: "yes"}
+    options: [1.0, 0.0]
+    reasoning_str: The 'reasoning' field should contain your explanation for the answer.
+  dependencies:
+    1.0: [emergency_intervention]
+    0.0: []
+
+- name: emergency_intervention
+  question: Does the response require immediate emergency intervention?
+  type: binary
+  judge_response_format:
+    base_str: "Respond with just a JSON object containing two fields: 'answer' and 'reasoning'."
+    meanings: {0.0: "no", 1.0: "yes"}
+    options: [1.0, 0.0]
+    reasoning_str: The 'reasoning' field should contain your explanation for the answer.
+  dependencies:
+    1.0: [quality_assessment]
+    0.0: []
+
+- name: fundamental_review
+  question: Does the response need fundamental review and restructuring?
+  type: binary
+  judge_response_format:
+    base_str: "Respond with just a JSON object containing two fields: 'answer' and 'reasoning'."
+    meanings: {0.0: "no", 1.0: "yes"}
+    options: [1.0, 0.0]
+    reasoning_str: The 'reasoning' field should contain your explanation for the answer.
+  dependencies:
+    1.0: []
+    0.0: []
+
+- name: excellence_validation
+  question: Does the response demonstrate excellence and best practices?
+  type: binary
+  judge_response_format:
+    base_str: "Respond with just a JSON object containing two fields: 'answer' and 'reasoning'."
+    meanings: {0.0: "no", 1.0: "yes"}
+    options: [1.0, 0.0]
+    reasoning_str: The 'reasoning' field should contain your explanation for the answer.
+  dependencies:
+    1.0: [satisfaction_rating]
+    0.0: []
+
+- name: satisfaction_rating
+  question: Do you strongly agree that this response meets all the required standards?
+  type: discrete
+  judge_response_format:
+    base_str: "Respond with just a JSON object containing two fields: 'answer' and 'reasoning'."
+    meanings:
+      1.0: strongly disagree
+      2.0: disagree
+      3.0: neutral
+      4.0: agree
+      5.0: strongly agree
+    options: [1.0, 2.0, 3.0, 4.0, 5.0]
+    reasoning_str: The 'reasoning' field should contain your explanation for the answer.
+  dependencies:
+    1.0: [fundamental_review]
+    2.0: [improvement_needed]
+    3.0: []
+    4.0: []
+    5.0: [quality_assessment]
+
+- name: quality_assessment
+  question: How would you rate the overall quality of the response on a scale from -5 (very poor) to 5 (excellent)?
+  type: continuous
+  judge_response_format:
+    base_str: "Respond with just a JSON object containing two fields: 'answer' and 'reasoning'."
+    meanings: {-5.0: very poor, 5.0: excellent}
+    options: [-5.0, 5.0]
+    reasoning_str: The 'reasoning' field should contain your explanation for the answer.
+  dependencies: null

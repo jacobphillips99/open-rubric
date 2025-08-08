@@ -1,0 +1,66 @@
+judge_options:
+- client_config: {}
+  client_type: openai
+  judge_model: gpt-4o-mini
+  judge_prompt: 'Given a question and the ground truth answer, determine if the response
+    is correct. Respond according to the judge response format.
+
+
+    question={question}
+
+    response={response}
+
+    ground truth answer={answer}
+
+    judge response format={judge_response_format}'
+  type: binary
+- client_config: {}
+  client_type: openai
+  judge_model: gpt-4.1-nano
+  judge_prompt: 'Given a question and the ground truth answer, determine if the response
+    is correct. Respond according to the judge response format.
+
+
+    question={question}
+
+    response={response}
+
+    ground truth answer={answer}
+
+    judge response format={judge_response_format}'
+  response_format:
+    type: continuous
+    options: [-5.0, 5.0]
+    meanings:
+      -5.0: very poor
+      5.0: excellent
+  type: continuous
+- client_config: {}
+  client_type: openai
+  judge_model: gpt-4.1-nano
+  judge_prompt: 'Given a question and the ground truth answer, determine if the response
+    is correct. Respond according to the judge response format.
+
+
+    question={question}
+
+    response={response}
+
+    ground truth answer={answer}
+
+    judge response format={judge_response_format}'
+  response_format:
+    type: discrete
+    options: [1.0, 2.0, 3.0, 4.0, 5.0]
+    meanings:
+      1.0: strongly disagree
+      2.0: disagree
+      3.0: neutral
+      4.0: agree
+      5.0: strongly agree
+  type: discrete
+name: test_rubric
+reward_strategy:
+  base_weight: 1.0
+  level_multiplier: 1.0
+  type: levelweighted 

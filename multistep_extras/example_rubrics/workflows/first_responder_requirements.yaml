@@ -1,0 +1,293 @@
+requirements:
+- dependencies:
+    0.0: []
+    1.0:
+    - initial_assessment
+    - vital_signs
+    - trauma_check
+  judge_response_format:
+    base_str: 'Respond with just a JSON object containing two fields: ''answer'' and
+      ''reasoning''.'
+    meanings: &id001
+      0.0: 'no'
+      1.0: 'yes'
+    options: &id002
+    - 1.0
+    - 0.0
+    reasoning_str: The 'reasoning' field should contain your explanation for the answer.
+  name: scene_safety
+  question: Does the response consider if the scene is safe to approach?
+  type: binary
+- dependencies:
+    0.0:
+    - airway_management
+    - breathing_support
+    1.0:
+    - communication
+    - pain_assessment
+  judge_response_format:
+    base_str: 'Respond with just a JSON object containing two fields: ''answer'' and
+      ''reasoning''.'
+    meanings: *id001
+    options: *id002
+    reasoning_str: The 'reasoning' field should contain your explanation for the answer.
+  name: initial_assessment
+  question: Does the response consider if the patient is conscious and responsive?
+  type: binary
+- dependencies:
+    0.0:
+    - immediate_intervention
+    - emergency_protocols
+    1.0:
+    - transport_decision
+  judge_response_format:
+    base_str: 'Respond with just a JSON object containing two fields: ''answer'' and
+      ''reasoning''.'
+    meanings: *id001
+    options: *id002
+    reasoning_str: The 'reasoning' field should contain your explanation for the answer.
+  name: vital_signs
+  question: Does the response consider if the patient's vital signs are stable?
+  type: binary
+- dependencies:
+    0.0:
+    - medical_history
+    - symptom_assessment
+    1.0:
+    - bleeding_control
+    - immobilization
+    - injury_assessment
+  judge_response_format:
+    base_str: 'Respond with just a JSON object containing two fields: ''answer'' and
+      ''reasoning''.'
+    meanings: *id001
+    options: *id002
+    reasoning_str: The 'reasoning' field should contain your explanation for the answer.
+  name: trauma_check
+  question: Does the response consider if there are visible signs of trauma or injury?
+  type: binary
+- dependencies:
+    0.0:
+    - emergency_protocols
+    1.0:
+    - breathing_support
+  judge_response_format:
+    base_str: 'Respond with just a JSON object containing two fields: ''answer'' and
+      ''reasoning''.'
+    meanings: *id001
+    options: *id002
+    reasoning_str: The 'reasoning' field should contain your explanation for the answer.
+  name: airway_management
+  question: Does the response consider if the patient's airway is clear and protected?
+  type: binary
+- dependencies:
+    0.0:
+    - emergency_protocols
+    1.0:
+    - circulation_check
+  judge_response_format:
+    base_str: 'Respond with just a JSON object containing two fields: ''answer'' and
+      ''reasoning''.'
+    meanings: *id001
+    options: *id002
+    reasoning_str: The 'reasoning' field should contain your explanation for the answer.
+  name: breathing_support
+  question: Does the response consider if the patient is breathing adequately?
+  type: binary
+- dependencies:
+    0.0:
+    - emergency_protocols
+    1.0:
+    - transport_decision
+  judge_response_format:
+    base_str: 'Respond with just a JSON object containing two fields: ''answer'' and
+      ''reasoning''.'
+    meanings: *id001
+    options: *id002
+    reasoning_str: The 'reasoning' field should contain your explanation for the answer.
+  name: bleeding_control
+  question: Does the response consider if any significant bleeding has been controlled?
+  type: binary
+- dependencies:
+    0.0:
+    - emergency_protocols
+    1.0:
+    - transport_decision
+  judge_response_format:
+    base_str: 'Respond with just a JSON object containing two fields: ''answer'' and
+      ''reasoning''.'
+    meanings: *id001
+    options: *id002
+    reasoning_str: The 'reasoning' field should contain your explanation for the answer.
+  name: circulation_check
+  question: Does the response consider if the patient has adequate circulation and
+    pulse?
+  type: binary
+- dependencies:
+    0.0:
+    - observation_assessment
+    1.0:
+    - symptom_assessment
+    - medical_history
+  judge_response_format:
+    base_str: 'Respond with just a JSON object containing two fields: ''answer'' and
+      ''reasoning''.'
+    meanings: *id001
+    options: *id002
+    reasoning_str: The 'reasoning' field should contain your explanation for the answer.
+  name: communication
+  question: Does the response consider if the patient can communicate their symptoms
+    clearly?
+  type: binary
+- dependencies:
+    0.0:
+    - pain_management
+    1.0:
+    - comfort_measures
+    - transport_decision
+  judge_response_format:
+    base_str: 'Respond with just a JSON object containing two fields: ''answer'' and
+      ''reasoning''.'
+    meanings: *id001
+    options: *id002
+    reasoning_str: The 'reasoning' field should contain your explanation for the answer.
+  name: pain_assessment
+  question: Does the response consider if the patient's pain level has been assessed
+    and managed?
+  type: binary
+- dependencies:
+    0.0:
+    - emergency_protocols
+    1.0:
+    - stabilization_check
+  judge_response_format:
+    base_str: 'Respond with just a JSON object containing two fields: ''answer'' and
+      ''reasoning''.'
+    meanings: *id001
+    options: *id002
+    reasoning_str: The 'reasoning' field should contain your explanation for the answer.
+  name: immediate_intervention
+  question: Does the response consider if immediate life-saving interventions have
+    been performed?
+  type: binary
+- dependencies:
+    0.0:
+    - injury_assessment
+    1.0:
+    - transport_preparation
+  judge_response_format:
+    base_str: 'Respond with just a JSON object containing two fields: ''answer'' and
+      ''reasoning''.'
+    meanings: *id001
+    options: *id002
+    reasoning_str: The 'reasoning' field should contain your explanation for the answer.
+  name: immobilization
+  question: Does the response consider if the patient has been properly immobilized
+    if needed?
+  type: binary
+- dependencies: null
+  judge_response_format:
+    base_str: 'Respond with just a JSON object containing two fields: ''answer'' and
+      ''reasoning''.'
+    meanings: *id001
+    options: *id002
+    reasoning_str: The 'reasoning' field should contain your explanation for the answer.
+  name: emergency_protocols
+  question: Does the response consider if emergency protocols have been activated
+    and followed?
+  type: binary
+- dependencies: null
+  judge_response_format:
+    base_str: 'Respond with just a JSON object containing two fields: ''answer'' and
+      ''reasoning''.'
+    meanings: *id001
+    options: *id002
+    reasoning_str: The 'reasoning' field should contain your explanation for the answer.
+  name: transport_decision
+  question: Does the response consider if the appropriate transport decision has been
+    made and executed?
+  type: binary
+- dependencies: null
+  judge_response_format:
+    base_str: 'Respond with just a JSON object containing two fields: ''answer'' and
+      ''reasoning''.'
+    meanings: *id001
+    options: *id002
+    reasoning_str: The 'reasoning' field should contain your explanation for the answer.
+  name: medical_history
+  question: Does the response consider if relevant medical history has been obtained?
+  type: binary
+- dependencies: null
+  judge_response_format:
+    base_str: 'Respond with just a JSON object containing two fields: ''answer'' and
+      ''reasoning''.'
+    meanings: *id001
+    options: *id002
+    reasoning_str: The 'reasoning' field should contain your explanation for the answer.
+  name: symptom_assessment
+  question: Does the response consider if the patient's symptoms have been thoroughly
+    assessed?
+  type: binary
+- dependencies: null
+  judge_response_format:
+    base_str: 'Respond with just a JSON object containing two fields: ''answer'' and
+      ''reasoning''.'
+    meanings: *id001
+    options: *id002
+    reasoning_str: The 'reasoning' field should contain your explanation for the answer.
+  name: observation_assessment
+  question: Does the response consider if a thorough observational assessment has
+    been completed?
+  type: binary
+- dependencies: null
+  judge_response_format:
+    base_str: 'Respond with just a JSON object containing two fields: ''answer'' and
+      ''reasoning''.'
+    meanings: *id001
+    options: *id002
+    reasoning_str: The 'reasoning' field should contain your explanation for the answer.
+  name: injury_assessment
+  question: Does the response consider if all injuries have been properly assessed
+    and documented?
+  type: binary
+- dependencies: null
+  judge_response_format:
+    base_str: 'Respond with just a JSON object containing two fields: ''answer'' and
+      ''reasoning''.'
+    meanings: *id001
+    options: *id002
+    reasoning_str: The 'reasoning' field should contain your explanation for the answer.
+  name: comfort_measures
+  question: Does the response consider if appropriate comfort measures have been provided?
+  type: binary
+- dependencies: null
+  judge_response_format:
+    base_str: 'Respond with just a JSON object containing two fields: ''answer'' and
+      ''reasoning''.'
+    meanings: *id001
+    options: *id002
+    reasoning_str: The 'reasoning' field should contain your explanation for the answer.
+  name: pain_management
+  question: Does the response consider if appropriate pain management has been provided?
+  type: binary
+- dependencies: null
+  judge_response_format:
+    base_str: 'Respond with just a JSON object containing two fields: ''answer'' and
+      ''reasoning''.'
+    meanings: *id001
+    options: *id002
+    reasoning_str: The 'reasoning' field should contain your explanation for the answer.
+  name: stabilization_check
+  question: Does the response consider if the patient has been stabilized successfully?
+  type: binary
+- dependencies: null
+  judge_response_format:
+    base_str: 'Respond with just a JSON object containing two fields: ''answer'' and
+      ''reasoning''.'
+    meanings: *id001
+    options: *id002
+    reasoning_str: The 'reasoning' field should contain your explanation for the answer.
+  name: transport_preparation
+  question: Does the response consider if the patient has been properly prepared for
+    transport?
+  type: binary

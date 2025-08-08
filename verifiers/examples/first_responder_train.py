@@ -1,23 +1,20 @@
 import asyncio
 import json
 import os
-from datasets import Dataset, load_dataset
-from openai import AsyncOpenAI, OpenAI
+from datasets import load_dataset
 import verifiers as vf
-from multistep_extras.example_rubrics import get_workflow
 from verifiers.envs.multistep_env import MultiStepMultiTurnEnv
-from verifiers.rewards.judge_reward import JUDGE_PROMPT, BinaryJudgeRewarder
 from verifiers.rubrics.multistep.multistep_rubric import MultiStepRubric
-from verifiers.rubrics.multistep.reward_strategies import LevelWeightedRewardStrategy
 
 """
 inference:
-CUDA_VISIBLE_DEVICES=0 vf-vllm --model your-finetuned-model-name --enforce-eager
+CUDA_VISIBLE_DEVICES=0 vf-vllm --model willcb/Qwen3-0.6B --enforce-eager
 
 training:
 CUDA_VISIBLE_DEVICES=1 accelerate launch --num-processes 1 --config-file configs/zero3.yaml verifiers/examples/first_responder.py
 """
 
+model_name = "willcb/Qwen3-0.6B"
 hf_repo_name = "jacobphillips99"
 project_name = "open-rubric"
 group = "first-responder"
@@ -55,10 +52,7 @@ train_dataset = processed_dataset.select(range(num_train))
 eval_dataset = processed_dataset.select(range(num_train, num_train + num_eval))
 
 # load rubric from configs
-rubric = MultiStepRubric.load("outputs/workflows", "first_responder")
-
-# Model configuration
-model_name = "willcb/Qwen3-0.6B"
+rubric = MultiStepRubric.load("multistep_extras/example_rubrics", "first_responder")
 
 # Create the multistep environment
 vf_env = MultiStepMultiTurnEnv(

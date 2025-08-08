@@ -1,0 +1,30 @@
+scenario:
+  answers:
+    airway_management:
+      answer: 0.0
+      reasoning: Airway needs immediate attention as patient is not breathing
+    breathing_support:
+      answer: 0.0
+      reasoning: Patient is not breathing and requires immediate respiratory support
+    emergency_protocols:
+      answer: 1.0
+      reasoning: CPR initiated and advanced life support called
+    initial_assessment:
+      answer: 0.0
+      reasoning: Patient is unconscious and not breathing, requiring immediate life
+        support
+    scene_safety:
+      answer: 1.0
+      reasoning: The residential street has no visible hazards, electrical wires,
+        fire, or aggressive bystanders
+  completion: First, I'll check if the scene is safe. Since there are no visible hazards,
+    I'll proceed. The patient is unconscious and not breathing, so I'll immediately
+    check their airway and begin CPR. I'll call for advanced life support and continue
+    resuscitation efforts.
+  description: Patient is unconscious and not breathing in a safe environment
+  name: Unconscious Non-Breathing Patient
+  prompt: You are a first responder arriving at a residential street. You come across
+    a patient who is unconscious and not breathing, lying on the sidewalk. There are
+    no immediate hazards visible, no electrical wires down, no fire, and no aggressive
+    bystanders. The area appears secure.
+  revealed_info: {}
