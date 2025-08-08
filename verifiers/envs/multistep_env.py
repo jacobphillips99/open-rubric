@@ -1,4 +1,5 @@
 from copy import deepcopy
+import json
 from typing import Any, Dict, List, Tuple, Union
 
 from openai import AsyncOpenAI
@@ -118,6 +119,9 @@ class MultiStepMultiTurnEnv(MultiTurnEnv):
         else:
             messages = deepcopy(prompt)
 
+        # GenerateOutputs forcing "answer" to be a string
+        if isinstance(answer, str):
+            answer = json.loads(answer)
         # Initialize clean state
         state = self._initialise_state(answer)
 

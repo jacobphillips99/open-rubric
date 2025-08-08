@@ -15,48 +15,51 @@ import traceback
 from pathlib import Path
 from typing import Optional
 
+import yaml
 # Hugging Face datasets
 from datasets import Dataset, DatasetDict
 from openai import OpenAI
-import yaml
+
+from verifiers.rubrics.multistep.scenario import Scenario
 
 from .generate_hidden_descriptions import (generate_hidden_descriptions_async,
                                            load_rubric_from_path)
 from .generate_scenarios import generate_scenarios_parallel, save_scenarios
-from verifiers.rubrics.multistep.scenario import Scenario
 
 
 def load_existing_data(output_dir: str) -> tuple[list[dict], list[Scenario]]:
     """
     Load existing hidden descriptions and scenarios from output directory.
-    
+
     Args:
         output_dir: Directory containing the generated files
-        
+
     Returns:
         Tuple of (hidden_descriptions, scenarios)
-        
+
     Raises:
         FileNotFoundError: If required files don't exist
         ValueError: If files can't be parsed
     """
     output_path = Path(output_dir)
-    
+
     # Load hidden descriptions
     descriptions_file = output_path / "hidden_descriptions.json"
     if not descriptions_file.exists():
-        raise FileNotFoundError(f"Hidden descriptions file not found: {descriptions_file}")
-    
+        raise FileNotFoundError(
+            f"Hidden descriptions file not found: {descriptions_file}"
+        )
+
     with open(descriptions_file) as f:
         hidden_descriptions = json.load(f)
-    
+
     # Load scenarios
     scenarios_file = output_path / "synthetic_scenarios.yaml"
     if not scenarios_file.exists():
         raise FileNotFoundError(f"Scenarios file not found: {scenarios_file}")
-    
+
     scenarios = Scenario.load_multiple(scenarios_file)
-    
+
     return hidden_descriptions, scenarios
 
 
@@ -69,7 +72,7 @@ async def push_to_huggingface_only(
 ) -> None:
     """
     Load existing data and push to Hugging Face Hub without regenerating.
-    
+
     Args:
         output_dir: Directory containing the generated files
         hf_repo_id: Hugging Face Hub repo id
@@ -79,10 +82,12 @@ async def push_to_huggingface_only(
     """
     print(f"Loading existing data from {output_dir}...")
     hidden_descriptions, scenarios = load_existing_data(output_dir)
-    
-    print(f"Loaded {len(hidden_descriptions)} hidden descriptions and {len(scenarios)} scenarios")
+
+    print(
+        f"Loaded {len(hidden_descriptions)} hidden descriptions and {len(scenarios)} scenarios"
+    )
     print(f"Pushing to Hugging Face Hub: {hf_repo_id}")
-    
+
     _export_and_push_to_hub(
         hidden_descriptions=hidden_descriptions,
         scenarios=scenarios,
@@ -127,7 +132,9 @@ async def full_synthetic_pipeline(
     if output_dir is None:
         # Default to outputs/ folder at project root (same level as multistep_extras)
         current_file = Path(__file__)
-        project_root = current_file.parent.parent.parent  # Go up from synthetic/ -> multistep_extras/ -> project_root/
+        project_root = (
+            current_file.parent.parent.parent
+        )  # Go up from synthetic/ -> multistep_extras/ -> project_root/
         output_dir = project_root / "outputs"
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
@@ -209,7 +216,7 @@ def _export_and_push_to_hub(
             "_hidden_description": getattr(scenario, "_hidden_description", None),
             "prompt": getattr(scenario, "prompt", None),
         }
-        
+
         # Answer column: JSON with everything else
         answer_data = {
             "name": getattr(scenario, "name", None),
@@ -217,11 +224,13 @@ def _export_and_push_to_hub(
             "answers": getattr(scenario, "answers", None),
             "revealed_info": getattr(scenario, "revealed_info", None),
         }
-        
-        qa_rows.append({
-            "question": json.dumps(question_data),
-            "answer": json.dumps(answer_data),
-        })
+
+        qa_rows.append(
+            {
+                "question": json.dumps(question_data),
+                "answer": json.dumps(answer_data),
+            }
+        )
 
     # Write JSONL locally
     qa_path = hf_dir / "scenarios.jsonl"
@@ -436,13 +445,13 @@ Examples:
             if not args.hf_repo_id:
                 print("Error: --hf-repo-id is required when using --push-only")
                 return 1
-            
+
             # Set default output directory if not provided
             if args.output_dir is None:
                 current_file = Path(__file__)
                 project_root = current_file.parent.parent.parent
                 args.output_dir = project_root / "outputs"
-            
+
             await push_to_huggingface_only(
                 output_dir=str(args.output_dir),
                 hf_repo_id=args.hf_repo_id,
@@ -450,15 +459,15 @@ Examples:
                 hf_branch=args.hf_branch,
                 hf_token=args.hf_token,
             )
-            
+
             print("\n✅ Push to Hugging Face Hub completed successfully!")
             return 0
-        
+
         # Validate rubric_path for non-push-only mode
         if not args.rubric_path:
             print("Error: rubric_path is required when not using --push-only")
             return 1
-        
+
         # Run full generation pipeline
         hidden_descriptions, scenarios = await full_synthetic_pipeline(
             rubric_path=args.rubric_path,

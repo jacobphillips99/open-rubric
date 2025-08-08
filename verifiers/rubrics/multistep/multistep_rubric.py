@@ -6,6 +6,7 @@ from collections.abc import Sequence
 from copy import deepcopy
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Tuple, Union
+from verifiers import Messages, Info, Parser, Reward, State, RolloutScore, RolloutScores
 
 import yaml
 
@@ -293,14 +294,11 @@ class MultiStepRubric(Rubric):
             evaluation_results, EvaluationMode.MODEL_GUIDED, **reward_kwargs
         )
 
-        # Return reward info with the full original state preserved
-        return {
-            "state": state,  # Return the full original state, don't modify it
-            "reward": reward,
-            "reward_strategy": self.reward_strategy.name,
-            "mode": EvaluationMode.MODEL_GUIDED.value,
-            "terminal_condition": TerminalCondition.COMPLETED.value,
-        }
+        return RolloutScore(
+            reward=reward,
+            metrics={"reward": reward},
+
+        )
 
     def get_next_conversation_step(
         self, messages: List[Dict[str, Any]], state: Dict[str, Any], **kwargs
