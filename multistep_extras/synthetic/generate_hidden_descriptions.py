@@ -176,7 +176,7 @@ def load_rubric_from_path(rubric_path: str) -> MultiStepRubric:
     )
 
 
-async def main() -> None:
+async def main() -> int:
     """Main entry point for generating hidden descriptions from a rubric."""
     parser = argparse.ArgumentParser(
         description="Generate hidden descriptions for scenarios based on a rubric"
@@ -221,7 +221,7 @@ async def main() -> None:
         model_kwargs = {"temperature": args.temperature}
 
         descriptions = await generate_hidden_descriptions_async(
-            requirements=rubric.requirements,
+            requirements=list(rubric.requirements),
             num_descriptions=args.num_descriptions,
             model=args.model,
             client=client,

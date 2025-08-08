@@ -15,9 +15,7 @@ import traceback
 from pathlib import Path
 from typing import Optional
 
-import yaml
-# Hugging Face datasets
-from datasets import Dataset, DatasetDict
+from datasets import Dataset
 from openai import OpenAI
 
 from verifiers.rubrics.multistep.scenario import Scenario
@@ -135,7 +133,7 @@ async def full_synthetic_pipeline(
         project_root = (
             current_file.parent.parent.parent
         )  # Go up from synthetic/ -> multistep_extras/ -> project_root/
-        output_dir = project_root / "outputs"
+        output_dir = str(project_root / "outputs")
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
 
@@ -151,7 +149,7 @@ async def full_synthetic_pipeline(
     # Step 2: Generate hidden descriptions
     print(f"Generating {num_descriptions} hidden descriptions...")
     hidden_descriptions = await generate_hidden_descriptions_async(
-        requirements=rubric.requirements,
+        requirements=list(rubric.requirements),
         num_descriptions=num_descriptions,
         model=model,
         client=client,
@@ -168,7 +166,7 @@ async def full_synthetic_pipeline(
     print(f"Generating scenarios from {len(hidden_descriptions)} descriptions...")
     scenarios = await generate_scenarios_parallel(
         hidden_descriptions=hidden_descriptions,
-        requirements=rubric.requirements,
+        requirements=list(rubric.requirements),
         model=model,
         client=client,
         model_kwargs=scenario_model_kwargs,
@@ -336,7 +334,7 @@ This dataset was generated using the Open Rubric synthetic scenario generation p
     print(f"Pushed dataset to Hugging Face Hub: {repo_id}")
 
 
-async def main() -> None:
+async def main() -> int:
     """Main entry point for the full synthetic scenario generation pipeline."""
     parser = argparse.ArgumentParser(
         description="Generate synthetic scenarios - full pipeline from rubric to scenarios",
@@ -450,7 +448,7 @@ Examples:
             if args.output_dir is None:
                 current_file = Path(__file__)
                 project_root = current_file.parent.parent.parent
-                args.output_dir = project_root / "outputs"
+                args.output_dir = str(project_root / "outputs")
 
             await push_to_huggingface_only(
                 output_dir=str(args.output_dir),

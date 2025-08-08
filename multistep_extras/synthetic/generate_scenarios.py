@@ -124,7 +124,11 @@ async def generate_scenarios_parallel(
             print(f"Failed to generate scenario: {result}")
             continue
 
-        scenario_id, scenario = result
+        if isinstance(result, tuple) and len(result) == 2:
+            scenario_id, scenario = result
+        else:
+            # This shouldn't happen if result isn't an exception, but being safe
+            continue
         scenarios.append(scenario)
         print(f"✓ Generated scenario {scenario_id}: {scenario.description}")
 
@@ -187,7 +191,7 @@ def save_scenarios(scenarios: list[Scenario], output_file: str) -> None:
     Scenario.save_multiple(scenarios, output_path)
 
 
-async def main() -> None:
+async def main() -> int:
     """Main entry point for generating scenarios from hidden descriptions."""
     parser = argparse.ArgumentParser(
         description="Generate scenarios from hidden descriptions using a rubric"
@@ -241,7 +245,7 @@ async def main() -> None:
 
         scenarios = await generate_scenarios_parallel(
             hidden_descriptions=hidden_descriptions,
-            requirements=rubric.requirements,
+            requirements=list(rubric.requirements),
             model=args.model,
             client=client,
             model_kwargs=model_kwargs,

@@ -1,6 +1,6 @@
 from abc import abstractmethod
 from copy import deepcopy
-from typing import Tuple
+from typing import Tuple, Union
 
 from openai import AsyncOpenAI
 
@@ -68,10 +68,10 @@ class MultiTurnEnv(Environment):
         state = self.setup_state(state)
         if self.message_type == "chat":
             assert isinstance(prompt, list)
-            completion = []
+            completion: list[ChatMessage] = []
         else:
             assert isinstance(prompt, str)
-            completion = ""
+            completion: str = ""
         rollout = deepcopy(prompt)
         while not is_completed:
             if self.is_completed(rollout, state, **kwargs):
@@ -85,7 +85,9 @@ class MultiTurnEnv(Environment):
                 sampling_args=sampling_args,
                 message_type=self.message_type,
             )
-            state["responses"].append(response)
+            responses = state["responses"]
+            assert isinstance(responses, list)
+            responses.append(response)
             if self.message_type == "chat":
                 assert isinstance(rollout, list)
                 assert isinstance(completion, list)
@@ -108,10 +110,14 @@ class MultiTurnEnv(Environment):
                 response_text: str = response.choices[0].text or ""  # type: ignore
                 rollout += response_text
                 completion += response_text
-            state["turn"] += 1
+            turn = state["turn"]
+            assert isinstance(turn, int)
+            state["turn"] = turn + 1
+            turn = state["turn"]
+            assert isinstance(turn, int)
             if (
                 self.is_completed(rollout, state, **kwargs)
-                or state["turn"] >= self.max_turns
+                or turn >= self.max_turns
             ):
                 is_completed = True
             else:
