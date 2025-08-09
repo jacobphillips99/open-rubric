@@ -1,10 +1,10 @@
 """MultiStep rubric implementation for evaluating requirements in a dependency graph in both single-turn and multi-turn environments."""
 
 import asyncio
+import json
 from collections import defaultdict
 from collections.abc import Sequence
 from copy import deepcopy
-import json
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Tuple, Union
 

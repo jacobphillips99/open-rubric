@@ -120,6 +120,12 @@ def generate_scenario_from_hidden_description(
         **model_kwargs,
     )
     parsed = parser.parse(response.choices[0].message.content)
+    if getattr(parsed, "answer", None) is None:
+        preview = (response.choices[0].message.content or "")[:500]
+        raise ValueError(
+            "LLM response missing <answer> block with JSON. "
+            f"First 500 chars of message: {preview}"
+        )
     try:
         generated_data = json.loads(parsed.answer)
     except json.JSONDecodeError as e:

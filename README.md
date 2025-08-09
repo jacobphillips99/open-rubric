@@ -125,7 +125,7 @@ Outputs include two splits: `hidden` (hidden descriptions) and `scenarios` (full
 GRPO training examples with multi‑step rubrics live under `examples/` (e.g., `train_gsm8k.py`, `train_math_group.py`, `train_wordle.py`).
 
 ### Running on Prime Intellect
-Following the instructions in [`verifiers/`](https://github.com/willccbb/verifiers/blob/main/README.md#training-on-prime-intellect), we reccomend renting Prime Intellect nodes. 
+Following the instructions in [`verifiers/`](https://github.com/willccbb/verifiers/blob/main/README.md#training-on-prime-intellect), we reccomend renting Prime Intellect nodes.
 
 Tips and Tricks:
 - `ssh -A` to forward your local SSH agent to the remote node
