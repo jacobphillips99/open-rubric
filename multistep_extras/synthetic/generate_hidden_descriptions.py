@@ -106,7 +106,7 @@ async def generate_hidden_descriptions_async(
     response = client.chat.completions.create(
         model=model,
         messages=[{"role": "user", "content": prompt}],
-        max_tokens=4000,
+        max_tokens=10000,
         **model_kwargs,
     )
 

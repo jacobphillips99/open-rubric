@@ -8,6 +8,7 @@ with prompts, answers, and revealed information.
 import argparse
 import asyncio
 import json
+import re
 import traceback
 from pathlib import Path
 from typing import Callable, Optional

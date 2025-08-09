@@ -101,7 +101,7 @@ async def push_to_huggingface_only(
 async def full_synthetic_pipeline(
     rubric_path: str,
     num_descriptions: int = 5,
-    model: str = "gpt-4.1-nano",
+    model: str = "gpt-4.1-mini",
     hidden_temperature: float = 0.7,
     scenario_temperature: float = 0.1,
     max_concurrent: int = 5,
@@ -523,8 +523,8 @@ Examples:
     )
     parser.add_argument(
         "--model",
-        default="gpt-4.1-nano",
-        help="Model to use for generation (default: gpt-4.1-nano)",
+        default="gpt-4.1-mini",
+        help="Model to use for generation (default: gpt-4.1-mini)",
     )
     parser.add_argument(
         "--hidden-temp",
