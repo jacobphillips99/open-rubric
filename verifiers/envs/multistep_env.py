@@ -86,6 +86,9 @@ class MultiStepMultiTurnEnv(MultiTurnEnv):
             "revealed_info": set(),
             "revealed_info_data": revealed_info_data,
             "evaluation_results": {},
+            # Required by vLLM post-processing
+            "responses": [],
+            "turn": 0,
         }
 
     def env_response(
@@ -155,9 +158,15 @@ class MultiStepMultiTurnEnv(MultiTurnEnv):
             else:
                 model_reply = str(model_response)
 
+            # Track raw responses for vLLM token/logprob extraction
+            responses_list = state.get("responses", [])
+            responses_list.append(model_response)
+            state["responses"] = responses_list
+
             messages.append({"role": "assistant", "content": model_reply})
             completion.append({"role": "assistant", "content": model_reply})
             turn += 1
+            state["turn"] = turn
 
             self.progression_tracker.add_step(
                 turn, "assistant_response", content=model_reply

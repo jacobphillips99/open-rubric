@@ -124,6 +124,26 @@ Outputs include two splits: `hidden` (hidden descriptions) and `scenarios` (full
 
 GRPO training examples with multi‑step rubrics live under `examples/` (e.g., `train_gsm8k.py`, `train_math_group.py`, `train_wordle.py`).
 
+### Running on Prime Intellect
+Following the instructions in [`verifiers/`](https://github.com/willccbb/verifiers/blob/main/README.md#training-on-prime-intellect), we reccomend renting Prime Intellect nodes. 
+
+Tips and Tricks:
+- `ssh -A` to forward your local SSH agent to the remote node
+- `NCCL_SHM_DISABLE=1 NCCL_DEBUG=INFO NCCL_P2P_DISABLE=1` to avoid NCCL issues and for easier debugging
+- Don't forget to set `OPENAI_API_KEY` and `WANDB_API_KEY`
+
+
+
+```bash
+git clone https://github.com/jacobphillips99/open-rubric.git
+cd open-rubric
+chmod +x install.sh
+./install.sh
+```
+
+One-shot setup: installs `uv` and basic tools, configures tmux, installs project dependencies (optional `flash-attn`), and installs OpenRubric.
+
+
 ## License
 
 MIT — see `LICENSE`.

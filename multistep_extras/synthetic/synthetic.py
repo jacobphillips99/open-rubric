@@ -286,7 +286,9 @@ async def full_synthetic_pipeline(
             scenarios.extend(existing)
             print(f"Recovered {len(existing)} scenarios from temp file {scenarios_tmp}")
         except Exception as e:
-            print(f"Warning: failed to resume scenarios from temp file {scenarios_tmp}: {e}")
+            print(
+                f"Warning: failed to resume scenarios from temp file {scenarios_tmp}: {e}"
+            )
 
     # Track how many scenarios we already have so we only generate remaining
     start_index = len(scenarios)

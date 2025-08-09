@@ -14,7 +14,7 @@ training:
 CUDA_VISIBLE_DEVICES=1 accelerate launch --num-processes 1 --config-file configs/zero3.yaml verifiers/examples/first_responder_train.py
 """
 
-model_name = "willcb/Qwen3-0.6B"
+model_name = "willcb/Qwen3-0.6B-Base"
 hf_repo_name = "jacobphillips99"
 project_name = "open-rubric"
 group = "first-responder"
@@ -27,13 +27,20 @@ def process_dataset_item(item):
     question_data = json.loads(item['question'])
     answer_data = json.loads(item['answer'])
 
+    # Ensure chat-format prompts for vLLM parsing and chat environments
+    raw_prompt = question_data['prompt']
+    if isinstance(raw_prompt, list):
+        prompt_messages = raw_prompt
+    else:
+        prompt_messages = [{"role": "user", "content": raw_prompt}]
+
     answer_with_revealed_info = json.dumps({
         **answer_data['answers'],
         "_revealed_info": answer_data.get('revealed_info', {})
     })
 
     return {
-        'prompt': question_data['prompt'],
+        'prompt': prompt_messages,
         'answer': answer_with_revealed_info
     }
 
@@ -61,8 +68,6 @@ vf_env = MultiStepMultiTurnEnv(
     dataset=train_dataset,
     message_type="chat",
 )
-
-breakpoint()
 
 # Training configuration - optimized for multistep environment
 args = vf.grpo_defaults(run_name='first_responder_multistep_emergency_response')
