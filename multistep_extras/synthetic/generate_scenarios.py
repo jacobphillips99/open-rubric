@@ -10,7 +10,7 @@ import asyncio
 import json
 import traceback
 from pathlib import Path
-from typing import Optional
+from typing import Callable, Optional
 
 from openai import OpenAI
 
@@ -68,6 +68,7 @@ async def generate_scenarios_parallel(
     client: Optional[OpenAI] = None,
     model_kwargs: Optional[dict] = None,
     max_concurrent: int = 5,
+    progress_callback: Optional[Callable[[int, Scenario], None]] = None,
 ) -> list[Scenario]:
     """
     Generate scenarios in parallel from hidden descriptions.
@@ -114,23 +115,27 @@ async def generate_scenarios_parallel(
         f"Generating {len(tasks)} scenarios with max {max_concurrent} concurrent requests..."
     )
 
-    # Run all tasks and gather results
-    results = await asyncio.gather(*tasks, return_exceptions=True)
-
-    # Process results and handle exceptions
+    # Process tasks as they complete so we can checkpoint progress
     scenarios = []
-    for result in results:
-        if isinstance(result, Exception):
-            print(f"Failed to generate scenario: {result}")
+    for future in asyncio.as_completed(tasks):
+        try:
+            result = await future
+        except Exception as e:
+            print(f"Failed to generate scenario: {e}")
             continue
 
         if isinstance(result, tuple) and len(result) == 2:
             scenario_id, scenario = result
         else:
-            # This shouldn't happen if result isn't an exception, but being safe
+            # Unexpected result shape
             continue
         scenarios.append(scenario)
         print(f"✓ Generated scenario {scenario_id}: {scenario.description}")
+        if progress_callback is not None:
+            try:
+                progress_callback(scenario_id, scenario)
+            except Exception as cb_err:
+                print(f"Warning: progress callback failed: {cb_err}")
 
     return scenarios
 

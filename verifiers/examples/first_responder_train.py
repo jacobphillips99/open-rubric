@@ -62,6 +62,8 @@ vf_env = MultiStepMultiTurnEnv(
     message_type="chat",
 )
 
+breakpoint()
+
 # Training configuration - optimized for multistep environment
 args = vf.grpo_defaults(run_name='first_responder_multistep_emergency_response')
 args.per_device_train_batch_size = 2

@@ -136,7 +136,12 @@ async def generate_hidden_descriptions_async(
             candidate = raw_text
 
         # Normalize quotes
-        candidate = candidate.replace("\u201c", '"').replace("\u201d", '"').replace("\u2018", "'").replace("\u2019", "'")
+        candidate = (
+            candidate.replace("\u201c", '"')
+            .replace("\u201d", '"')
+            .replace("\u2018", "'")
+            .replace("\u2019", "'")
+        )
 
         # Remove control chars except standard whitespace
         candidate = re.sub(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]", " ", candidate)

@@ -165,15 +165,30 @@ async def full_synthetic_pipeline(
                     data = json.load(f)
                 if isinstance(data, list):
                     hidden_descriptions = data
-                    print(f"Resumed {len(hidden_descriptions)} existing hidden descriptions from {descriptions_file}")
+                    print(
+                        f"Resumed {len(hidden_descriptions)} existing hidden descriptions from {descriptions_file}"
+                    )
             elif tmp_file.exists():
                 with open(tmp_file) as f:
                     data = json.load(f)
                 if isinstance(data, list):
                     hidden_descriptions = data
-                    print(f"Recovered {len(hidden_descriptions)} hidden descriptions from temp file {tmp_file}")
+                    print(
+                        f"Recovered {len(hidden_descriptions)} hidden descriptions from temp file {tmp_file}"
+                    )
         except Exception as resume_err:
             print(f"Warning: failed to resume intermediates: {resume_err}")
+    # Compute next increasing ID based on any resumed items
+    current_max_id = 0
+    for item in hidden_descriptions:
+        if isinstance(item, dict) and "id" in item:
+            try:
+                val = int(item["id"])  # tolerate strings that are ints
+            except Exception:
+                val = 0
+            if val > current_max_id:
+                current_max_id = val
+    next_id = current_max_id + 1
     batch_index = 0
     zero_batch_streak = 0
     # Continue until we reach the requested number of descriptions
@@ -205,20 +220,35 @@ async def full_synthetic_pipeline(
                 if attempt < retries:
                     await asyncio.sleep(delay_seconds * attempt)
         if last_error is not None:
-            print("    All retries failed for this batch. Proceeding to next batch if possible.")
+            print(
+                "    All retries failed for this batch. Proceeding to next batch if possible."
+            )
             batch = []
         # Be defensive: some models may return fewer items than requested
         if not isinstance(batch, list):
             batch = []
-        hidden_descriptions.extend(batch)
+        # Normalize and assign globally increasing IDs
+        normalized_batch: list[dict] = []
+        for item in batch:
+            if not isinstance(item, dict):
+                continue
+            normalized = dict(item)
+            normalized["id"] = next_id
+            if not normalized.get("title"):
+                normalized["title"] = f"Hidden description {next_id}"
+            normalized_batch.append(normalized)
+            next_id += 1
+        hidden_descriptions.extend(normalized_batch)
         print(
-            f"    Collected {len(batch)} in this batch; running total: {len(hidden_descriptions)}"
+            f"    Collected {len(normalized_batch)} in this batch; running total: {len(hidden_descriptions)}"
         )
         # Safety: if model repeatedly returns 0, break to avoid infinite loop
-        if len(batch) == 0:
+        if len(normalized_batch) == 0:
             zero_batch_streak += 1
             if zero_batch_streak >= 2:
-                print("    Model returned 0 descriptions twice in a row; stopping early to avoid infinite loop.")
+                print(
+                    "    Model returned 0 descriptions twice in a row; stopping early to avoid infinite loop."
+                )
                 break
         else:
             zero_batch_streak = 0
@@ -235,16 +265,61 @@ async def full_synthetic_pipeline(
             except Exception as save_err:
                 print(f"Warning: failed to save intermediates: {save_err}")
 
-    # Step 3: Generate scenarios
+    # Step 3: Generate scenarios with periodic checkpointing
     print(f"Generating scenarios from {len(hidden_descriptions)} descriptions...")
-    scenarios = await generate_scenarios_parallel(
-        hidden_descriptions=hidden_descriptions,
+    scenarios: list[Scenario] = []
+
+    scenarios_file = output_path / "synthetic_scenarios.yaml"
+    scenarios_tmp = output_path / "synthetic_scenarios.yaml.tmp"
+
+    # Attempt resume: load existing scenarios if present
+    if scenarios_file.exists():
+        try:
+            existing = Scenario.load_multiple(scenarios_file)
+            scenarios.extend(existing)
+            print(f"Resumed {len(existing)} existing scenarios from {scenarios_file}")
+        except Exception as e:
+            print(f"Warning: failed to resume scenarios from {scenarios_file}: {e}")
+    elif scenarios_tmp.exists():
+        try:
+            existing = Scenario.load_multiple(scenarios_tmp)
+            scenarios.extend(existing)
+            print(f"Recovered {len(existing)} scenarios from temp file {scenarios_tmp}")
+        except Exception as e:
+            print(f"Warning: failed to resume scenarios from temp file {scenarios_tmp}: {e}")
+
+    # Track how many scenarios we already have so we only generate remaining
+    start_index = len(scenarios)
+    remaining_hidden = hidden_descriptions[start_index:]
+
+    def _checkpoint_callback(_scenario_id: int, scenario: Scenario) -> None:
+        scenarios.append(scenario)
+        try:
+            # Save atomically
+            Scenario.save_multiple(scenarios, scenarios_tmp)
+            os.replace(scenarios_tmp, scenarios_file)
+            print(f"Checkpointed {len(scenarios)} scenarios to {scenarios_file}")
+        except Exception as err:
+            print(f"Warning: failed to checkpoint scenarios: {err}")
+
+    _ = await generate_scenarios_parallel(
+        hidden_descriptions=remaining_hidden,
         requirements=list(rubric.requirements),
         model=model,
         client=client,
         model_kwargs=scenario_model_kwargs,
         max_concurrent=max_concurrent,
+        progress_callback=_checkpoint_callback,
     )
+
+    # Ensure a scenarios file exists even if no scenario completed in this run
+    if not scenarios_file.exists():
+        try:
+            Scenario.save_multiple(scenarios, scenarios_tmp)
+            os.replace(scenarios_tmp, scenarios_file)
+            print(f"Wrote scenarios file to {scenarios_file} (count: {len(scenarios)})")
+        except Exception as err:
+            print(f"Warning: failed to write scenarios file: {err}")
 
     # Step 4: Save scenarios
     scenarios_file = output_path / "synthetic_scenarios.yaml"
@@ -538,12 +613,43 @@ Examples:
             )
 
             print("\n✅ Push to Hugging Face Hub completed successfully!")
+            # Final artifact summary
+            try:
+                output_path = Path(str(args.output_dir))
+                descriptions_file = output_path / "hidden_descriptions.json"
+                scenarios_file = output_path / "synthetic_scenarios.yaml"
+                hf_dir = output_path / "hf"
+                qa_path = hf_dir / "scenarios.jsonl"
+                readme_path = hf_dir / "README.md"
+
+                print("\nArtifacts written:")
+                if descriptions_file.exists():
+                    print(f"  - {descriptions_file}")
+                if scenarios_file.exists():
+                    print(f"  - {scenarios_file}")
+                if qa_path.exists():
+                    print(f"  - {qa_path}")
+                if readme_path.exists():
+                    print(f"  - {readme_path}")
+                if args.hf_repo_id:
+                    print(
+                        f"Hugging Face dataset pushed: https://huggingface.co/datasets/{args.hf_repo_id}"
+                    )
+            except Exception as artifact_err:
+                print(f"Warning: failed to enumerate final artifacts: {artifact_err}")
             return 0
 
         # Validate rubric_path for non-push-only mode
         if not args.rubric_path:
             print("Error: rubric_path is required when not using --push-only")
             return 1
+
+        # Resolve output directory used for downstream printing and pass to pipeline
+        resolved_output_dir = args.output_dir
+        if resolved_output_dir is None:
+            current_file = Path(__file__)
+            project_root = current_file.parent.parent.parent
+            resolved_output_dir = str(project_root / "example_rubrics" / "workflows")
 
         # Run full generation pipeline
         hidden_descriptions, scenarios = await full_synthetic_pipeline(
@@ -553,7 +659,7 @@ Examples:
             hidden_temperature=args.hidden_temp,
             scenario_temperature=args.scenario_temp,
             max_concurrent=args.max_concurrent,
-            output_dir=args.output_dir,
+            output_dir=resolved_output_dir,
             save_intermediates=not args.no_intermediates,
             batch_size=args.batch_size,
             hf_repo_id=args.hf_repo_id,
@@ -574,6 +680,31 @@ Examples:
         print("\n📝 Generated scenarios:")
         for scenario in scenarios:
             print(f"  - {scenario.name}: {scenario.description}")
+
+        # Final artifact summary
+        try:
+            output_path = Path(resolved_output_dir)
+            descriptions_file = output_path / "hidden_descriptions.json"
+            scenarios_file = output_path / "synthetic_scenarios.yaml"
+            hf_dir = output_path / "hf"
+            qa_path = hf_dir / "scenarios.jsonl"
+            readme_path = hf_dir / "README.md"
+
+            print("\nArtifacts written:")
+            if descriptions_file.exists():
+                print(f"  - {descriptions_file}")
+            if scenarios_file.exists():
+                print(f"  - {scenarios_file}")
+            if qa_path.exists():
+                print(f"  - {qa_path}")
+            if readme_path.exists():
+                print(f"  - {readme_path}")
+            if args.hf_repo_id and not args.no_push:
+                print(
+                    f"Hugging Face dataset pushed: https://huggingface.co/datasets/{args.hf_repo_id}"
+                )
+        except Exception as artifact_err:
+            print(f"Warning: failed to enumerate final artifacts: {artifact_err}")
 
     except Exception as e:
         print(f"Error: {e}")
