@@ -4,6 +4,7 @@ import asyncio
 from collections import defaultdict
 from collections.abc import Sequence
 from copy import deepcopy
+import json
 from pathlib import Path
 from typing import Any, Dict, List, Mapping, Optional, Tuple, Union
 
@@ -122,6 +123,8 @@ class MultiStepRubric(Rubric):
 
         # Convert scenario.answers to ground_truth_answers format
         ground_truth_answers = {}
+        if isinstance(scenario.answers, str):
+            scenario.answers = json.loads(scenario.answers)
         for req_name, answer_data in scenario.answers.items():
             # Skip None answers and metadata keys (starting with underscore)
             if answer_data is None or req_name.startswith("_"):
