@@ -52,7 +52,7 @@ train_dataset = processed_dataset.select(range(num_train))
 eval_dataset = processed_dataset.select(range(num_train, num_train + num_eval))
 
 # load rubric from configs
-rubric = MultiStepRubric.load("multistep_extras/example_rubrics", "first_responder")
+rubric = MultiStepRubric.load("example_rubrics", "first_responder")
 
 # Create the multistep environment
 vf_env = MultiStepMultiTurnEnv(

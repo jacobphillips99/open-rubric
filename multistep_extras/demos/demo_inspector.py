@@ -12,7 +12,7 @@ import traceback
 
 from openai import OpenAI
 
-from multistep_extras.example_rubrics import get_workflow
+from example_rubrics import get_workflow
 from multistep_extras.inspection.inspector import (EvaluationInspector,
                                                    RequirementsInspector,
                                                    RubricInspector,

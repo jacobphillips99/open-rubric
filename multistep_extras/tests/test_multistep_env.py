@@ -11,7 +11,7 @@ from typing import Any, Dict, List
 from datasets import Dataset
 from openai import OpenAI
 
-from multistep_extras.example_rubrics import get_workflow
+from example_rubrics import get_workflow
 from multistep_extras.utils.print_utils import (Colors, print_assistant,
                                                 print_debug, print_environment,
                                                 print_error, print_header,

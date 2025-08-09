@@ -2,10 +2,10 @@
 
 from .builders import RubricBuilder, ScenarioBuilder
 from .demos import MultiStepTutorial, run_inspector_demo, run_visualizer_demo
-from .example_rubrics import (AVAILABLE_WORKFLOWS, all_scenarios,
-                              debugging_reqs, debugging_scenarios,
-                              first_responder_reqs, get_workflow,
-                              get_workflow_summary, list_workflows, scenarios)
+from example_rubrics import (AVAILABLE_WORKFLOWS, all_scenarios,
+                            debugging_reqs, debugging_scenarios,
+                            first_responder_reqs, get_workflow,
+                            get_workflow_summary, list_workflows, scenarios)
 # Legacy aliases for backward compatibility
 from .inspection import (EvaluationInspector, RequirementsInspector,
                          RubricInspector, inspect_requirements)

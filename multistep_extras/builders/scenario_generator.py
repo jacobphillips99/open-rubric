@@ -160,7 +160,7 @@ def _format_requirements_for_prompt(requirements: list[Requirement]) -> str:
 
 
 if __name__ == "__main__":
-    from multistep_extras.example_rubrics import get_workflow
+    from example_rubrics import get_workflow
 
     reqs, scenarios = get_workflow("first_responder")
     hidden_descriptions = [

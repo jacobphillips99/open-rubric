@@ -10,7 +10,7 @@ from pathlib import Path
 
 import plotly.graph_objects as go
 
-from multistep_extras.example_rubrics import get_workflow
+from example_rubrics import get_workflow
 from multistep_extras.visualization.visualizer import (
     RequirementsVisualizer, create_dependency_graph, create_metrics_dashboard)
 from verifiers.rubrics.multistep.requirement import Requirement

@@ -114,11 +114,12 @@ vf-install = "verifiers.scripts.install:main"
 vf-vllm = "verifiers.inference.vllm_server:main"
 
 [tool.setuptools]
-packages = ["verifiers", "multistep_extras"]
+packages = ["verifiers", "multistep_extras", "example_rubrics"]
 
 [tool.hatch.build.targets.sdist]
 include = [
     "/verifiers",
+    "/example_rubrics",
     "/tests",
     "/README.md",
     "/LICENSE",
@@ -131,7 +132,7 @@ exclude = [
 ]
 
 [tool.hatch.build.targets.wheel]
-packages = ["verifiers"]
+packages = ["verifiers", "example_rubrics"]
 
 [dependency-groups]
 dev = [

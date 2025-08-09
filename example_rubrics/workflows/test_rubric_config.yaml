@@ -63,4 +63,4 @@ name: test_rubric
 reward_strategy:
   base_weight: 1.0
   level_multiplier: 1.0
-  type: levelweighted 
+  type: levelweighted

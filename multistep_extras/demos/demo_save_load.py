@@ -8,8 +8,8 @@ and demonstrates loading it back using methods on the objects themselves.
 from pathlib import Path
 
 # Import the existing first responder workflow
-from multistep_extras.example_rubrics.first_responder import (requirements,
-                                                              scenarios)
+from example_rubrics.first_responder import (requirements,
+                                            scenarios)
 from verifiers.rewards.judge_reward import JUDGE_PROMPT, BinaryJudgeRewarder
 from verifiers.rubrics.multistep.multistep_rubric import MultiStepRubric
 from verifiers.rubrics.multistep.requirement import Requirement

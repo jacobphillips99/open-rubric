@@ -27,7 +27,7 @@ from verifiers.rubrics.multistep.reward_strategies import (
     NAME_TO_REWARD_STRATEGY_CLASS, make_reward_strategy)
 
 # Default save directory
-DEFAULT_SAVE_DIR = Path("outputs/workflows")
+DEFAULT_SAVE_DIR = Path("example_rubrics/workflows")
 
 
 def configure_page() -> None:
@@ -1783,7 +1783,7 @@ def _test_scenarios_with_rubric() -> None:
 def _load_example_scenarios(example_name: str) -> None:
     """Load example scenarios from the multistep_extras package."""
     try:
-        from multistep_extras.example_rubrics import get_workflow
+        from example_rubrics import get_workflow
 
         _, scenarios = get_workflow(example_name)
         st.session_state.loaded_scenarios = scenarios

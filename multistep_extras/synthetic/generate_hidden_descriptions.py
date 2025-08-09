@@ -14,7 +14,7 @@ from typing import Optional
 
 from openai import OpenAI
 
-from multistep_extras.example_rubrics import get_workflow, list_workflows
+from example_rubrics import get_workflow, list_workflows
 from verifiers.parsers.xml_parser import XMLParser
 from verifiers.rubrics.multistep.multistep_rubric import MultiStepRubric
 from verifiers.rubrics.multistep.requirement import Requirement

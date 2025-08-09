@@ -16,7 +16,7 @@ from openai import OpenAI
 
 from multistep_extras.builders.scenario_generator import \
     generate_scenario_from_hidden_description
-from multistep_extras.example_rubrics import get_workflow, list_workflows
+from example_rubrics import get_workflow, list_workflows
 from verifiers.rubrics.multistep.multistep_rubric import MultiStepRubric
 from verifiers.rubrics.multistep.scenario import Scenario
 
