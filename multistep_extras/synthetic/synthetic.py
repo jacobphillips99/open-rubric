@@ -12,6 +12,7 @@ import asyncio
 import json
 import os
 import traceback
+from math import ceil
 from pathlib import Path
 from typing import Optional
 
@@ -106,6 +107,7 @@ async def full_synthetic_pipeline(
     max_concurrent: int = 5,
     output_dir: Optional[str] = None,
     save_intermediates: bool = True,
+    batch_size: int = 10,
     hf_repo_id: Optional[str] = None,
     hf_private: bool = False,
     hf_branch: Optional[str] = None,
@@ -128,12 +130,12 @@ async def full_synthetic_pipeline(
         Tuple of (hidden_descriptions, scenarios)
     """
     if output_dir is None:
-        # Default to outputs/ folder at project root (same level as multistep_extras)
+        # Default to example_rubrics/workflows/ at project root
         current_file = Path(__file__)
         project_root = (
             current_file.parent.parent.parent
         )  # Go up from synthetic/ -> multistep_extras/ -> project_root/
-        output_dir = str(project_root / "outputs")
+        output_dir = str(project_root / "example_rubrics" / "workflows")
     output_path = Path(output_dir)
     output_path.mkdir(parents=True, exist_ok=True)
 
@@ -146,21 +148,92 @@ async def full_synthetic_pipeline(
     rubric = load_rubric_from_path(rubric_path)
     print(f"Loaded rubric with {len(rubric.requirements)} requirements")
 
-    # Step 2: Generate hidden descriptions
-    print(f"Generating {num_descriptions} hidden descriptions...")
-    hidden_descriptions = await generate_hidden_descriptions_async(
-        requirements=list(rubric.requirements),
-        num_descriptions=num_descriptions,
-        model=model,
-        client=client,
-        model_kwargs=hidden_model_kwargs,
+    # Step 2: Generate hidden descriptions (in batches to avoid token limits)
+    if batch_size < 1:
+        batch_size = 1
+    print(
+        f"Generating {num_descriptions} hidden descriptions in batches of up to {batch_size}..."
     )
-
+    hidden_descriptions: list[dict] = []
+    # Try to resume from previous intermediates in output dir
     if save_intermediates:
         descriptions_file = output_path / "hidden_descriptions.json"
-        with open(descriptions_file, "w") as f:
-            json.dump(hidden_descriptions, f, indent=2)
-        print(f"Saved hidden descriptions to {descriptions_file}")
+        tmp_file = output_path / "hidden_descriptions.json.tmp"
+        try:
+            if descriptions_file.exists():
+                with open(descriptions_file) as f:
+                    data = json.load(f)
+                if isinstance(data, list):
+                    hidden_descriptions = data
+                    print(f"Resumed {len(hidden_descriptions)} existing hidden descriptions from {descriptions_file}")
+            elif tmp_file.exists():
+                with open(tmp_file) as f:
+                    data = json.load(f)
+                if isinstance(data, list):
+                    hidden_descriptions = data
+                    print(f"Recovered {len(hidden_descriptions)} hidden descriptions from temp file {tmp_file}")
+        except Exception as resume_err:
+            print(f"Warning: failed to resume intermediates: {resume_err}")
+    batch_index = 0
+    zero_batch_streak = 0
+    # Continue until we reach the requested number of descriptions
+    while len(hidden_descriptions) < num_descriptions:
+        to_generate = min(batch_size, num_descriptions - len(hidden_descriptions))
+        batch_index += 1
+        print(
+            f"  → Batch {batch_index}: requesting {to_generate} hidden description(s)"
+        )
+        # Retry wrapper for hidden description generation
+        retries = 3
+        delay_seconds = 2
+        last_error: Optional[Exception] = None
+        for attempt in range(1, retries + 1):
+            try:
+                batch = await generate_hidden_descriptions_async(
+                    requirements=list(rubric.requirements),
+                    num_descriptions=to_generate,
+                    model=model,
+                    client=client,
+                    model_kwargs=hidden_model_kwargs,
+                    attempt_repair=True,
+                )
+                last_error = None
+                break
+            except Exception as e:
+                last_error = e
+                print(f"    Attempt {attempt}/{retries} failed: {e}")
+                if attempt < retries:
+                    await asyncio.sleep(delay_seconds * attempt)
+        if last_error is not None:
+            print("    All retries failed for this batch. Proceeding to next batch if possible.")
+            batch = []
+        # Be defensive: some models may return fewer items than requested
+        if not isinstance(batch, list):
+            batch = []
+        hidden_descriptions.extend(batch)
+        print(
+            f"    Collected {len(batch)} in this batch; running total: {len(hidden_descriptions)}"
+        )
+        # Safety: if model repeatedly returns 0, break to avoid infinite loop
+        if len(batch) == 0:
+            zero_batch_streak += 1
+            if zero_batch_streak >= 2:
+                print("    Model returned 0 descriptions twice in a row; stopping early to avoid infinite loop.")
+                break
+        else:
+            zero_batch_streak = 0
+
+        if save_intermediates:
+            descriptions_file = output_path / "hidden_descriptions.json"
+            tmp_file = output_path / "hidden_descriptions.json.tmp"
+            try:
+                # Write atomically via temp file then rename
+                with open(tmp_file, "w") as f:
+                    json.dump(hidden_descriptions, f, indent=2)
+                os.replace(tmp_file, descriptions_file)
+                print(f"Saved hidden descriptions to {descriptions_file}")
+            except Exception as save_err:
+                print(f"Warning: failed to save intermediates: {save_err}")
 
     # Step 3: Generate scenarios
     print(f"Generating scenarios from {len(hidden_descriptions)} descriptions...")
@@ -421,8 +494,14 @@ Examples:
         help="Maximum concurrent requests for scenario generation (default: 5)",
     )
     parser.add_argument(
+        "--batch-size",
+        type=int,
+        default=10,
+        help="Generate hidden descriptions in batches to avoid token limits (default: 10)",
+    )
+    parser.add_argument(
         "--output-dir",
-        help="Output directory for generated files (default: outputs/ folder at project root)",
+        help="Output directory for generated files (default: example_rubrics/workflows at project root)",
     )
     parser.add_argument(
         "--no-intermediates",
@@ -448,7 +527,7 @@ Examples:
             if args.output_dir is None:
                 current_file = Path(__file__)
                 project_root = current_file.parent.parent.parent
-                args.output_dir = str(project_root / "outputs")
+                args.output_dir = str(project_root / "example_rubrics" / "workflows")
 
             await push_to_huggingface_only(
                 output_dir=str(args.output_dir),
@@ -476,6 +555,7 @@ Examples:
             max_concurrent=args.max_concurrent,
             output_dir=args.output_dir,
             save_intermediates=not args.no_intermediates,
+            batch_size=args.batch_size,
             hf_repo_id=args.hf_repo_id,
             hf_private=args.hf_private,
             hf_branch=args.hf_branch,

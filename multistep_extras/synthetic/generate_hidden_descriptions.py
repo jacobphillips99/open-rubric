@@ -8,6 +8,7 @@ that can later be used to create full scenarios with the scenario generator.
 import argparse
 import asyncio
 import json
+import re
 import traceback
 from pathlib import Path
 from typing import Optional
@@ -70,6 +71,7 @@ async def generate_hidden_descriptions_async(
     model: str = "gpt-4.1-nano",
     client: Optional[OpenAI] = None,
     model_kwargs: Optional[dict] = None,
+    attempt_repair: bool = True,
 ) -> list[dict]:
     """
     Generate multiple hidden descriptions for scenarios based on rubric requirements.
@@ -110,12 +112,56 @@ async def generate_hidden_descriptions_async(
 
     parsed = parser.parse(response.choices[0].message.content)
 
+    if getattr(parsed, "answer", None) is None:
+        preview = (response.choices[0].message.content or "")[:500]
+        raise ValueError(
+            "LLM response missing <answer> block with JSON. "
+            f"First 500 chars of message: {preview}"
+        )
+
+    def _repair_and_load(raw_text: str) -> dict:
+        """Best-effort repair for near-JSON strings, then load.
+
+        - Extract innermost JSON object from first '{' to last '}'
+        - Normalize smart quotes to standard quotes
+        - Remove disallowed control characters
+        - Remove trailing commas before closing braces/brackets
+        """
+        # Extract object slice
+        if "{" in raw_text and "}" in raw_text:
+            start = raw_text.find("{")
+            end = raw_text.rfind("}") + 1
+            candidate = raw_text[start:end]
+        else:
+            candidate = raw_text
+
+        # Normalize quotes
+        candidate = candidate.replace("\u201c", '"').replace("\u201d", '"').replace("\u2018", "'").replace("\u2019", "'")
+
+        # Remove control chars except standard whitespace
+        candidate = re.sub(r"[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]", " ", candidate)
+
+        # Remove trailing commas in objects/arrays
+        candidate = re.sub(r",(\s*[}\]])", r"\1", candidate)
+
+        return json.loads(candidate)
+
     try:
         generated_data = json.loads(parsed.answer)
     except json.JSONDecodeError as e:
-        raise ValueError(
-            f"LLM response was not valid JSON: {e}; {traceback.format_exc()}"
-        ) from e
+        if attempt_repair:
+            try:
+                generated_data = _repair_and_load(parsed.answer)
+            except Exception:
+                preview = (parsed.answer or "")[:500]
+                raise ValueError(
+                    "LLM response was not valid JSON and repair failed. "
+                    f"First 500 chars of answer: {preview}. Original error: {e}; {traceback.format_exc()}"
+                ) from e
+        else:
+            raise ValueError(
+                f"LLM response was not valid JSON: {e}; {traceback.format_exc()}"
+            ) from e
 
     if "descriptions" not in generated_data:
         raise ValueError("Generated data missing 'descriptions' field")

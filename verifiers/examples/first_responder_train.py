@@ -8,10 +8,10 @@ from verifiers.rubrics.multistep.multistep_rubric import MultiStepRubric
 
 """
 inference:
-CUDA_VISIBLE_DEVICES=0 vf-vllm --model willcb/Qwen3-0.6B --enforce-eager
+CUDA_VISIBLE_DEVICES=0 vf-vllm --model willcb/Qwen3-0.6B-Base --enforce-eager
 
 training:
-CUDA_VISIBLE_DEVICES=1 accelerate launch --num-processes 1 --config-file configs/zero3.yaml verifiers/examples/first_responder.py
+CUDA_VISIBLE_DEVICES=1 accelerate launch --num-processes 1 --config-file configs/zero3.yaml verifiers/examples/first_responder_train.py
 """
 
 model_name = "willcb/Qwen3-0.6B"
@@ -52,7 +52,7 @@ train_dataset = processed_dataset.select(range(num_train))
 eval_dataset = processed_dataset.select(range(num_train, num_train + num_eval))
 
 # load rubric from configs
-rubric = MultiStepRubric.load("example_rubrics", "first_responder")
+rubric = MultiStepRubric.load("example_rubrics/workflows", "first_responder")
 
 # Create the multistep environment
 vf_env = MultiStepMultiTurnEnv(
@@ -67,12 +67,12 @@ args = vf.grpo_defaults(run_name='first_responder_multistep_emergency_response')
 args.per_device_train_batch_size = 2
 args.num_generations = 2
 args.gradient_accumulation_steps = 16
-args.max_steps = 1000
+args.max_steps = 5
 args.eval_strategy = 'steps'
 args.eval_steps = 50
 args.report_to = 'wandb'
 args.max_tokens = 1024
-args.learning_rate = 3e-6
+args.learning_rate = 1e-5
 args.warmup_steps = 100
 
 # Load model and tokenizer

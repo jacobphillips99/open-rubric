@@ -5,10 +5,8 @@ from copy import deepcopy
 from datasets import Dataset
 from openai import AsyncOpenAI, OpenAI
 
-from example_rubrics import \
-    first_responder_requirements as REQUIREMENTS
-from example_rubrics import \
-    first_responder_scenarios as ALL_SCENARIOS
+from example_rubrics import first_responder_requirements as REQUIREMENTS
+from example_rubrics import first_responder_scenarios as ALL_SCENARIOS
 from verifiers.envs.singleturn_env import SingleTurnEnv
 from verifiers.rewards.judge_reward import JUDGE_PROMPT, BinaryJudgeRewarder
 from verifiers.rubrics.multistep.multistep_rubric import MultiStepRubric

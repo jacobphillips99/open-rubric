@@ -3,9 +3,8 @@
 import asyncio
 from collections.abc import Sequence
 
-from example_rubrics import (debugging_reqs,
-                            debugging_scenarios,
-                            first_responder_reqs, scenarios)
+from example_rubrics import (debugging_reqs, debugging_scenarios,
+                             first_responder_reqs, scenarios)
 from verifiers.rewards.judge_reward import (JUDGE_PROMPT, BinaryJudgeRewarder,
                                             UnitVectorJudgeRewarder)
 from verifiers.rubrics.multistep.multistep_rubric import MultiStepRubric
