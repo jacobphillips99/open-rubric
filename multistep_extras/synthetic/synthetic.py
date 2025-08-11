@@ -143,8 +143,14 @@ async def full_synthetic_pipeline(
     output_path.mkdir(parents=True, exist_ok=True)
 
     client = OpenAI()
-    hidden_model_kwargs = {"temperature": hidden_temperature, "max_tokens": hidden_max_tokens}
-    scenario_model_kwargs = {"temperature": scenario_temperature, "max_tokens": scenario_max_tokens}
+    hidden_model_kwargs = {
+        "temperature": hidden_temperature,
+        "max_tokens": hidden_max_tokens,
+    }
+    scenario_model_kwargs = {
+        "temperature": scenario_temperature,
+        "max_tokens": scenario_max_tokens,
+    }
 
     # Step 1: Load rubric
     print(f"Loading rubric from {rubric_path}...")

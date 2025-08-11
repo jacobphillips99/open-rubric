@@ -21,7 +21,6 @@ group = "first-responder"
 
 # generated synthetic scenarios from synthetic.py
 dataset = load_dataset(f'{hf_repo_name}/{project_name}-{group}-scenarios', split='train')
-
 def process_dataset_item(item):
     """Process a single dataset item into the format needed for training."""
     question_data = json.loads(item['question'])

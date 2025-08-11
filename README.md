@@ -137,7 +137,7 @@ Tips and Tricks:
 - `ssh -A` to forward your local SSH agent to the remote node
 - `NCCL_SHM_DISABLE=1 NCCL_DEBUG=INFO NCCL_P2P_DISABLE=1` to avoid NCCL issues and for easier debugging
 - Don't forget to set `OPENAI_API_KEY` and `WANDB_API_KEY`
-- You may need to `eval "$(ssh-agent -s)" && ssh-add path/to/your/ssh/key` 
+- You may need to `eval "$(ssh-agent -s)" && ssh-add path/to/your/ssh/key`
 
 
 For remote setup:
@@ -148,7 +148,7 @@ chmod +x install.sh
 ./install.sh
 ```
 
-This runs the one-shot setup: installs `uv` and basic tools, configures tmux, installs project dependencies (optional `flash-attn`), and installs OpenRubric. After this, simply open tmux shells to run the providing training arguments (one window with `vf-vllm ...` and another with `accelerate ...`). 
+This runs the one-shot setup: installs `uv` and basic tools, configures tmux, installs project dependencies (optional `flash-attn`), and installs OpenRubric. After this, simply open tmux shells to run the providing training arguments (one window with `vf-vllm ...` and another with `accelerate ...`).
 
 ## Citation
 

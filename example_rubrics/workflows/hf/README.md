@@ -40,7 +40,7 @@ This dataset was generated using the Open Rubric framework for creating syntheti
 
 ### Data Splits
 
-The dataset contains 190 synthetic scenarios in a single split.
+The dataset contains 815 synthetic scenarios in a single split.
 
 ## Usage
 

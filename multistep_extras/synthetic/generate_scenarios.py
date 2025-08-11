@@ -7,11 +7,11 @@ with prompts, answers, and revealed information.
 
 import argparse
 import asyncio
-import json
 import concurrent.futures
+import json
+import re
 import sys
 import time
-import re
 import traceback
 from pathlib import Path
 from typing import Callable, Optional
@@ -53,6 +53,7 @@ async def generate_scenario_async(
     Returns:
         Tuple of (scenario_id, generated_scenario)
     """
+
     # Run the synchronous generation function in a thread so that asyncio
     # concurrency is effective for network-bound API calls.
     async def _invoke_in_thread() -> Scenario:
@@ -89,7 +90,7 @@ async def generate_scenario_async(
             last_error = e
             if attempt < max_retries:
                 # Exponential backoff with simple scaling
-                delay = backoff_base_seconds ** attempt
+                delay = backoff_base_seconds**attempt
                 print(
                     f"Retrying scenario {scenario_id} after error (attempt {attempt}/{max_retries}): {e}. Sleeping {delay:.2f}s"
                 )
@@ -149,6 +150,7 @@ async def generate_scenarios_parallel(
     # Create tasks for all scenarios
     tasks = []
     for idx, desc in enumerate(hidden_descriptions):
+
         async def _task(d=desc, i=idx):
             async with semaphore:
                 return await generate_scenario_async(
@@ -161,6 +163,7 @@ async def generate_scenarios_parallel(
                     model_kwargs=model_kwargs,
                     executor=executor,
                 )
+
         tasks.append(_task())
 
     total = len(tasks)
