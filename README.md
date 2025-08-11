@@ -3,7 +3,7 @@
 [![Python 3.11+](https://img.shields.io/badge/python-3.11+-blue.svg)](https://www.python.org/downloads/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
 
-OpenRubric is a multi-step rubric evaluation framework built on top of [verifiers](https://github.com/willccbb/verifiers). OpenRubric is built on the idea that real-world problems are typically full of branching logic, and that single-step rubric evaluation is insufficient for evaluating complex problems. OpenRubric extends `verifiers` to support multi-step rubrics that can mix judges and verifiable rewards in single- or multi-turn scenarios. 
+OpenRubric is a multi-step rubric evaluation framework built on top of [verifiers](https://github.com/willccbb/verifiers). OpenRubric is built on the idea that real-world problems are typically full of branching logic, and that single-step rubric evaluation is insufficient for evaluating complex problems. OpenRubric extends `verifiers` to support multi-step rubrics that can mix judges and verifiable rewards in single- or multi-turn scenarios.
 
 We also develop a synthetic data generation pipeline that can generate hidden descriptions and full scenarios from any rubric. Additionally, we create a GUI builder for rubrics that can be used to create and edit rubrics for easier access for researchers. Finally, we show example training runs using OpenRubric on PrimeIntellect nodes.
 
@@ -96,9 +96,9 @@ scenario = Scenario(
 )
 ```
 
-Now we can create a `Environment` object, which contains all the information and logic for evaluating the scenario according to a model completion and rubric. 
+Now we can create a `Environment` object, which contains all the information and logic for evaluating the scenario according to a model completion and rubric.
 
-```python 
+```python
 env = MultiStepMultiTurnEnv(multistep_rubric=rubric)
 completion, state = env.rollout(client, model, prompt, answer, kwargs)
 scores = rubric.score_rollout(prompt, completion, answers, state)
@@ -130,15 +130,17 @@ Outputs include two splits: `hidden` (hidden descriptions) and `scenarios` (full
 
 ## Training on Prime Intellect
 
-We adapt the train examples from `verifiers` and train better rubric-following policy models. We focus on training for the `first_responder` rubric, which simulates a complex, real-world difficult medical decision-making framework. Following the instructions in [`verifiers/`](https://github.com/willccbb/verifiers/blob/main/README.md#training-on-prime-intellect), we reccomend renting Prime Intellect nodes.
+We adapt the train examples from `verifiers` and train better rubric-following policy models. We focus on training for the `first_responder` rubric, which simulates a complex, real-world difficult medical decision-making framework. Following the instructions in [`verifiers`](https://github.com/willccbb/verifiers/blob/main/README.md#training-on-prime-intellect), we reccomend renting Prime Intellect nodes.
 
 Tips and Tricks:
+- We use 2xH100s for setup and testing and 8xH100s for training; reccomend `pytorch/pytorch:2.7.0-cuda12.8-cudnn9-runtime` as the base image. If you're going to run many experiments, you may want to set up a Template.
 - `ssh -A` to forward your local SSH agent to the remote node
 - `NCCL_SHM_DISABLE=1 NCCL_DEBUG=INFO NCCL_P2P_DISABLE=1` to avoid NCCL issues and for easier debugging
 - Don't forget to set `OPENAI_API_KEY` and `WANDB_API_KEY`
+- You may need to `eval "$(ssh-agent -s)" && ssh-add path/to/your/ssh/key` 
 
 
-For setup: 
+For remote setup:
 ```bash
 git clone https://github.com/jacobphillips99/open-rubric.git
 cd open-rubric
@@ -146,9 +148,7 @@ chmod +x install.sh
 ./install.sh
 ```
 
-One-shot setup: installs `uv` and basic tools, configures tmux, installs project dependencies (optional `flash-attn`), and installs OpenRubric.
-
-
+This runs the one-shot setup: installs `uv` and basic tools, configures tmux, installs project dependencies (optional `flash-attn`), and installs OpenRubric. After this, simply open tmux shells to run the providing training arguments (one window with `vf-vllm ...` and another with `accelerate ...`). 
 
 ## Citation
 

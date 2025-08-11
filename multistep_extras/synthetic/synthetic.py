@@ -108,6 +108,9 @@ async def full_synthetic_pipeline(
     output_dir: Optional[str] = None,
     save_intermediates: bool = True,
     batch_size: int = 10,
+    checkpoint_every: int = 1,
+    hidden_max_tokens: int = 4000,
+    scenario_max_tokens: int = 1000,
     hf_repo_id: Optional[str] = None,
     hf_private: bool = False,
     hf_branch: Optional[str] = None,
@@ -140,8 +143,8 @@ async def full_synthetic_pipeline(
     output_path.mkdir(parents=True, exist_ok=True)
 
     client = OpenAI()
-    hidden_model_kwargs = {"temperature": hidden_temperature}
-    scenario_model_kwargs = {"temperature": scenario_temperature}
+    hidden_model_kwargs = {"temperature": hidden_temperature, "max_tokens": hidden_max_tokens}
+    scenario_model_kwargs = {"temperature": scenario_temperature, "max_tokens": scenario_max_tokens}
 
     # Step 1: Load rubric
     print(f"Loading rubric from {rubric_path}...")
@@ -297,10 +300,11 @@ async def full_synthetic_pipeline(
     def _checkpoint_callback(_scenario_id: int, scenario: Scenario) -> None:
         scenarios.append(scenario)
         try:
-            # Save atomically
-            Scenario.save_multiple(scenarios, scenarios_tmp)
-            os.replace(scenarios_tmp, scenarios_file)
-            print(f"Checkpointed {len(scenarios)} scenarios to {scenarios_file}")
+            if checkpoint_every <= 1 or len(scenarios) % checkpoint_every == 0:
+                # Save atomically
+                Scenario.save_multiple(scenarios, scenarios_tmp)
+                os.replace(scenarios_tmp, scenarios_file)
+                print(f"Checkpointed {len(scenarios)} scenarios to {scenarios_file}")
         except Exception as err:
             print(f"Warning: failed to checkpoint scenarios: {err}")
 
@@ -577,6 +581,24 @@ Examples:
         help="Generate hidden descriptions in batches to avoid token limits (default: 10)",
     )
     parser.add_argument(
+        "--checkpoint-every",
+        type=int,
+        default=10,
+        help="Write scenarios to disk every N completions (default: 10; 1 = every scenario)",
+    )
+    parser.add_argument(
+        "--hidden-max-tokens",
+        type=int,
+        default=4000,
+        help="Max tokens for hidden description generation (default: 4000)",
+    )
+    parser.add_argument(
+        "--scenario-max-tokens",
+        type=int,
+        default=1000,
+        help="Max tokens for scenario generation (default: 1000)",
+    )
+    parser.add_argument(
         "--output-dir",
         help="Output directory for generated files (default: example_rubrics/workflows at project root)",
     )
@@ -664,6 +686,9 @@ Examples:
             output_dir=resolved_output_dir,
             save_intermediates=not args.no_intermediates,
             batch_size=args.batch_size,
+            checkpoint_every=args.checkpoint_every,
+            hidden_max_tokens=args.hidden_max_tokens,
+            scenario_max_tokens=args.scenario_max_tokens,
             hf_repo_id=args.hf_repo_id,
             hf_private=args.hf_private,
             hf_branch=args.hf_branch,

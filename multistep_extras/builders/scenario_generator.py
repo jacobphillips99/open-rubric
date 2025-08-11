@@ -113,10 +113,12 @@ def generate_scenario_from_hidden_description(
         requirements_text=requirements_text,
     )
     parser = XMLParser(fields=["think", "answer"])
+    # Allow caller to override max_tokens via model_kwargs without causing duplicate kwarg
+    max_tokens_arg = int(model_kwargs.pop("max_tokens", 2000))
     response = client.chat.completions.create(
         model=model,
         messages=[{"role": "user", "content": prompt}],
-        max_tokens=2000,
+        max_tokens=max_tokens_arg,
         **model_kwargs,
     )
     parsed = parser.parse(response.choices[0].message.content)

@@ -103,10 +103,12 @@ async def generate_hidden_descriptions_async(
 
     parser = XMLParser(fields=["think", "answer"])
 
+    # Allow caller to override max_tokens via model_kwargs without causing duplicate kwarg
+    max_tokens_arg = int(model_kwargs.pop("max_tokens", 10000))
     response = client.chat.completions.create(
         model=model,
         messages=[{"role": "user", "content": prompt}],
-        max_tokens=10000,
+        max_tokens=max_tokens_arg,
         **model_kwargs,
     )
 
