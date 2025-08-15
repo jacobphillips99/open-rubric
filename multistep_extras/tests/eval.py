@@ -20,8 +20,16 @@ def _process_dataset_item(item: dict[str, Any]) -> dict[str, Any]:
       question: {"prompt": str | list[{role, content}]}
       answer:   {"answers": dict, "revealed_info": dict}
     """
-    question_data = json.loads(item["question"]) if isinstance(item["question"], str) else item["question"]
-    answer_data = json.loads(item["answer"]) if isinstance(item["answer"], str) else item["answer"]
+    question_data = (
+        json.loads(item["question"])
+        if isinstance(item["question"], str)
+        else item["question"]
+    )
+    answer_data = (
+        json.loads(item["answer"])
+        if isinstance(item["answer"], str)
+        else item["answer"]
+    )
 
     raw_prompt = question_data["prompt"]
     if isinstance(raw_prompt, list):
@@ -29,10 +37,12 @@ def _process_dataset_item(item: dict[str, Any]) -> dict[str, Any]:
     else:
         prompt_messages = [{"role": "user", "content": raw_prompt}]
 
-    answer_with_revealed_info = json.dumps({
-        **answer_data["answers"],
-        "_revealed_info": answer_data.get("revealed_info", {}),
-    })
+    answer_with_revealed_info = json.dumps(
+        {
+            **answer_data["answers"],
+            "_revealed_info": answer_data.get("revealed_info", {}),
+        }
+    )
 
     return {"prompt": prompt_messages, "answer": answer_with_revealed_info}
 
@@ -54,19 +64,29 @@ def load_eval_dataset(hf_repo: str) -> Dataset:
 
 
 def main() -> None:
-    parser = argparse.ArgumentParser(description="Evaluate test split and save per-episode rewards")
-    parser.add_argument("--hf_repo", type=str, default="jacobphillips99/open-rubric-first-responder-scenarios")
+    parser = argparse.ArgumentParser(
+        description="Evaluate test split and save per-episode rewards"
+    )
+    parser.add_argument(
+        "--hf_repo",
+        type=str,
+        default="jacobphillips99/open-rubric-first-responder-scenarios",
+    )
     parser.add_argument("--workflow_dir", type=str, default="example_rubrics/workflows")
     parser.add_argument("--workflow_name", type=str, default="first_responder")
     parser.add_argument("--model", type=str, default="gpt-4.1")
-    parser.add_argument("--base_url", type=str, default=os.getenv("OPENAI_BASE_URL", ""))
+    parser.add_argument(
+        "--base_url", type=str, default=os.getenv("OPENAI_BASE_URL", "")
+    )
     parser.add_argument("--api_key", type=str, default=os.getenv("OPENAI_API_KEY", ""))
     parser.add_argument("--max_concurrent", type=int, default=64)
     parser.add_argument("--num_examples", type=int, default=-1)
     parser.add_argument("--rollouts_per_example", type=int, default=1)
     parser.add_argument("--temperature", type=float, default=0.7)
     parser.add_argument("--max_tokens", type=int, default=1024)
-    parser.add_argument("--out", type=Path, default=Path("outputs/first_responder_test_rewards.csv"))
+    parser.add_argument(
+        "--out", type=Path, default=Path("outputs/first_responder_test_rewards.csv")
+    )
     args = parser.parse_args()
 
     eval_dataset = load_eval_dataset(args.hf_repo)
@@ -122,4 +142,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

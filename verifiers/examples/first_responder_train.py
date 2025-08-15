@@ -8,10 +8,10 @@ from verifiers.rubrics.multistep.multistep_rubric import MultiStepRubric
 
 """
 inference:
-CUDA_VISIBLE_DEVICES=0,1,2,3,4,5 vf-vllm --model willcb/Qwen3-8B --enforce-eager
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5 vf-vllm --model willcb/Qwen3-8B --data-parallel-size 6 --enforce-eager --disable-log-requests
 
 training:
-CUDA_VISIBLE_DEVICES=6,7 accelerate launch --num-processes 1 --config-file configs/zero3.yaml verifiers/examples/first_responder_train.py
+CUDA_VISIBLE_DEVICES=6,7 accelerate launch --num-processes 2 --config-file configs/zero3.yaml verifiers/examples/first_responder_train.py
 """
 
 model_name = "willcb/Qwen3-8B"
