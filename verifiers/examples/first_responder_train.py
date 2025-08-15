@@ -8,13 +8,13 @@ from verifiers.rubrics.multistep.multistep_rubric import MultiStepRubric
 
 """
 inference:
-CUDA_VISIBLE_DEVICES=0 vf-vllm --model willcb/Qwen3-0.6B-Base --enforce-eager
+CUDA_VISIBLE_DEVICES=0,1,2,3,4,5 vf-vllm --model willcb/Qwen3-8B --enforce-eager
 
 training:
-CUDA_VISIBLE_DEVICES=1 accelerate launch --num-processes 1 --config-file configs/zero3.yaml verifiers/examples/first_responder_train.py
+CUDA_VISIBLE_DEVICES=6,7 accelerate launch --num-processes 1 --config-file configs/zero3.yaml verifiers/examples/first_responder_train.py
 """
 
-model_name = "willcb/Qwen3-0.6B-Base"
+model_name = "willcb/Qwen3-8B"
 hf_repo_name = "jacobphillips99"
 project_name = "open-rubric"
 group = "first-responder"
@@ -73,7 +73,7 @@ args = vf.grpo_defaults(run_name='first_responder_multistep_emergency_response')
 args.per_device_train_batch_size = 2
 args.num_generations = 2
 args.gradient_accumulation_steps = 16
-args.max_steps = 5
+args.max_steps = 500
 args.eval_strategy = 'steps'
 args.eval_steps = 50
 args.report_to = 'wandb'
