@@ -70,10 +70,11 @@ vf_env = MultiStepMultiTurnEnv(
 
 # Training configuration - optimized for multistep environment
 args = vf.grpo_defaults(run_name='first_responder_multistep_emergency_response')
-args.per_device_train_batch_size = 2
-args.num_generations = 2
-args.gradient_accumulation_steps = 16
+args.per_device_train_batch_size = 8
+args.num_generations = 16
+args.gradient_accumulation_steps = 8
 args.max_steps = 500
+args.num_iterations = 1
 args.eval_strategy = 'steps'
 args.eval_steps = 50
 args.report_to = 'wandb'
